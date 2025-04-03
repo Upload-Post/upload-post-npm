@@ -1,0 +1,28 @@
+{
+  "name": "upload-post",
+  "version": "1.0.1",
+  "description": "Official client library for Upload-Post API - cross-platform social media video upload",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "license": "MIT",
+  "keywords": [
+    "social-media",
+    "video-upload",
+    "tiktok",
+    "instagram",
+    "api-client"
+  ],
+  "dependencies": {
+    "axios": "^1.6.2",
+    "form-data": "^4.0.0",
+    "upload-post": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}
