@@ -1,6 +1,6 @@
 {
   "name": "upload-post",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Official client library for Upload-Post API - cross-platform social media video upload",
   "main": "index.js",
   "types": "index.d.ts",
