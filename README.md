@@ -169,7 +169,7 @@ Uploads photos to various social media platforms.
     -   `options.pinterest_alt_text`: `string` - Alt text for the image.
     -   `options.pinterest_link`: `string` - Destination link for the Pin.
 
-**X (Twitter) and Threads** do not require additional parameters.
+**X (Twitter), Threads and Bluesky** do not require additional parameters.
 
 #### Example: Uploading Photos
 
