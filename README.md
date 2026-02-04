@@ -1,13 +1,8 @@
-# Upload-Post Node.js Client
+# Upload-Post SDK for Node.js
 
-Official client library for [Upload-Post](https://www.upload-post.com) API - cross-platform social media video upload.
+Official Node.js client for the [Upload-Post API](https://www.upload-post.com) - Cross-platform social media upload.
 
-## Features
-
-- 🚀 Simple video upload to multiple platforms
-- 🔒 Secure API key authentication
-- 📁 Supports all major video formats
-- 📝 Automatic form data handling
+Upload videos, photos, text posts, and documents to **TikTok, Instagram, YouTube, LinkedIn, Facebook, Pinterest, Threads, Reddit, Bluesky, and X (Twitter)** with a single API.
 
 ## Installation
 
@@ -15,246 +10,317 @@ Official client library for [Upload-Post](https://www.upload-post.com) API - cro
 npm install upload-post
 ```
 
-## Usage
+## Quick Start
 
 ```javascript
 import { UploadPost } from 'upload-post';
 
-const uploader = new UploadPost('your-api-key-here');
+const client = new UploadPost('YOUR_API_KEY');
 
-// Upload video with options
-try {
-  const result = await uploader.upload(
-    '/path/to/your/local/video.mp4', // or "https://example.com/remote/video.mp4"
-    {
-      title: 'My Awesome Video',
-      user: 'test-user',
-      platforms: ['tiktok', 'youtube'],
-      // TikTok specific
-      privacy_level: 'PUBLIC_TO_EVERYONE',
-      disable_comment: false,
-      // YouTube specific
-      description: 'This is a great video about coding.',
-      tags: ['coding', 'nodejs', 'api'],
-      privacyStatus: 'public'
-    }
-  );
-  console.log('Upload successful:', result);
-} catch (error) {
-  console.error('Upload failed:', error.message);
-}
+// Upload a video to multiple platforms
+const response = await client.upload('./video.mp4', {
+  title: 'Check out this awesome video! 🎬',
+  user: 'my-profile',
+  platforms: ['tiktok', 'instagram', 'youtube']
+});
 
-// Example: Upload video from a URL
-try {
-  const resultFromUrl = await uploader.upload(
-    null, // videoPath can be null or undefined if options.video is a URL
-    {
-      video: "https://example.com/remote/another_video.mp4",
-      title: 'Remote Video Fun',
-      user: 'test-user-url',
-      platforms: ['instagram'],
-      media_type: 'REELS',
-      share_to_feed: true
-    }
-  );
-  console.log('Upload from URL successful:', resultFromUrl);
-} catch (error) {
-  console.error('Upload from URL failed:', error.message);
-}
+console.log(response);
 ```
 
-## API Documentation
+## Features
 
-### Constructor
-`new UploadPost(apiKey: string)`
+- ✅ **Video Upload** - TikTok, Instagram, YouTube, LinkedIn, Facebook, Pinterest, Threads, Bluesky, X
+- ✅ **Photo Upload** - TikTok, Instagram, LinkedIn, Facebook, Pinterest, Threads, Reddit, Bluesky, X
+- ✅ **Text Posts** - X, LinkedIn, Facebook, Threads, Reddit, Bluesky
+- ✅ **Document Upload** - LinkedIn (PDF, PPT, PPTX, DOC, DOCX)
+- ✅ **Scheduling** - Schedule posts for later
+- ✅ **Posting Queue** - Add posts to your configured queue
+- ✅ **First Comments** - Auto-post first comment after publishing
+- ✅ **Analytics** - Get engagement metrics
+- ✅ **Full TypeScript Support**
 
-### upload()
-`upload(videoPath: string, options: UploadOptions): Promise<object>`
+## API Reference
 
-#### Video Upload Options (`UploadOptions`)
-**Common Parameters:**
-- `videoPath`: (Required) Path to your local video file (e.g., MP4, MOV) OR a public URL to a video file. If providing a URL, you can also use the `options.video` field.
-- `options.title`: (Required) Title of the video.
-- `options.user`: (Required) User identifier.
-- `options.platforms`: (Required) Array of target platforms (e.g., `['tiktok', 'youtube', 'instagram']`). Supported: `tiktok`, `instagram`, `linkedin`, `youtube`, `facebook`, `x` (Twitter), `threads`, `pinterest`.
-- `options.video`: (Optional) Public URL of the video file. Use this if `videoPath` is not a local file.
-
-**Platform-Specific Parameters (all optional):**
-
--   **TikTok:**
-    -   `options.privacy_level`: `'PUBLIC_TO_EVERYONE'`, `'MUTUAL_FOLLOW_FRIENDS'`, `'FOLLOWER_OF_CREATOR'`, or `'SELF_ONLY'`.
-    -   `options.disable_duet`: `boolean`.
-    -   `options.disable_comment`: `boolean`.
-    -   `options.disable_stitch`: `boolean`.
-    -   `options.cover_timestamp`: `number` (milliseconds for video cover).
-    -   `options.brand_content_toggle`: `boolean`.
-    -   `options.brand_organic`: `boolean`.
-    -   `options.branded_content`: `boolean`.
-    -   `options.brand_organic_toggle`: `boolean`.
-    -   `options.is_aigc`: `boolean` (AI-generated content).
--   **Instagram:**
-    -   `options.media_type`: `'REELS'` or `'STORIES'`. Default: `'REELS'`.
-    -   `options.share_to_feed`: `boolean`.
-    -   `options.collaborators`: `string` (comma-separated usernames).
-    -   `options.cover_url`: `string` (URL for custom video cover).
-    -   `options.audio_name`: `string`.
-    -   `options.user_tags`: `string` (comma-separated user tags).
-    -   `options.location_id`: `string`.
-    -   `options.thumb_offset`: `string` (timestamp offset for thumbnail).
--   **LinkedIn:**
-    -   `options.description`: `string` (post commentary, defaults to `title`).
-    -   `options.visibility`: `'CONNECTIONS'`, `'PUBLIC'`, `'LOGGED_IN'`, or `'CONTAINER'`. Default: `'PUBLIC'`.
-    -   `options.target_linkedin_page_id`: `string` (LinkedIn page ID for organization uploads).
--   **YouTube:**
-    -   `options.description`: `string` (video description, defaults to `title`).
-    -   `options.tags`: `string[]` (array of tags).
-    -   `options.categoryId`: `string` (video category ID, default: `"22"`).
-    -   `options.privacyStatus`: `'public'`, `'unlisted'`, or `'private'`. Default: `'public'`.
-    -   `options.embeddable`: `boolean`.
-    -   `options.license`: `'youtube'` or `'creativeCommon'`.
-    -   `options.publicStatsViewable`: `boolean`.
-    -   `options.madeForKids`: `boolean`.
--   **Facebook:**
-    -   `options.facebook_page_id`: (Required if `facebook` in `platforms`) Facebook Page ID.
-    -   `options.description`: `string` (video description, defaults to `title`).
-    -   `options.video_state`: `'DRAFT'`, `'PUBLISHED'`, or `'SCHEDULED'`. Default: `'PUBLISHED'`.
--   **Threads:**
-    -   `options.description`: `string` (post commentary, defaults to `title`).
--   **X (Twitter):**
-    -   `options.tagged_user_ids`: `string[]` (array of user IDs to tag).
-    -   `options.reply_settings`: `'following'`, `'mentionedUsers'`, or `'everyone'`.
-    -   `options.nullcast`: `boolean` (publish without broadcasting).
-    -   `options.place_id`: `string` (location place ID).
-    -   `options.poll_duration`: `number` (poll duration in minutes).
-    -   `options.poll_options`: `string[]` (array of poll options).
-    -   `options.poll_reply_settings`: `'following'`, `'mentionedUsers'`, or `'everyone'` (for poll replies).
--   **Pinterest:**
-    -   `options.pinterest_board_id`: (Required if `pinterest` in `platforms`) Pinterest board ID.
-    -   `options.pinterest_link`: `string` (destination link for the Pin).
-    -   `options.pinterest_cover_image_url`: `string` (URL for cover image).
-    -   `options.pinterest_cover_image_content_type`: `string` (e.g., `image/jpeg`).
-    -   `options.pinterest_cover_image_data`: `string` (Base64 encoded cover image).
-    -   `options.pinterest_cover_image_key_frame_time`: `number` (milliseconds for video frame to use as cover).
-
-### uploadPhotos()
-`uploadPhotos(photos: string[], options: UploadPhotosOptions): Promise<object>`
-
-Uploads photos to various social media platforms.
-
-#### Photo Upload Options (`UploadPhotosOptions`)
-- `photos`: Array of strings, where each string is a local file path to a photo or a public URL of a photo.
-- `options.user`: (Required) User identifier.
-- `options.platforms`: (Required) Array of target platforms. Supported: `tiktok`, `instagram`, `linkedin`, `facebook`, `x`, `threads`, `pinterest`.
-- `options.title`: (Required) Title of the post.
-- `options.caption`: (Optional) Caption/description for the photos. This will be used as the post commentary.
-
-##### Platform-Specific Parameters (Optional unless stated otherwise):
-
--   **LinkedIn:**
-    -   `options.visibility`: `'PUBLIC'` - Visibility setting for the post.
-    -   `options.target_linkedin_page_id`: LinkedIn page ID to upload photos to an organization.
--   **Facebook:**
-    -   `options.facebook_page_id`: (Required if `facebook` in `platforms`) Facebook Page ID.
--   **TikTok:**
-    -   `options.auto_add_music`: `boolean` - Automatically add background music.
-    -   `options.disable_comment`: `boolean` - Disable comments.
-    -   `options.branded_content`: `boolean` - Indicate branded content (requires `disclose_commercial` to be `true`).
-    -   `options.disclose_commercial`: `boolean` - Disclose commercial nature.
-    -   `options.photo_cover_index`: `number` - Index (0-based) of the photo to use as cover.
-    -   `options.description`: `string` - Description for TikTok (defaults to `title`).
--   **Instagram:**
-    -   `options.media_type`: `'IMAGE'` or `'STORIES'` - Type of media. Defaults to `'IMAGE'`.
--   **Pinterest:**
-    -   `options.pinterest_board_id`: (Required if `pinterest` in `platforms`) Pinterest board ID.
-    -   `options.pinterest_alt_text`: `string` - Alt text for the image.
-    -   `options.pinterest_link`: `string` - Destination link for the Pin.
-
-**X (Twitter) and Threads** do not require additional parameters.
-
-#### Example: Uploading Photos
+### Upload Video
 
 ```javascript
-import { UploadPost } from 'upload-post';
-
-const uploader = new UploadPost('your-api-key-here');
-
-// Example: Upload photos to Instagram and Facebook
-try {
-  const photoResult = await uploader.uploadPhotos(
-    ['/path/to/your/image1.jpg', 'https://example.com/images/photo2.jpg'],
-    {
-      user: 'test-user',
-      platforms: ['instagram', 'facebook'],
-      title: 'My Beautiful Photos',
-      caption: 'Check out these amazing shots!',
-      facebook_page_id: 'your-facebook-page-id', // Required for Facebook
-      media_type: 'IMAGE' // Optional for Instagram
-    }
-  );
-  console.log('Photo upload successful:', photoResult);
-} catch (error) {
-  console.error('Photo upload failed:', error.message);
-}
+const response = await client.upload('./video.mp4', {
+  title: 'My awesome video',
+  user: 'my-profile',
+  platforms: ['tiktok', 'instagram', 'youtube'],
+  
+  // Optional: Schedule for later
+  scheduledDate: '2024-12-25T10:00:00Z',
+  timezone: 'Europe/Madrid',
+  
+  // Optional: Add first comment
+  firstComment: 'Thanks for watching! 🙏',
+  
+  // Optional: Platform-specific settings
+  tiktokPrivacyLevel: 'PUBLIC_TO_EVERYONE',
+  instagramMediaType: 'REELS',
+  youtubePrivacyStatus: 'public',
+  youtubeTags: ['tutorial', 'coding'],
+});
 ```
 
-### uploadText()
-`uploadText(options: UploadTextOptions): Promise<object>`
-
-Uploads text-only posts to supported social media platforms.
-
-#### Text Upload Options (`UploadTextOptions`)
-- `options.user`: (Required) User identifier.
-- `options.platforms`: (Required) Array of target platforms. Supported: `'linkedin'`, `'x'` (Twitter), `'facebook'`, `'threads'`.
-- `options.title`: (Required) The text content for the post. This field is used as the main content for all specified platforms.
-
-##### Platform-Specific Parameters:
--   **LinkedIn:**
-    -   `options.target_linkedin_page_id`: (Optional) LinkedIn page ID to upload text to an organization's page. If not provided, posts to the user's personal profile.
--   **Facebook:**
-    -   `options.facebook_page_id`: (Required if `'facebook'` is in `platforms`) Facebook Page ID where the text will be posted.
-
-**X (Twitter) and Threads** use the common `options.title` for the text content and do not require additional specific parameters for text posts.
-
-#### Example: Uploading a Text Post
+### Upload Photos
 
 ```javascript
-import { UploadPost } from 'upload-post';
+// Upload single or multiple photos
+const response = await client.uploadPhotos(
+  ['./photo1.jpg', './photo2.jpg', 'https://example.com/photo3.jpg'],
+  {
+    title: 'Check out these photos! 📸',
+    user: 'my-profile',
+    platforms: ['instagram', 'facebook', 'x'],
+    
+    // Optional: Add to queue instead of posting immediately
+    addToQueue: true,
+    
+    // Platform-specific
+    instagramMediaType: 'IMAGE', // or 'STORIES'
+    facebookPageId: 'your-page-id',
+  }
+);
+```
 
-const uploader = new UploadPost('your-api-key-here');
+### Upload Text Posts
 
-// Example: Upload a text post to X (Twitter) and LinkedIn
-try {
-  const textResult = await uploader.uploadText({
-    user: 'test-user',
-    platforms: ['x', 'linkedin'],
-    title: 'This is my awesome text post for X and LinkedIn!',
-    target_linkedin_page_id: 'your-linkedin-org-page-id' // Optional: for LinkedIn organization page
-  });
-  console.log('Text post successful:', textResult);
-} catch (error) {
-  console.error('Text post failed:', error.message);
-}
+```javascript
+const response = await client.uploadText({
+  title: 'Just shipped a new feature! 🚀 Check it out at example.com',
+  user: 'my-profile',
+  platforms: ['x', 'linkedin', 'threads'],
+  
+  // Optional: Create a poll on X
+  xPollOptions: ['Option A', 'Option B', 'Option C'],
+  xPollDuration: 1440, // 24 hours in minutes
+  
+  // Optional: Post to a LinkedIn company page
+  targetLinkedinPageId: 'company-page-id',
+});
+```
 
-// Example: Upload a text post to a Facebook Page
-try {
-  const fbTextResult = await uploader.uploadText({
-    user: 'test-user-fb',
-    platforms: ['facebook'],
-    title: 'Hello Facebook Page!',
-    facebook_page_id: 'your-facebook-page-id' // Required for Facebook
-  });
-  console.log('Facebook text post successful:', fbTextResult);
-} catch (error) {
-  console.error('Facebook text post failed:', error.message);
-}
+### Upload Documents (LinkedIn)
+
+```javascript
+const response = await client.uploadDocument('./presentation.pdf', {
+  title: 'Q4 2024 Report',
+  user: 'my-profile',
+  description: 'Check out our latest quarterly results!',
+  linkedinVisibility: 'PUBLIC',
+  targetLinkedinPageId: 'company-page-id', // Optional: post to company page
+});
+```
+
+### Check Upload Status
+
+For async uploads, check the status using the request_id:
+
+```javascript
+const status = await client.getStatus('request_id_from_upload');
+console.log(status);
+```
+
+### Get Upload History
+
+```javascript
+const history = await client.getHistory({ page: 1, limit: 20 });
+console.log(history.uploads);
+```
+
+### Scheduled Posts
+
+```javascript
+// List all scheduled posts
+const scheduled = await client.listScheduled();
+
+// Edit a scheduled post
+await client.editScheduled('job-id', {
+  scheduledDate: '2024-12-26T15:00:00Z',
+  timezone: 'America/New_York',
+});
+
+// Cancel a scheduled post
+await client.cancelScheduled('job-id');
+```
+
+### User Management
+
+```javascript
+// List all profiles
+const users = await client.listUsers();
+
+// Create a new profile
+await client.createUser('new-profile');
+
+// Delete a profile
+await client.deleteUser('old-profile');
+
+// Generate JWT for platform integration (white-label)
+const jwt = await client.generateJwt('my-profile', {
+  redirectUrl: 'https://yourapp.com/callback',
+  platforms: ['tiktok', 'instagram'],
+});
+```
+
+### Get Analytics
+
+```javascript
+const analytics = await client.getAnalytics('my-profile', {
+  platforms: ['instagram', 'tiktok'],
+});
+console.log(analytics);
+```
+
+### Helper Methods
+
+```javascript
+// Get Facebook pages for a profile
+const fbPages = await client.getFacebookPages('my-profile');
+
+// Get LinkedIn pages for a profile
+const liPages = await client.getLinkedinPages('my-profile');
+
+// Get Pinterest boards for a profile
+const boards = await client.getPinterestBoards('my-profile');
+```
+
+## Platform-Specific Options
+
+### TikTok (Video)
+- `tiktokPrivacyLevel` - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY
+- `tiktokDisableDuet` - Disable duet
+- `tiktokDisableComment` - Disable comments
+- `tiktokDisableStitch` - Disable stitch
+- `tiktokCoverTimestamp` - Timestamp in ms for cover
+- `tiktokIsAigc` - AI-generated content flag
+- `tiktokPostMode` - DIRECT_POST or MEDIA_UPLOAD
+- `brandContentToggle` - Branded content toggle
+- `brandOrganicToggle` - Brand organic toggle
+
+### TikTok (Photos)
+- `tiktokAutoAddMusic` - Auto add music
+- `tiktokPhotoCoverIndex` - Index of photo for cover (0-based)
+- `tiktokDisableComment` - Disable comments
+
+### Instagram
+- `instagramMediaType` - REELS, STORIES, IMAGE
+- `instagramShareToFeed` - Share to feed (for Reels/Stories)
+- `instagramCollaborators` - Comma-separated collaborator usernames
+- `instagramCoverUrl` - Custom cover URL
+- `instagramAudioName` - Audio track name
+- `instagramUserTags` - Comma-separated user tags
+- `instagramLocationId` - Location ID
+- `instagramThumbOffset` - Thumbnail offset
+
+### YouTube
+- `youtubeTags` - Array or comma-separated tags
+- `youtubeCategoryId` - Category ID (default: "22" People & Blogs)
+- `youtubePrivacyStatus` - public, unlisted, private
+- `youtubeEmbeddable` - Allow embedding
+- `youtubeLicense` - youtube, creativeCommon
+- `youtubePublicStatsViewable` - Show public stats
+- `youtubeThumbnailUrl` - Custom thumbnail URL
+- `youtubeSelfDeclaredMadeForKids` - Made for kids (COPPA)
+- `youtubeContainsSyntheticMedia` - AI/synthetic content flag
+- `youtubeDefaultLanguage` - Title/description language (BCP-47)
+- `youtubeDefaultAudioLanguage` - Audio language (BCP-47)
+- `youtubeAllowedCountries` / `youtubeBlockedCountries` - Country restrictions
+- `youtubeHasPaidProductPlacement` - Paid placement flag
+- `youtubeRecordingDate` - Recording date (ISO 8601)
+
+### LinkedIn
+- `linkedinVisibility` - PUBLIC, CONNECTIONS, LOGGED_IN, CONTAINER
+- `targetLinkedinPageId` - Page ID for organization posts
+
+### Facebook
+- `facebookPageId` - Facebook Page ID (required)
+- `facebookVideoState` - PUBLISHED, DRAFT
+- `facebookMediaType` - REELS, STORIES
+- `facebookLinkUrl` - URL for text posts
+
+### Pinterest
+- `pinterestBoardId` - Board ID
+- `pinterestLink` - Destination link
+- `pinterestAltText` - Alt text for photos
+- `pinterestCoverImageUrl` - Cover image URL (video)
+- `pinterestCoverImageKeyFrameTime` - Key frame time in ms
+
+### X (Twitter)
+- `xReplySettings` - everyone, following, mentionedUsers, subscribers, verified
+- `xNullcast` - Promoted-only post
+- `xTaggedUserIds` - User IDs to tag
+- `xPlaceId` / `xGeoPlaceId` - Location place ID
+- `xQuoteTweetId` - Tweet ID to quote
+- `xPollOptions` - Poll options (2-4)
+- `xPollDuration` - Poll duration in minutes (5-10080)
+- `xForSuperFollowersOnly` - Exclusive for super followers
+- `xCommunityId` - Community ID
+- `xShareWithFollowers` - Share community post with followers
+- `xCardUri` - Card URI for Twitter Cards
+- `xLongTextAsPost` - Post long text as single post
+
+### Threads
+- `threadsLongTextAsPost` - Post long text as single post (vs thread)
+
+### Reddit
+- `redditSubreddit` - Subreddit name (without r/)
+- `redditFlairId` - Flair template ID
+
+## Common Options
+
+These options work across all upload methods:
+
+| Option | Description |
+|--------|-------------|
+| `title` | Post title/caption (required) |
+| `user` | Profile name (required) |
+| `platforms` | Target platforms array (required) |
+| `firstComment` | First comment to post |
+| `altText` | Alt text for accessibility |
+| `scheduledDate` | ISO date for scheduling |
+| `timezone` | Timezone for scheduled date |
+| `addToQueue` | Add to posting queue |
+| `asyncUpload` | Process asynchronously (default: true) |
+
+## TypeScript Support
+
+Full TypeScript support with comprehensive type definitions:
+
+```typescript
+import { UploadPost, UploadVideoOptions, UploadResponse } from 'upload-post';
+
+const client = new UploadPost('YOUR_API_KEY');
+
+const options: UploadVideoOptions = {
+  title: 'My video',
+  user: 'my-profile',
+  platforms: ['tiktok', 'instagram'],
+  tiktokPrivacyLevel: 'PUBLIC_TO_EVERYONE',
+};
+
+const response: UploadResponse = await client.upload('./video.mp4', options);
 ```
 
 ## Error Handling
-The library throws errors for:
-- Missing required parameters
-- File not found
-- API request failures
-- Invalid platform specifications
+
+```javascript
+try {
+  const response = await client.upload('./video.mp4', options);
+  console.log('Upload successful:', response);
+} catch (error) {
+  console.error('Upload failed:', error.message);
+}
+```
+
+## Links
+
+- [Upload-Post Website](https://www.upload-post.com)
+- [API Documentation](https://docs.upload-post.com)
+- [Dashboard](https://app.upload-post.com)
 
 ## License
+
 MIT

@@ -1,7 +1,7 @@
 {
   "name": "upload-post",
-  "version": "1.0.3",
-  "description": "Official client library for Upload-Post API - cross-platform social media video upload",
+  "version": "2.0.0",
+  "description": "Official client library for Upload-Post API - Cross-platform social media upload for TikTok, Instagram, YouTube, LinkedIn, Facebook, Pinterest, Threads, Reddit, Bluesky, and X (Twitter)",
   "main": "index.js",
   "types": "index.d.ts",
   "type": "module",
@@ -12,17 +12,40 @@
   "keywords": [
     "social-media",
     "video-upload",
+    "photo-upload",
     "tiktok",
     "instagram",
-    "api-client"
+    "youtube",
+    "linkedin",
+    "facebook",
+    "pinterest",
+    "threads",
+    "reddit",
+    "bluesky",
+    "twitter",
+    "x",
+    "api-client",
+    "social-media-api",
+    "upload-post"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/upload-post/upload-post-npm.git"
+  },
+  "homepage": "https://www.upload-post.com",
+  "bugs": {
+    "url": "https://github.com/upload-post/upload-post-npm/issues"
+  },
+  "author": "Upload-Post <hi@img2html.com>",
   "dependencies": {
     "axios": "^1.6.2",
-    "form-data": "^4.0.0",
-    "upload-post": "^1.0.0"
+    "form-data": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }

@@ -3,97 +3,13 @@ import FormData from 'form-data';
 import fs from 'fs';
 import { createReadStream } from 'fs';
 
-/**
- * @typedef {Object} UploadOptions
- * @property {string} title - Video title
- * @property {string} user - User identifier
- * @property {string[]} platforms - Array of platforms (e.g. ['tiktok', 'youtube', 'instagram'])
- * @property {string} [video] - The video file to upload (can be a file upload or a video URL) - typically handled by videoPath param.
- *
- * @property {'PUBLIC_TO_EVERYONE' | 'MUTUAL_FOLLOW_FRIENDS' | 'FOLLOWER_OF_CREATOR' | 'SELF_ONLY'} [privacy_level] - TikTok: Privacy setting
- * @property {boolean} [disable_duet] - TikTok: Disable duet feature
- * @property {boolean} [disable_comment] - TikTok: Disable comments
- * @property {boolean} [disable_stitch] - TikTok: Disable stitch feature
- * @property {number} [cover_timestamp] - TikTok: Timestamp in milliseconds for video cover
- * @property {boolean} [brand_content_toggle] - TikTok: Enable branded content
- * @property {boolean} [brand_organic] - TikTok: Enable organic branded content
- * @property {boolean} [branded_content] - TikTok: Enable branded content with disclosure
- * @property {boolean} [brand_organic_toggle] - TikTok: Enable organic branded content toggle
- * @property {boolean} [is_aigc] - TikTok: Indicates if content is AI-generated
- *
- * @property {'REELS' | 'STORIES'} [media_type] - Instagram: Type of media
- * @property {boolean} [share_to_feed] - Instagram: Whether to share to feed
- * @property {string} [collaborators] - Instagram: Comma-separated list of collaborator usernames
- * @property {string} [cover_url] - Instagram: URL for custom video cover
- * @property {string} [audio_name] - Instagram: Name of the audio track
- * @property {string} [user_tags] - Instagram: Comma-separated list of user tags
- * @property {string} [location_id] - Instagram: Instagram location ID
- * @property {string} [thumb_offset] - Instagram: Timestamp offset for video thumbnail
- *
- * @property {string} [description] - LinkedIn, YouTube, Facebook, Threads: Description or commentary
- * @property {'CONNECTIONS' | 'PUBLIC' | 'LOGGED_IN' | 'CONTAINER'} [visibility] - LinkedIn: Visibility setting
- * @property {string} [target_linkedin_page_id] - LinkedIn: Page ID for organization uploads
- *
- * @property {string[]} [tags] - YouTube: Array of tags
- * @property {string} [categoryId] - YouTube: Video category ID
- * @property {'public' | 'unlisted' | 'private'} [privacyStatus] - YouTube: Privacy setting
- * @property {boolean} [embeddable] - YouTube: Whether video is embeddable
- * @property {'youtube' | 'creativeCommon'} [license] - YouTube: Video license
- * @property {boolean} [publicStatsViewable] - YouTube: Whether public stats are viewable
- * @property {boolean} [madeForKids] - YouTube: Whether video is made for kids
- *
- * @property {string} [facebook_page_id] - Facebook: Page ID
- * @property {'DRAFT' | 'PUBLISHED' | 'SCHEDULED'} [video_state] - Facebook: Desired state of the video
- *
- * @property {string[]} [tagged_user_ids] - X (Twitter): Array of user IDs to tag
- * @property {'following' | 'mentionedUsers' | 'everyone'} [reply_settings] - X (Twitter): Who can reply
- * @property {boolean} [nullcast] - X (Twitter): Whether to publish without broadcasting
- * @property {string} [place_id] - X (Twitter): Location place ID
- * @property {number} [poll_duration] - X (Twitter): Poll duration in minutes
- * @property {string[]} [poll_options] - X (Twitter): Array of poll options
- * @property {'following' | 'mentionedUsers' | 'everyone'} [poll_reply_settings] - X (Twitter): Who can reply to poll
- *
- * @property {string} [pinterest_board_id] - Pinterest: Board ID
- * @property {string} [pinterest_link] - Pinterest: Destination link
- * @property {string} [pinterest_cover_image_url] - Pinterest: URL of an image to use as the video cover
- * @property {string} [pinterest_cover_image_content_type] - Pinterest: Content type of the cover image
- * @property {string} [pinterest_cover_image_data] - Pinterest: Base64 encoded cover image data
- * @property {number} [pinterest_cover_image_key_frame_time] - Pinterest: Time in ms of video frame for cover
- */
-
-/**
- * @typedef {Object} UploadPhotosOptions
- * @property {string} user - User identifier
- * @property {string[]} platforms - Array of target platforms. Supported: tiktok, instagram, linkedin, facebook, x, threads, pinterest
- * @property {string[]} photos - Array of photo file paths or URLs
- * @property {string} title - Title of the post
- * @property {string} [caption] - Caption/description for the photos
- * @property {'PUBLIC'} [visibility] - LinkedIn: Visibility setting ("PUBLIC")
- * @property {string} [target_linkedin_page_id] - LinkedIn: Page ID for organization uploads
- * @property {string} [facebook_page_id] - Facebook: Page ID
- * @property {boolean} [auto_add_music] - TikTok: Automatically add background music
- * @property {boolean} [disable_comment] - TikTok: Disable comments
- * @property {boolean} [branded_content] - TikTok: Branded content (requires disclose_commercial=true)
- * @property {boolean} [disclose_commercial] - TikTok: Disclose commercial nature
- * @property {number} [photo_cover_index] - TikTok: Index of photo for cover
- * @property {string} [description] - TikTok: Description (defaults to title)
- * @property {'IMAGE' | 'STORIES'} [media_type] - Instagram: Media type ("IMAGE" or "STORIES")
- * @property {string} [pinterest_board_id] - Pinterest: Board ID
- * @property {string} [pinterest_alt_text] - Pinterest: Alt text
- * @property {string} [pinterest_link] - Pinterest: Destination link
- */
-
-/**
- * @typedef {Object} UploadTextOptions
- * @property {string} user - User identifier
- * @property {('linkedin' | 'x' | 'facebook' | 'threads')[]} platforms - Array of target platforms.
- * @property {string} title - The text content for the post.
- * @property {string} [target_linkedin_page_id] - LinkedIn: Page ID for organization posts.
- * @property {string} [facebook_page_id] - Facebook: Page ID. Required if 'facebook' is in platforms.
- */
+const API_BASE_URL = 'https://api.upload-post.com/api';
 
 /**
  * Upload-Post API client
+ * 
+ * Supports uploading to: TikTok, Instagram, YouTube, LinkedIn, Facebook, 
+ * Pinterest, Threads, Reddit, Bluesky, X (Twitter)
  */
 export class UploadPost {
   /**
@@ -101,244 +17,730 @@ export class UploadPost {
    */
   constructor(apiKey) {
     this.apiKey = apiKey;
-    this.baseUrl = 'https://api.upload-post.com/api';
+    this.baseUrl = API_BASE_URL;
   }
 
   /**
-   * Upload video to social media platforms
-   * @param {string} videoPath - Path to video file
-   * @param {UploadOptions} options - Upload options
-   * @returns {Promise<Object>} API response
+   * Make an API request
+   * @private
    */
-  async upload(videoPath, options) {
-    const form = new FormData();
-    
-    form.append('video', createReadStream(videoPath));
-    form.append('title', options.title);
-    form.append('user', options.user);
-    options.platforms.forEach(platform => {
-      form.append('platform[]', platform);
-    });
+  async _request(endpoint, method = 'GET', data = null, isFormData = false) {
+    const config = {
+      method,
+      url: `${this.baseUrl}${endpoint}`,
+      headers: {
+        'Authorization': `Apikey ${this.apiKey}`
+      },
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity
+    };
 
-    // Add platform-specific parameters if they exist in options
-    // TikTok
-    if (options.privacy_level) form.append('privacy_level', options.privacy_level);
-    if (options.disable_duet !== undefined) form.append('disable_duet', options.disable_duet.toString());
-    if (options.disable_comment !== undefined) form.append('disable_comment', options.disable_comment.toString());
-    if (options.disable_stitch !== undefined) form.append('disable_stitch', options.disable_stitch.toString());
-    if (options.cover_timestamp !== undefined) form.append('cover_timestamp', options.cover_timestamp.toString());
-    if (options.brand_content_toggle !== undefined) form.append('brand_content_toggle', options.brand_content_toggle.toString());
-    if (options.brand_organic !== undefined) form.append('brand_organic', options.brand_organic.toString());
-    if (options.branded_content !== undefined) form.append('branded_content', options.branded_content.toString());
-    if (options.brand_organic_toggle !== undefined) form.append('brand_organic_toggle', options.brand_organic_toggle.toString());
-    if (options.is_aigc !== undefined) form.append('is_aigc', options.is_aigc.toString());
-
-    // Instagram
-    if (options.media_type) form.append('media_type', options.media_type); // Used by photos and videos
-    if (options.share_to_feed !== undefined) form.append('share_to_feed', options.share_to_feed.toString());
-    if (options.collaborators) form.append('collaborators', options.collaborators);
-    if (options.cover_url) form.append('cover_url', options.cover_url);
-    if (options.audio_name) form.append('audio_name', options.audio_name);
-    if (options.user_tags) form.append('user_tags', options.user_tags);
-    if (options.location_id) form.append('location_id', options.location_id);
-    if (options.thumb_offset) form.append('thumb_offset', options.thumb_offset);
-    
-    // LinkedIn
-    if (options.description) form.append('description', options.description); // Used by multiple platforms
-    if (options.visibility) form.append('visibility', options.visibility); // Used by multiple platforms
-    if (options.target_linkedin_page_id) form.append('target_linkedin_page_id', options.target_linkedin_page_id);
-
-    // YouTube
-    if (options.tags) options.tags.forEach(tag => form.append('tags[]', tag));
-    if (options.categoryId) form.append('categoryId', options.categoryId);
-    if (options.privacyStatus) form.append('privacyStatus', options.privacyStatus);
-    if (options.embeddable !== undefined) form.append('embeddable', options.embeddable.toString());
-    if (options.license) form.append('license', options.license);
-    if (options.publicStatsViewable !== undefined) form.append('publicStatsViewable', options.publicStatsViewable.toString());
-    if (options.madeForKids !== undefined) form.append('madeForKids', options.madeForKids.toString());
-
-    // Facebook
-    if (options.facebook_page_id) form.append('facebook_page_id', options.facebook_page_id);
-    if (options.video_state) form.append('video_state', options.video_state);
-
-    // X (Twitter)
-    if (options.tagged_user_ids) options.tagged_user_ids.forEach(id => form.append('tagged_user_ids[]', id));
-    if (options.reply_settings) form.append('reply_settings', options.reply_settings);
-    if (options.nullcast !== undefined) form.append('nullcast', options.nullcast.toString());
-    if (options.place_id) form.append('place_id', options.place_id);
-    if (options.poll_duration !== undefined) form.append('poll_duration', options.poll_duration.toString());
-    if (options.poll_options) options.poll_options.forEach(opt => form.append('poll_options[]', opt));
-    if (options.poll_reply_settings) form.append('poll_reply_settings', options.poll_reply_settings);
-    
-    // Pinterest
-    if (options.pinterest_board_id) form.append('pinterest_board_id', options.pinterest_board_id);
-    if (options.pinterest_link) form.append('pinterest_link', options.pinterest_link);
-    if (options.pinterest_cover_image_url) form.append('pinterest_cover_image_url', options.pinterest_cover_image_url);
-    if (options.pinterest_cover_image_content_type) form.append('pinterest_cover_image_content_type', options.pinterest_cover_image_content_type);
-    if (options.pinterest_cover_image_data) form.append('pinterest_cover_image_data', options.pinterest_cover_image_data);
-    if (options.pinterest_cover_image_key_frame_time !== undefined) form.append('pinterest_cover_image_key_frame_time', options.pinterest_cover_image_key_frame_time.toString());
-
-    // If video is passed as a URL in options.video (as per API docs for URL uploads)
-    if (options.video && (options.video.startsWith('http://') || options.video.startsWith('https://'))) {
-        form.append('video', options.video);
+    if (data) {
+      if (isFormData) {
+        config.headers = { ...config.headers, ...data.getHeaders() };
+        config.data = data;
+      } else if (method === 'GET') {
+        config.params = data;
+      } else {
+        config.headers['Content-Type'] = 'application/json';
+        config.data = data;
+      }
     }
-
 
     try {
-      const response = await axios.post(`${this.baseUrl}/upload`, form, {
-        headers: {
-          ...form.getHeaders(),
-          'Authorization': `Apikey ${this.apiKey}`
-        },
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
-      });
-
-      if (response.status !== 200) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
+      const response = await axios(config);
       return response.data;
     } catch (error) {
-      throw new Error(`Upload failed: ${error.message}`);
+      const message = error.response?.data?.message || error.response?.data?.detail || error.message;
+      throw new Error(`Upload-Post API error: ${message}`);
     }
+  }
+
+  /**
+   * Add common upload parameters to form
+   * @private
+   */
+  _addCommonParams(form, options) {
+    form.append('user', options.user);
+    form.append('title', options.title);
+
+    // Platforms
+    const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
+    platforms.forEach(p => form.append('platform[]', p));
+
+    // Optional common parameters
+    if (options.firstComment) form.append('first_comment', options.firstComment);
+    if (options.altText) form.append('alt_text', options.altText);
+    if (options.scheduledDate) form.append('scheduled_date', options.scheduledDate);
+    if (options.timezone) form.append('timezone', options.timezone);
+    if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
+    if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
+
+    // Platform-specific title overrides
+    if (options.blueskyTitle) form.append('bluesky_title', options.blueskyTitle);
+    if (options.instagramTitle) form.append('instagram_title', options.instagramTitle);
+    if (options.facebookTitle) form.append('facebook_title', options.facebookTitle);
+    if (options.tiktokTitle) form.append('tiktok_title', options.tiktokTitle);
+    if (options.linkedinTitle) form.append('linkedin_title', options.linkedinTitle);
+    if (options.xTitle) form.append('x_title', options.xTitle);
+    if (options.youtubeTitle) form.append('youtube_title', options.youtubeTitle);
+    if (options.pinterestTitle) form.append('pinterest_title', options.pinterestTitle);
+    if (options.threadsTitle) form.append('threads_title', options.threadsTitle);
+
+    // Platform-specific description overrides
+    if (options.description) form.append('description', options.description);
+    if (options.linkedinDescription) form.append('linkedin_description', options.linkedinDescription);
+    if (options.youtubeDescription) form.append('youtube_description', options.youtubeDescription);
+    if (options.facebookDescription) form.append('facebook_description', options.facebookDescription);
+    if (options.tiktokDescription) form.append('tiktok_description', options.tiktokDescription);
+    if (options.pinterestDescription) form.append('pinterest_description', options.pinterestDescription);
+
+    // Platform-specific first comment overrides
+    if (options.instagramFirstComment) form.append('instagram_first_comment', options.instagramFirstComment);
+    if (options.facebookFirstComment) form.append('facebook_first_comment', options.facebookFirstComment);
+    if (options.xFirstComment) form.append('x_first_comment', options.xFirstComment);
+    if (options.threadsFirstComment) form.append('threads_first_comment', options.threadsFirstComment);
+    if (options.youtubeFirstComment) form.append('youtube_first_comment', options.youtubeFirstComment);
+    if (options.redditFirstComment) form.append('reddit_first_comment', options.redditFirstComment);
+    if (options.blueskyFirstComment) form.append('bluesky_first_comment', options.blueskyFirstComment);
+  }
+
+  /**
+   * Add TikTok-specific parameters
+   * @private
+   */
+  _addTiktokParams(form, options, isVideo = true) {
+    if (options.tiktokDisableComment !== undefined) form.append('disable_comment', String(options.tiktokDisableComment));
+    if (options.brandContentToggle !== undefined) form.append('brand_content_toggle', String(options.brandContentToggle));
+    if (options.brandOrganicToggle !== undefined) form.append('brand_organic_toggle', String(options.brandOrganicToggle));
+
+    if (isVideo) {
+      if (options.tiktokPrivacyLevel) form.append('privacy_level', options.tiktokPrivacyLevel);
+      if (options.tiktokDisableDuet !== undefined) form.append('disable_duet', String(options.tiktokDisableDuet));
+      if (options.tiktokDisableStitch !== undefined) form.append('disable_stitch', String(options.tiktokDisableStitch));
+      if (options.tiktokCoverTimestamp !== undefined) form.append('cover_timestamp', options.tiktokCoverTimestamp);
+      if (options.tiktokIsAigc !== undefined) form.append('is_aigc', String(options.tiktokIsAigc));
+      if (options.tiktokPostMode) form.append('post_mode', options.tiktokPostMode);
+    } else {
+      // Photo-specific
+      if (options.tiktokAutoAddMusic !== undefined) form.append('auto_add_music', String(options.tiktokAutoAddMusic));
+      if (options.tiktokPhotoCoverIndex !== undefined) form.append('photo_cover_index', options.tiktokPhotoCoverIndex);
+    }
+  }
+
+  /**
+   * Add Instagram-specific parameters
+   * @private
+   */
+  _addInstagramParams(form, options, isVideo = true) {
+    if (options.instagramMediaType) form.append('media_type', options.instagramMediaType);
+    if (options.instagramCollaborators) form.append('collaborators', options.instagramCollaborators);
+    if (options.instagramUserTags) form.append('user_tags', options.instagramUserTags);
+    if (options.instagramLocationId) form.append('location_id', options.instagramLocationId);
+
+    if (isVideo) {
+      if (options.instagramShareToFeed !== undefined) form.append('share_to_feed', String(options.instagramShareToFeed));
+      if (options.instagramCoverUrl) form.append('cover_url', options.instagramCoverUrl);
+      if (options.instagramAudioName) form.append('audio_name', options.instagramAudioName);
+      if (options.instagramThumbOffset) form.append('thumb_offset', options.instagramThumbOffset);
+    }
+  }
+
+  /**
+   * Add YouTube-specific parameters
+   * @private
+   */
+  _addYoutubeParams(form, options) {
+    if (options.youtubeTags) {
+      const tags = Array.isArray(options.youtubeTags) ? options.youtubeTags : options.youtubeTags.split(',').map(t => t.trim());
+      tags.forEach(tag => form.append('tags[]', tag));
+    }
+    if (options.youtubeCategoryId) form.append('categoryId', options.youtubeCategoryId);
+    if (options.youtubePrivacyStatus) form.append('privacyStatus', options.youtubePrivacyStatus);
+    if (options.youtubeEmbeddable !== undefined) form.append('embeddable', String(options.youtubeEmbeddable));
+    if (options.youtubeLicense) form.append('license', options.youtubeLicense);
+    if (options.youtubePublicStatsViewable !== undefined) form.append('publicStatsViewable', String(options.youtubePublicStatsViewable));
+    if (options.youtubeThumbnailUrl) form.append('thumbnail_url', options.youtubeThumbnailUrl);
+    if (options.youtubeSelfDeclaredMadeForKids !== undefined) form.append('selfDeclaredMadeForKids', String(options.youtubeSelfDeclaredMadeForKids));
+    if (options.youtubeContainsSyntheticMedia !== undefined) form.append('containsSyntheticMedia', String(options.youtubeContainsSyntheticMedia));
+    if (options.youtubeDefaultLanguage) form.append('defaultLanguage', options.youtubeDefaultLanguage);
+    if (options.youtubeDefaultAudioLanguage) form.append('defaultAudioLanguage', options.youtubeDefaultAudioLanguage);
+    if (options.youtubeAllowedCountries) form.append('allowedCountries', options.youtubeAllowedCountries);
+    if (options.youtubeBlockedCountries) form.append('blockedCountries', options.youtubeBlockedCountries);
+    if (options.youtubeHasPaidProductPlacement !== undefined) form.append('hasPaidProductPlacement', String(options.youtubeHasPaidProductPlacement));
+    if (options.youtubeRecordingDate) form.append('recordingDate', options.youtubeRecordingDate);
+  }
+
+  /**
+   * Add LinkedIn-specific parameters
+   * @private
+   */
+  _addLinkedinParams(form, options) {
+    if (options.linkedinVisibility) form.append('visibility', options.linkedinVisibility);
+    if (options.targetLinkedinPageId) form.append('target_linkedin_page_id', options.targetLinkedinPageId);
+  }
+
+  /**
+   * Add Facebook-specific parameters
+   * @private
+   */
+  _addFacebookParams(form, options, isVideo = false, isText = false) {
+    if (options.facebookPageId) form.append('facebook_page_id', options.facebookPageId);
+    
+    if (isVideo) {
+      if (options.facebookVideoState) form.append('video_state', options.facebookVideoState);
+      if (options.facebookMediaType) form.append('facebook_media_type', options.facebookMediaType);
+    }
+    
+    if (isText && options.facebookLinkUrl) {
+      form.append('facebook_link_url', options.facebookLinkUrl);
+    }
+  }
+
+  /**
+   * Add Pinterest-specific parameters
+   * @private
+   */
+  _addPinterestParams(form, options, isVideo = false) {
+    if (options.pinterestBoardId) form.append('pinterest_board_id', options.pinterestBoardId);
+    if (options.pinterestAltText) form.append('pinterest_alt_text', options.pinterestAltText);
+    if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
+
+    if (isVideo) {
+      if (options.pinterestCoverImageUrl) form.append('pinterest_cover_image_url', options.pinterestCoverImageUrl);
+      if (options.pinterestCoverImageContentType) form.append('pinterest_cover_image_content_type', options.pinterestCoverImageContentType);
+      if (options.pinterestCoverImageData) form.append('pinterest_cover_image_data', options.pinterestCoverImageData);
+      if (options.pinterestCoverImageKeyFrameTime !== undefined) form.append('pinterest_cover_image_key_frame_time', options.pinterestCoverImageKeyFrameTime);
+    }
+  }
+
+  /**
+   * Add X (Twitter) specific parameters
+   * @private
+   */
+  _addXParams(form, options, isText = false) {
+    if (options.xReplySettings && options.xReplySettings !== 'everyone') form.append('reply_settings', options.xReplySettings);
+    if (options.xNullcast !== undefined) form.append('nullcast', String(options.xNullcast));
+    if (options.xQuoteTweetId) form.append('quote_tweet_id', options.xQuoteTweetId);
+    if (options.xGeoPlaceId) form.append('geo_place_id', options.xGeoPlaceId);
+    if (options.xForSuperFollowersOnly !== undefined) form.append('for_super_followers_only', String(options.xForSuperFollowersOnly));
+    if (options.xCommunityId) form.append('community_id', options.xCommunityId);
+    if (options.xShareWithFollowers !== undefined) form.append('share_with_followers', String(options.xShareWithFollowers));
+    if (options.xDirectMessageDeepLink) form.append('direct_message_deep_link', options.xDirectMessageDeepLink);
+    if (options.xLongTextAsPost !== undefined) form.append('x_long_text_as_post', String(options.xLongTextAsPost));
+
+    if (!isText) {
+      if (options.xTaggedUserIds) {
+        const ids = Array.isArray(options.xTaggedUserIds) ? options.xTaggedUserIds : options.xTaggedUserIds.split(',').map(t => t.trim());
+        ids.forEach(id => form.append('tagged_user_ids[]', id));
+      }
+      if (options.xPlaceId) form.append('place_id', options.xPlaceId);
+    } else {
+      if (options.xPostUrl) form.append('post_url', options.xPostUrl);
+      if (options.xCardUri) form.append('card_uri', options.xCardUri);
+      
+      // Poll options
+      if (options.xPollOptions) {
+        const pollOpts = Array.isArray(options.xPollOptions) ? options.xPollOptions : options.xPollOptions.split(',').map(t => t.trim());
+        pollOpts.forEach(opt => form.append('poll_options[]', opt));
+        if (options.xPollDuration) form.append('poll_duration', options.xPollDuration);
+        if (options.xPollReplySettings) form.append('poll_reply_settings', options.xPollReplySettings);
+      }
+    }
+  }
+
+  /**
+   * Add Threads-specific parameters
+   * @private
+   */
+  _addThreadsParams(form, options) {
+    if (options.threadsLongTextAsPost !== undefined) form.append('threads_long_text_as_post', String(options.threadsLongTextAsPost));
+  }
+
+  /**
+   * Add Reddit-specific parameters
+   * @private
+   */
+  _addRedditParams(form, options) {
+    if (options.redditSubreddit) form.append('subreddit', options.redditSubreddit);
+    if (options.redditFlairId) form.append('flair_id', options.redditFlairId);
+  }
+
+  /**
+   * Upload a video to social media platforms
+   * 
+   * @param {string} videoPathOrUrl - Path to video file or video URL
+   * @param {Object} options - Upload options
+   * @param {string} options.title - Video title/caption
+   * @param {string} options.user - User identifier (profile name)
+   * @param {string[]} options.platforms - Target platforms (tiktok, instagram, youtube, linkedin, facebook, pinterest, threads, bluesky, x)
+   * @param {string} [options.description] - Video description
+   * @param {string} [options.firstComment] - First comment to post
+   * @param {string} [options.scheduledDate] - ISO date for scheduling (e.g., "2024-12-25T10:00:00Z")
+   * @param {string} [options.timezone] - Timezone for scheduled date (e.g., "Europe/Madrid")
+   * @param {boolean} [options.addToQueue] - Add to posting queue instead of immediate post
+   * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
+   * 
+   * TikTok options:
+   * @param {string} [options.tiktokPrivacyLevel] - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY
+   * @param {boolean} [options.tiktokDisableDuet] - Disable duet
+   * @param {boolean} [options.tiktokDisableComment] - Disable comments
+   * @param {boolean} [options.tiktokDisableStitch] - Disable stitch
+   * @param {number} [options.tiktokCoverTimestamp] - Timestamp in ms for video cover
+   * @param {boolean} [options.tiktokIsAigc] - AI-generated content flag
+   * @param {string} [options.tiktokPostMode] - DIRECT_POST or MEDIA_UPLOAD
+   * @param {boolean} [options.brandContentToggle] - Branded content toggle
+   * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
+   * 
+   * Instagram options:
+   * @param {string} [options.instagramMediaType] - REELS or STORIES
+   * @param {boolean} [options.instagramShareToFeed] - Share to feed
+   * @param {string} [options.instagramCollaborators] - Comma-separated collaborator usernames
+   * @param {string} [options.instagramCoverUrl] - Custom cover URL
+   * @param {string} [options.instagramAudioName] - Audio track name
+   * @param {string} [options.instagramUserTags] - Comma-separated user tags
+   * @param {string} [options.instagramLocationId] - Location ID
+   * @param {string} [options.instagramThumbOffset] - Thumbnail offset
+   * 
+   * YouTube options:
+   * @param {string|string[]} [options.youtubeTags] - Video tags
+   * @param {string} [options.youtubeCategoryId] - Category ID (e.g., "22" for People & Blogs)
+   * @param {string} [options.youtubePrivacyStatus] - public, unlisted, or private
+   * @param {boolean} [options.youtubeEmbeddable] - Allow embedding
+   * @param {string} [options.youtubeLicense] - youtube or creativeCommon
+   * @param {boolean} [options.youtubePublicStatsViewable] - Show public stats
+   * @param {string} [options.youtubeThumbnailUrl] - Custom thumbnail URL
+   * @param {boolean} [options.youtubeSelfDeclaredMadeForKids] - Made for kids flag
+   * @param {boolean} [options.youtubeContainsSyntheticMedia] - AI/synthetic content flag
+   * @param {string} [options.youtubeDefaultLanguage] - Title/description language (BCP-47)
+   * @param {string} [options.youtubeDefaultAudioLanguage] - Audio language (BCP-47)
+   * @param {string} [options.youtubeAllowedCountries] - Comma-separated country codes
+   * @param {string} [options.youtubeBlockedCountries] - Comma-separated country codes
+   * @param {boolean} [options.youtubeHasPaidProductPlacement] - Paid placement flag
+   * @param {string} [options.youtubeRecordingDate] - Recording date (ISO 8601)
+   * 
+   * LinkedIn options:
+   * @param {string} [options.linkedinVisibility] - PUBLIC, CONNECTIONS, LOGGED_IN, CONTAINER
+   * @param {string} [options.targetLinkedinPageId] - Page ID for organization posts
+   * 
+   * Facebook options:
+   * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookVideoState] - PUBLISHED or DRAFT
+   * @param {string} [options.facebookMediaType] - REELS or STORIES
+   * 
+   * Pinterest options:
+   * @param {string} [options.pinterestBoardId] - Board ID
+   * @param {string} [options.pinterestLink] - Destination link
+   * @param {string} [options.pinterestCoverImageUrl] - Cover image URL
+   * @param {number} [options.pinterestCoverImageKeyFrameTime] - Key frame time in ms
+   * 
+   * X (Twitter) options:
+   * @param {string} [options.xReplySettings] - everyone, following, mentionedUsers, subscribers, verified
+   * @param {boolean} [options.xNullcast] - Promoted-only post
+   * @param {string|string[]} [options.xTaggedUserIds] - User IDs to tag
+   * @param {string} [options.xPlaceId] - Location place ID
+   * @param {string} [options.xGeoPlaceId] - Geographic place ID
+   * @param {boolean} [options.xForSuperFollowersOnly] - Exclusive for super followers
+   * @param {string} [options.xCommunityId] - Community ID
+   * @param {boolean} [options.xShareWithFollowers] - Share community post with followers
+   * @param {boolean} [options.xLongTextAsPost] - Post long text as single post
+   * 
+   * Threads options:
+   * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post (vs thread)
+   * 
+   * @returns {Promise<Object>} API response with request_id for async uploads
+   */
+  async upload(videoPathOrUrl, options) {
+    const form = new FormData();
+
+    // Handle video (file path or URL)
+    if (videoPathOrUrl.toLowerCase().startsWith('http://') || videoPathOrUrl.toLowerCase().startsWith('https://')) {
+      form.append('video', videoPathOrUrl);
+    } else {
+      if (!fs.existsSync(videoPathOrUrl)) {
+        throw new Error(`Video file not found: ${videoPathOrUrl}`);
+      }
+      form.append('video', createReadStream(videoPathOrUrl));
+    }
+
+    this._addCommonParams(form, options);
+    
+    const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
+    if (platforms.includes('tiktok')) this._addTiktokParams(form, options, true);
+    if (platforms.includes('instagram')) this._addInstagramParams(form, options, true);
+    if (platforms.includes('youtube')) this._addYoutubeParams(form, options);
+    if (platforms.includes('linkedin')) this._addLinkedinParams(form, options);
+    if (platforms.includes('facebook')) this._addFacebookParams(form, options, true);
+    if (platforms.includes('pinterest')) this._addPinterestParams(form, options, true);
+    if (platforms.includes('x')) this._addXParams(form, options, false);
+    if (platforms.includes('threads')) this._addThreadsParams(form, options);
+
+    return this._request('/upload', 'POST', form, true);
   }
 
   /**
    * Upload photos to social media platforms
+   * 
    * @param {string[]} photosPathsOrUrls - Array of photo file paths or URLs
-   * @param {UploadPhotosOptions} options - Upload photos options
+   * @param {Object} options - Upload options
+   * @param {string} options.title - Post title/caption
+   * @param {string} options.user - User identifier (profile name)
+   * @param {string[]} options.platforms - Target platforms (tiktok, instagram, linkedin, facebook, x, threads, pinterest, reddit, bluesky)
+   * @param {string} [options.description] - Photo description
+   * @param {string} [options.firstComment] - First comment to post
+   * @param {string} [options.altText] - Alt text for accessibility
+   * @param {string} [options.scheduledDate] - ISO date for scheduling
+   * @param {string} [options.timezone] - Timezone for scheduled date
+   * @param {boolean} [options.addToQueue] - Add to posting queue
+   * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
+   * 
+   * TikTok options:
+   * @param {boolean} [options.tiktokAutoAddMusic] - Auto add music
+   * @param {boolean} [options.tiktokDisableComment] - Disable comments
+   * @param {number} [options.tiktokPhotoCoverIndex] - Index of photo for cover (0-based)
+   * @param {boolean} [options.brandContentToggle] - Branded content toggle
+   * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
+   * 
+   * Instagram options:
+   * @param {string} [options.instagramMediaType] - IMAGE or STORIES
+   * @param {string} [options.instagramCollaborators] - Comma-separated collaborator usernames
+   * @param {string} [options.instagramUserTags] - Comma-separated user tags
+   * @param {string} [options.instagramLocationId] - Location ID
+   * 
+   * LinkedIn options:
+   * @param {string} [options.linkedinVisibility] - PUBLIC (only PUBLIC supported for photos)
+   * @param {string} [options.targetLinkedinPageId] - Page ID for organization posts
+   * 
+   * Facebook options:
+   * @param {string} [options.facebookPageId] - Facebook Page ID
+   * 
+   * Pinterest options:
+   * @param {string} [options.pinterestBoardId] - Board ID
+   * @param {string} [options.pinterestAltText] - Alt text
+   * @param {string} [options.pinterestLink] - Destination link
+   * 
+   * X (Twitter) options:
+   * @param {string} [options.xReplySettings] - Who can reply
+   * @param {boolean} [options.xNullcast] - Promoted-only post
+   * @param {string|string[]} [options.xTaggedUserIds] - User IDs to tag
+   * @param {boolean} [options.xLongTextAsPost] - Post long text as single post
+   * 
+   * Threads options:
+   * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post
+   * 
+   * Reddit options:
+   * @param {string} [options.redditSubreddit] - Subreddit name (without r/)
+   * @param {string} [options.redditFlairId] - Flair template ID
+   * 
    * @returns {Promise<Object>} API response
    */
   async uploadPhotos(photosPathsOrUrls, options) {
     const form = new FormData();
 
-    // Common parameters
-    form.append('user', options.user);
-    form.append('title', options.title);
-    if (options.caption) {
-      form.append('caption', options.caption);
-    }
-    options.platforms.forEach(platform => {
-      form.append('platform[]', platform);
-    });
-
-    photosPathsOrUrls.forEach(photoItem => {
-      if (typeof photoItem === 'string' && (photoItem.startsWith('http://') || photoItem.startsWith('https://'))) {
-        form.append('photos[]', photoItem); // Pass URL as string
-      } else if (typeof photoItem === 'string') {
+    // Handle photos (file paths or URLs)
+    for (const photoItem of photosPathsOrUrls) {
+      if (typeof photoItem === 'string' && (photoItem.toLowerCase().startsWith('http://') || photoItem.toLowerCase().startsWith('https://'))) {
+        form.append('photos[]', photoItem);
+      } else {
         if (!fs.existsSync(photoItem)) {
           throw new Error(`Photo file not found: ${photoItem}`);
         }
-        form.append('photos[]', createReadStream(photoItem)); // Pass file path as stream
-      } else {
-        throw new Error(`Invalid photo item: ${photoItem}. Must be a file path or URL string.`);
+        form.append('photos[]', createReadStream(photoItem));
       }
-    });
-    
-    // Platform-specific parameters
-    // LinkedIn
-    if (options.visibility) form.append('visibility', options.visibility);
-    if (options.target_linkedin_page_id) form.append('target_linkedin_page_id', options.target_linkedin_page_id);
-    
-    // Facebook
-    if (options.facebook_page_id) form.append('facebook_page_id', options.facebook_page_id);
-
-    // TikTok
-    if (options.auto_add_music !== undefined) form.append('auto_add_music', options.auto_add_music.toString());
-    if (options.disable_comment !== undefined) form.append('disable_comment', options.disable_comment.toString());
-    if (options.branded_content !== undefined) form.append('branded_content', options.branded_content.toString());
-    if (options.disclose_commercial !== undefined) form.append('disclose_commercial', options.disclose_commercial.toString());
-    if (options.photo_cover_index !== undefined) form.append('photo_cover_index', options.photo_cover_index.toString());
-    if (options.description) form.append('description', options.description);
-
-    // Instagram
-    if (options.media_type) form.append('media_type', options.media_type);
-
-    // Pinterest
-    if (options.pinterest_board_id) form.append('pinterest_board_id', options.pinterest_board_id);
-    if (options.pinterest_alt_text) form.append('pinterest_alt_text', options.pinterest_alt_text);
-    if (options.pinterest_link) form.append('pinterest_link', options.pinterest_link);
-
-    try {
-      const response = await axios.post(`${this.baseUrl}/upload_photos`, form, {
-        headers: {
-          ...form.getHeaders(),
-          'Authorization': `Apikey ${this.apiKey}`
-        },
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
-      });
-
-      if (response.status !== 200) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
-      return response.data;
-    } catch (error) {
-      let errorMessage = `Photo upload failed: ${error.message}`;
-      if (error.response && error.response.data && error.response.data.message) {
-        errorMessage += ` - ${error.response.data.message}`;
-      } else if (error.response && error.response.data && error.response.data.detail) {
-         errorMessage += ` - ${error.response.data.detail}`;
-      }
-      throw new Error(errorMessage);
     }
+
+    this._addCommonParams(form, options);
+    
+    const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
+    if (platforms.includes('tiktok')) this._addTiktokParams(form, options, false);
+    if (platforms.includes('instagram')) this._addInstagramParams(form, options, false);
+    if (platforms.includes('linkedin')) this._addLinkedinParams(form, options);
+    if (platforms.includes('facebook')) this._addFacebookParams(form, options, false);
+    if (platforms.includes('pinterest')) this._addPinterestParams(form, options, false);
+    if (platforms.includes('x')) this._addXParams(form, options, false);
+    if (platforms.includes('threads')) this._addThreadsParams(form, options);
+    if (platforms.includes('reddit')) this._addRedditParams(form, options);
+
+    return this._request('/upload_photos', 'POST', form, true);
   }
 
   /**
    * Upload text posts to social media platforms
-   * @param {UploadTextOptions} options - Upload text options
+   * 
+   * @param {Object} options - Upload options
+   * @param {string} options.title - Text content for the post
+   * @param {string} options.user - User identifier (profile name)
+   * @param {string[]} options.platforms - Target platforms (x, linkedin, facebook, threads, reddit, bluesky)
+   * @param {string} [options.firstComment] - First comment to post
+   * @param {string} [options.scheduledDate] - ISO date for scheduling
+   * @param {string} [options.timezone] - Timezone for scheduled date
+   * @param {boolean} [options.addToQueue] - Add to posting queue
+   * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
+   * 
+   * LinkedIn options:
+   * @param {string} [options.targetLinkedinPageId] - Page ID for organization posts
+   * 
+   * Facebook options:
+   * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookLinkUrl] - URL to attach as link preview
+   * 
+   * X (Twitter) options:
+   * @param {string} [options.xReplySettings] - Who can reply
+   * @param {string} [options.xPostUrl] - URL to attach
+   * @param {string} [options.xQuoteTweetId] - Tweet ID to quote
+   * @param {string|string[]} [options.xPollOptions] - Poll options (2-4 options)
+   * @param {number} [options.xPollDuration] - Poll duration in minutes (5-10080)
+   * @param {string} [options.xPollReplySettings] - Who can reply to poll
+   * @param {string} [options.xCardUri] - Card URI for Twitter Cards
+   * @param {boolean} [options.xLongTextAsPost] - Post long text as single post
+   * 
+   * Threads options:
+   * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post
+   * 
+   * Reddit options:
+   * @param {string} [options.redditSubreddit] - Subreddit name (without r/)
+   * @param {string} [options.redditFlairId] - Flair template ID
+   * 
    * @returns {Promise<Object>} API response
    */
   async uploadText(options) {
     const form = new FormData();
+    
+    this._addCommonParams(form, options);
+    
+    const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
+    if (platforms.includes('linkedin')) this._addLinkedinParams(form, options);
+    if (platforms.includes('facebook')) this._addFacebookParams(form, options, false, true);
+    if (platforms.includes('x')) this._addXParams(form, options, true);
+    if (platforms.includes('threads')) this._addThreadsParams(form, options);
+    if (platforms.includes('reddit')) this._addRedditParams(form, options);
 
-    // Common parameters
+    return this._request('/upload_text', 'POST', form, true);
+  }
+
+  /**
+   * Upload a document to LinkedIn (PDF, PPT, PPTX, DOC, DOCX)
+   * 
+   * @param {string} documentPathOrUrl - Path to document file or document URL
+   * @param {Object} options - Upload options
+   * @param {string} options.title - Post title/caption
+   * @param {string} options.user - User identifier (profile name)
+   * @param {string} [options.description] - Document description/commentary
+   * @param {string} [options.linkedinVisibility] - PUBLIC, CONNECTIONS, LOGGED_IN, CONTAINER
+   * @param {string} [options.targetLinkedinPageId] - Page ID for organization posts
+   * @param {string} [options.scheduledDate] - ISO date for scheduling
+   * @param {string} [options.timezone] - Timezone for scheduled date
+   * @param {boolean} [options.addToQueue] - Add to posting queue
+   * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
+   * 
+   * @returns {Promise<Object>} API response
+   */
+  async uploadDocument(documentPathOrUrl, options) {
+    const form = new FormData();
+
+    // Handle document (file path or URL)
+    if (documentPathOrUrl.toLowerCase().startsWith('http://') || documentPathOrUrl.toLowerCase().startsWith('https://')) {
+      form.append('document', documentPathOrUrl);
+    } else {
+      if (!fs.existsSync(documentPathOrUrl)) {
+        throw new Error(`Document file not found: ${documentPathOrUrl}`);
+      }
+      form.append('document', createReadStream(documentPathOrUrl));
+    }
+
+    // Force linkedin platform
     form.append('user', options.user);
-    form.append('title', options.title); // 'title' is used as the text content field for all supported platforms
+    form.append('title', options.title);
+    form.append('platform[]', 'linkedin');
 
-    options.platforms.forEach(platform => {
-      form.append('platform[]', platform);
+    if (options.description) form.append('description', options.description);
+    if (options.scheduledDate) form.append('scheduled_date', options.scheduledDate);
+    if (options.timezone) form.append('timezone', options.timezone);
+    if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
+    if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
+
+    this._addLinkedinParams(form, options);
+
+    return this._request('/upload_document', 'POST', form, true);
+  }
+
+  // ==================== Status & History ====================
+
+  /**
+   * Get the status of an async upload
+   * 
+   * @param {string} requestId - The request_id from an async upload
+   * @returns {Promise<Object>} Upload status
+   */
+  async getStatus(requestId) {
+    return this._request('/uploadposts/status', 'GET', { request_id: requestId });
+  }
+
+  /**
+   * Get upload history
+   * 
+   * @param {Object} [options] - Query options
+   * @param {number} [options.page=1] - Page number
+   * @param {number} [options.limit=20] - Items per page (20, 50, or 100)
+   * @returns {Promise<Object>} Upload history
+   */
+  async getHistory(options = {}) {
+    return this._request('/uploadposts/history', 'GET', {
+      page: options.page || 1,
+      limit: options.limit || 20
     });
+  }
 
-    // Platform-specific parameters
-    // LinkedIn
-    if (options.target_linkedin_page_id && options.platforms.includes('linkedin')) {
-      form.append('target_linkedin_page_id', options.target_linkedin_page_id);
+  /**
+   * Get analytics for a profile
+   * 
+   * @param {string} profileUsername - Profile username
+   * @param {Object} [options] - Query options
+   * @param {string[]} [options.platforms] - Filter by platforms (instagram, linkedin, facebook, x)
+   * @returns {Promise<Object>} Analytics data
+   */
+  async getAnalytics(profileUsername, options = {}) {
+    const params = {};
+    if (options.platforms && options.platforms.length > 0) {
+      params.platforms = options.platforms.join(',');
     }
+    return this._request(`/analytics/${encodeURIComponent(profileUsername)}`, 'GET', params);
+  }
 
-    // Facebook
-    if (options.facebook_page_id && options.platforms.includes('facebook')) {
-      form.append('facebook_page_id', options.facebook_page_id);
-    }
-    // X (Twitter) and Threads use the common 'title' parameter for their text content.
+  // ==================== Scheduled Posts ====================
 
-    try {
-      const response = await axios.post(`${this.baseUrl}/upload_text`, form, {
-        headers: {
-          ...form.getHeaders(),
-          'Authorization': `Apikey ${this.apiKey}`
-        },
-      });
+  /**
+   * List scheduled posts
+   * 
+   * @returns {Promise<Object>} List of scheduled posts
+   */
+  async listScheduled() {
+    return this._request('/uploadposts/schedule', 'GET');
+  }
 
-      if (response.status !== 200) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
+  /**
+   * Cancel a scheduled post
+   * 
+   * @param {string} jobId - Scheduled job ID
+   * @returns {Promise<Object>} Cancellation result
+   */
+  async cancelScheduled(jobId) {
+    return this._request(`/uploadposts/schedule/${jobId}`, 'DELETE');
+  }
 
-      return response.data;
-    } catch (error) {
-      let errorMessage = `Text post upload failed: ${error.message}`;
-      if (error.response && error.response.data) {
-        if (error.response.data.message) {
-          errorMessage += ` - ${error.response.data.message}`;
-        } else if (error.response.data.detail) {
-          errorMessage += ` - ${error.response.data.detail}`;
-        } else {
-          errorMessage += ` - ${JSON.stringify(error.response.data)}`;
-        }
-      }
-      throw new Error(errorMessage);
-    }
+  /**
+   * Edit a scheduled post
+   * 
+   * @param {string} jobId - Scheduled job ID
+   * @param {Object} options - Edit options
+   * @param {string} [options.scheduledDate] - New scheduled date (ISO 8601)
+   * @param {string} [options.timezone] - New timezone
+   * @returns {Promise<Object>} Edit result
+   */
+  async editScheduled(jobId, options) {
+    const body = {};
+    if (options.scheduledDate) body.scheduled_date = options.scheduledDate;
+    if (options.timezone) body.timezone = options.timezone;
+    return this._request(`/uploadposts/schedule/${jobId}`, 'POST', body);
+  }
+
+  // ==================== User Management ====================
+
+  /**
+   * List all users/profiles
+   * 
+   * @returns {Promise<Object>} List of users
+   */
+  async listUsers() {
+    return this._request('/uploadposts/users', 'GET');
+  }
+
+  /**
+   * Create a new user/profile
+   * 
+   * @param {string} username - Profile name to create
+   * @returns {Promise<Object>} Created user
+   */
+  async createUser(username) {
+    return this._request('/uploadposts/users', 'POST', { username });
+  }
+
+  /**
+   * Delete a user/profile
+   * 
+   * @param {string} username - Profile name to delete
+   * @returns {Promise<Object>} Deletion result
+   */
+  async deleteUser(username) {
+    return this._request('/uploadposts/users', 'DELETE', { username });
+  }
+
+  /**
+   * Generate a JWT for platform integration
+   * Used when integrating Upload-Post into your own platform
+   * 
+   * @param {string} username - Profile username
+   * @param {Object} [options] - JWT options
+   * @param {string} [options.redirectUrl] - URL to redirect after linking
+   * @param {string} [options.logoImage] - Logo image URL for the linking page
+   * @param {string} [options.redirectButtonText] - Text for redirect button
+   * @param {string[]} [options.platforms] - Platforms to show for connection
+   * @returns {Promise<Object>} JWT and connection URL
+   */
+  async generateJwt(username, options = {}) {
+    const body = { username };
+    if (options.redirectUrl) body.redirect_url = options.redirectUrl;
+    if (options.logoImage) body.logo_image = options.logoImage;
+    if (options.redirectButtonText) body.redirect_button_text = options.redirectButtonText;
+    if (options.platforms && options.platforms.length > 0) body.platforms = options.platforms;
+    return this._request('/uploadposts/users/generate-jwt', 'POST', body);
+  }
+
+  /**
+   * Validate a JWT token
+   * 
+   * @param {string} jwt - JWT token to validate
+   * @returns {Promise<Object>} Validation result
+   */
+  async validateJwt(jwt) {
+    return this._request('/uploadposts/users/validate-jwt', 'POST', { jwt });
+  }
+
+  // ==================== Helper Endpoints ====================
+
+  /**
+   * Get Facebook pages for a profile
+   * 
+   * @param {string} [profile] - Profile username
+   * @returns {Promise<Object>} List of Facebook pages
+   */
+  async getFacebookPages(profile) {
+    const params = profile ? { profile } : {};
+    return this._request('/uploadposts/facebook/pages', 'GET', params);
+  }
+
+  /**
+   * Get LinkedIn pages for a profile
+   * 
+   * @param {string} [profile] - Profile username
+   * @returns {Promise<Object>} List of LinkedIn pages
+   */
+  async getLinkedinPages(profile) {
+    const params = profile ? { profile } : {};
+    return this._request('/uploadposts/linkedin/pages', 'GET', params);
+  }
+
+  /**
+   * Get Pinterest boards for a profile
+   * 
+   * @param {string} [profile] - Profile username
+   * @returns {Promise<Object>} List of Pinterest boards
+   */
+  async getPinterestBoards(profile) {
+    const params = profile ? { profile } : {};
+    return this._request('/uploadposts/pinterest/boards', 'GET', params);
   }
 }
+
+// Default export for CommonJS compatibility
+export default UploadPost;
