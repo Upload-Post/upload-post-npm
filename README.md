@@ -238,7 +238,8 @@ const boards = await client.getPinterestBoards('my-profile');
 ### Facebook
 - `facebookPageId` - Facebook Page ID (required)
 - `facebookVideoState` - PUBLISHED, DRAFT
-- `facebookMediaType` - REELS, STORIES
+- `facebookMediaType` - REELS, STORIES, VIDEO (VIDEO for normal page videos with no 9:16 restriction)
+- `thumbnailUrl` - URL for custom video thumbnail (only when facebookMediaType is VIDEO)
 - `facebookLinkUrl` - URL for text posts
 
 ### Pinterest
@@ -261,6 +262,7 @@ const boards = await client.getPinterestBoards('my-profile');
 - `xShareWithFollowers` - Share community post with followers
 - `xCardUri` - Card URI for Twitter Cards
 - `xLongTextAsPost` - Post long text as single post
+- `xThreadImageLayout` - Comma-separated image layout for thread (e.g. "4,4" or "2,3,1")
 
 ### Threads
 - `threadsLongTextAsPost` - Post long text as single post (vs thread)

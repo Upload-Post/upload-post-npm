@@ -190,6 +190,7 @@ export class UploadPost {
     if (isVideo) {
       if (options.facebookVideoState) form.append('video_state', options.facebookVideoState);
       if (options.facebookMediaType) form.append('facebook_media_type', options.facebookMediaType);
+      if (options.thumbnailUrl) form.append('thumbnail_url', options.thumbnailUrl);
     }
     
     if (isText && options.facebookLinkUrl) {
@@ -235,6 +236,7 @@ export class UploadPost {
         ids.forEach(id => form.append('tagged_user_ids[]', id));
       }
       if (options.xPlaceId) form.append('place_id', options.xPlaceId);
+      if (options.xThreadImageLayout) form.append('x_thread_image_layout', options.xThreadImageLayout);
     } else {
       if (options.xPostUrl) form.append('post_url', options.xPostUrl);
       if (options.xCardUri) form.append('card_uri', options.xCardUri);
@@ -326,8 +328,9 @@ export class UploadPost {
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
    * @param {string} [options.facebookVideoState] - PUBLISHED or DRAFT
-   * @param {string} [options.facebookMediaType] - REELS or STORIES
-   * 
+   * @param {string} [options.facebookMediaType] - REELS, STORIES, or VIDEO
+   * @param {string} [options.thumbnailUrl] - Thumbnail URL for normal page videos (VIDEO type only)
+   *
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
    * @param {string} [options.pinterestLink] - Destination link

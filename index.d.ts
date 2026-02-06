@@ -35,7 +35,7 @@ declare module 'upload-post' {
   export type FacebookVideoState = 'PUBLISHED' | 'DRAFT';
 
   /** Facebook media type */
-  export type FacebookMediaType = 'REELS' | 'STORIES';
+  export type FacebookMediaType = 'REELS' | 'STORIES' | 'VIDEO';
 
   /** X (Twitter) reply settings */
   export type XReplySettings = 'everyone' | 'following' | 'mentionedUsers' | 'subscribers' | 'verified';
@@ -210,6 +210,8 @@ declare module 'upload-post' {
     facebookVideoState?: FacebookVideoState;
     /** Media type */
     facebookMediaType?: FacebookMediaType;
+    /** Thumbnail URL for normal page videos (only when facebookMediaType is 'VIDEO') */
+    thumbnailUrl?: string;
   }
 
   export interface FacebookPhotoOptions {
@@ -276,6 +278,8 @@ declare module 'upload-post' {
     xTaggedUserIds?: string | string[];
     /** Location place ID */
     xPlaceId?: string;
+    /** Comma-separated image layout for thread (e.g. "4,4" or "2,3,1"). Each value 1-4, total must equal image count. */
+    xThreadImageLayout?: string;
   }
 
   export interface XTextOptions extends XBaseOptions {
