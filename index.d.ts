@@ -555,6 +555,10 @@ declare module 'upload-post' {
       logoImage?: string;
       redirectButtonText?: string;
       platforms?: string[];
+      showCalendar?: boolean;
+      readonlyCalendar?: boolean;
+      connectTitle?: string;
+      connectDescription?: string;
     }): Promise<JwtResponse>;
 
     /**
