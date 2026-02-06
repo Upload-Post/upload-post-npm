@@ -685,6 +685,10 @@ export class UploadPost {
    * @param {string} [options.logoImage] - Logo image URL for the linking page
    * @param {string} [options.redirectButtonText] - Text for redirect button
    * @param {string[]} [options.platforms] - Platforms to show for connection
+   * @param {boolean} [options.showCalendar] - Whether to show the calendar view
+   * @param {boolean} [options.readonlyCalendar] - Show only a read-only calendar (no editing, no account connection)
+   * @param {string} [options.connectTitle] - Custom title for the connection page
+   * @param {string} [options.connectDescription] - Custom description for the connection page
    * @returns {Promise<Object>} JWT and connection URL
    */
   async generateJwt(username, options = {}) {
@@ -693,6 +697,10 @@ export class UploadPost {
     if (options.logoImage) body.logo_image = options.logoImage;
     if (options.redirectButtonText) body.redirect_button_text = options.redirectButtonText;
     if (options.platforms && options.platforms.length > 0) body.platforms = options.platforms;
+    if (options.showCalendar !== undefined) body.show_calendar = options.showCalendar;
+    if (options.readonlyCalendar !== undefined) body.readonly_calendar = options.readonlyCalendar;
+    if (options.connectTitle) body.connect_title = options.connectTitle;
+    if (options.connectDescription) body.connect_description = options.connectDescription;
     return this._request('/uploadposts/users/generate-jwt', 'POST', body);
   }
 
