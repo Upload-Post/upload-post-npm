@@ -62,7 +62,7 @@ export class UploadPost {
    */
   _addCommonParams(form, options) {
     form.append('user', options.user);
-    form.append('title', options.title);
+    if (options.title) form.append('title', options.title);
 
     // Platforms
     const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
@@ -271,7 +271,7 @@ export class UploadPost {
    * 
    * @param {string} videoPathOrUrl - Path to video file or video URL
    * @param {Object} options - Upload options
-   * @param {string} options.title - Video title/caption
+   * @param {string} [options.title] - Video title/caption. Required for most platforms; optional for TikTok-only uploads.
    * @param {string} options.user - User identifier (profile name)
    * @param {string[]} options.platforms - Target platforms (tiktok, instagram, youtube, linkedin, facebook, pinterest, threads, bluesky, x)
    * @param {string} [options.description] - Video description
@@ -383,7 +383,7 @@ export class UploadPost {
    * 
    * @param {string[]} photosPathsOrUrls - Array of photo file paths or URLs
    * @param {Object} options - Upload options
-   * @param {string} options.title - Post title/caption
+   * @param {string} [options.title] - Post title/caption. Required for most platforms; optional for TikTok-only uploads.
    * @param {string} options.user - User identifier (profile name)
    * @param {string[]} options.platforms - Target platforms (tiktok, instagram, linkedin, facebook, x, threads, pinterest, reddit, bluesky)
    * @param {string} [options.description] - Photo description
