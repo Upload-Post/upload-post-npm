@@ -43,8 +43,8 @@ declare module 'upload-post' {
   // ==================== Common Options ====================
 
   export interface CommonUploadOptions {
-    /** Post title/caption */
-    title: string;
+    /** Post title/caption. Required for most platforms; optional when uploading only to TikTok. */
+    title?: string;
     /** User identifier (profile name) */
     user: string;
     /** First comment to post after publishing */
