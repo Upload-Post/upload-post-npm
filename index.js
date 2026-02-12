@@ -257,6 +257,7 @@ export class UploadPost {
    */
   _addThreadsParams(form, options) {
     if (options.threadsLongTextAsPost !== undefined) form.append('threads_long_text_as_post', String(options.threadsLongTextAsPost));
+    if (options.threadsThreadMediaLayout) form.append('threads_thread_media_layout', options.threadsThreadMediaLayout);
   }
 
   /**
@@ -350,7 +351,8 @@ export class UploadPost {
    * 
    * Threads options:
    * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post (vs thread)
-   * 
+   * @param {string} [options.threadsThreadMediaLayout] - Comma-separated list of how many media items per Threads post (e.g. "5,5")
+   *
    * @returns {Promise<Object>} API response with request_id for async uploads
    */
   async upload(videoPathOrUrl, options) {
@@ -427,14 +429,15 @@ export class UploadPost {
    * @param {boolean} [options.xNullcast] - Promoted-only post
    * @param {string|string[]} [options.xTaggedUserIds] - User IDs to tag
    * @param {boolean} [options.xLongTextAsPost] - Post long text as single post
-   * 
+   *
    * Threads options:
    * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post
-   * 
+   * @param {string} [options.threadsThreadMediaLayout] - Comma-separated list of how many media items per Threads post (e.g. "5,5")
+   *
    * Reddit options:
    * @param {string} [options.redditSubreddit] - Subreddit name (without r/)
    * @param {string} [options.redditFlairId] - Flair template ID
-   * 
+   *
    * @returns {Promise<Object>} API response
    */
   async uploadPhotos(photosPathsOrUrls, options) {
@@ -496,14 +499,15 @@ export class UploadPost {
    * @param {string} [options.xPollReplySettings] - Who can reply to poll
    * @param {string} [options.xCardUri] - Card URI for Twitter Cards
    * @param {boolean} [options.xLongTextAsPost] - Post long text as single post
-   * 
+   *
    * Threads options:
    * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post
-   * 
+   * @param {string} [options.threadsThreadMediaLayout] - Comma-separated list of how many media items per Threads post (e.g. "5,5")
+   *
    * Reddit options:
    * @param {string} [options.redditSubreddit] - Subreddit name (without r/)
    * @param {string} [options.redditFlairId] - Flair template ID
-   * 
+   *
    * @returns {Promise<Object>} API response
    */
   async uploadText(options) {

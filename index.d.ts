@@ -302,6 +302,8 @@ declare module 'upload-post' {
   export interface ThreadsOptions {
     /** Post long text as single post (vs thread) */
     threadsLongTextAsPost?: boolean;
+    /** Comma-separated list of how many media items per Threads post (e.g. "5,5"). Each value 1-10, total must equal file count. */
+    threadsThreadMediaLayout?: string;
   }
 
   // ==================== Reddit Options ====================

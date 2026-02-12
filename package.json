@@ -1,6 +1,6 @@
 {
   "name": "upload-post",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Official client library for Upload-Post API - Cross-platform social media upload for TikTok, Instagram, YouTube, LinkedIn, Facebook, Pinterest, Threads, Reddit, Bluesky, and X (Twitter)",
   "main": "index.js",
   "types": "index.d.ts",
