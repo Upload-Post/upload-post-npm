@@ -43,8 +43,8 @@ declare module 'upload-post' {
   // ==================== Common Options ====================
 
   export interface CommonUploadOptions {
-    /** Post title/caption */
-    title: string;
+    /** Post title/caption. Required for YouTube, Reddit, and text posts. Optional for TikTok, Instagram, Facebook, LinkedIn, X, Threads, Bluesky, Pinterest. */
+    title?: string;
     /** User identifier (profile name) */
     user: string;
     /** First comment to post after publishing */
