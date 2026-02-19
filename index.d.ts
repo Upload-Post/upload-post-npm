@@ -343,12 +343,22 @@ declare module 'upload-post' {
     platforms: PhotoPlatform[];
   }
 
+  export interface LinkPreviewOptions {
+    /** Generic URL for link preview card (works for LinkedIn, Bluesky, Facebook). Platform-specific params take priority. */
+    linkUrl?: string;
+    /** URL for link preview card on LinkedIn */
+    linkedinLinkUrl?: string;
+    /** URL for external embed link preview on Bluesky */
+    blueskyLinkUrl?: string;
+  }
+
   export interface UploadTextOptions extends CommonUploadOptions,
     LinkedInOptions,
     FacebookTextOptions,
     XTextOptions,
     ThreadsOptions,
-    RedditOptions {
+    RedditOptions,
+    LinkPreviewOptions {
     /** Target platforms */
     platforms: TextPlatform[];
   }

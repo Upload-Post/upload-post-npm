@@ -175,9 +175,12 @@ export class UploadPost {
    * Add LinkedIn-specific parameters
    * @private
    */
-  _addLinkedinParams(form, options) {
+  _addLinkedinParams(form, options, isText = false) {
     if (options.linkedinVisibility) form.append('visibility', options.linkedinVisibility);
     if (options.targetLinkedinPageId) form.append('target_linkedin_page_id', options.targetLinkedinPageId);
+    if (isText && (options.linkedinLinkUrl || options.linkUrl)) {
+      form.append('linkedin_link_url', options.linkedinLinkUrl || options.linkUrl);
+    }
   }
 
   /**
@@ -482,13 +485,18 @@ export class UploadPost {
    * @param {string} [options.timezone] - Timezone for scheduled date
    * @param {boolean} [options.addToQueue] - Add to posting queue
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
-   * 
+   * @param {string} [options.linkUrl] - Generic URL for link preview card (works for LinkedIn, Bluesky, Facebook). Platform-specific params take priority.
+   *
    * LinkedIn options:
    * @param {string} [options.targetLinkedinPageId] - Page ID for organization posts
-   * 
+   * @param {string} [options.linkedinLinkUrl] - URL to attach as link preview on LinkedIn
+   *
+   * Bluesky options:
+   * @param {string} [options.blueskyLinkUrl] - URL to attach as external embed link preview on Bluesky
+   *
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
-   * @param {string} [options.facebookLinkUrl] - URL to attach as link preview
+   * @param {string} [options.facebookLinkUrl] - URL to attach as link preview on Facebook
    * 
    * X (Twitter) options:
    * @param {string} [options.xReplySettings] - Who can reply
@@ -512,15 +520,21 @@ export class UploadPost {
    */
   async uploadText(options) {
     const form = new FormData();
-    
+
     this._addCommonParams(form, options);
-    
+
+    // Generic link_url support
+    if (options.linkUrl) form.append('link_url', options.linkUrl);
+
     const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
-    if (platforms.includes('linkedin')) this._addLinkedinParams(form, options);
+    if (platforms.includes('linkedin')) this._addLinkedinParams(form, options, true);
     if (platforms.includes('facebook')) this._addFacebookParams(form, options, false, true);
     if (platforms.includes('x')) this._addXParams(form, options, true);
     if (platforms.includes('threads')) this._addThreadsParams(form, options);
     if (platforms.includes('reddit')) this._addRedditParams(form, options);
+    if (platforms.includes('bluesky') && (options.blueskyLinkUrl || options.linkUrl)) {
+      form.append('bluesky_link_url', options.blueskyLinkUrl || options.linkUrl);
+    }
 
     return this._request('/upload_text', 'POST', form, true);
   }
