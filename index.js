@@ -62,7 +62,7 @@ export class UploadPost {
    */
   _addCommonParams(form, options) {
     form.append('user', options.user);
-    form.append('title', options.title);
+    if (options.title) form.append('title', options.title);
 
     // Platforms
     const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
