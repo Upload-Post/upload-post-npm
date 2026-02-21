@@ -614,18 +614,71 @@ export class UploadPost {
 
   /**
    * Get analytics for a profile
-   * 
+   *
    * @param {string} profileUsername - Profile username
    * @param {Object} [options] - Query options
-   * @param {string[]} [options.platforms] - Filter by platforms (instagram, linkedin, facebook, x)
-   * @returns {Promise<Object>} Analytics data
+   * @param {string[]} [options.platforms] - Filter by platforms (instagram, linkedin, facebook, x, youtube, tiktok, threads, pinterest, reddit)
+   * @param {string} [options.pageId] - Facebook Page ID (required for Facebook analytics)
+   * @param {string} [options.pageUrn] - LinkedIn page URN (defaults to "me" for personal profile)
+   * @returns {Promise<Object>} Analytics data per platform
    */
   async getAnalytics(profileUsername, options = {}) {
     const params = {};
     if (options.platforms && options.platforms.length > 0) {
       params.platforms = options.platforms.join(',');
     }
+    if (options.pageId) params.page_id = options.pageId;
+    if (options.pageUrn) params.page_urn = options.pageUrn;
     return this._request(`/analytics/${encodeURIComponent(profileUsername)}`, 'GET', params);
+  }
+
+  /**
+   * Get total impressions for a profile from daily snapshots
+   *
+   * @param {string} profileUsername - Profile username
+   * @param {Object} [options] - Query options
+   * @param {string} [options.period] - Period shortcut: last_day, last_week, last_month, last_3months, last_year
+   * @param {string} [options.startDate] - Start date in YYYY-MM-DD format
+   * @param {string} [options.endDate] - End date in YYYY-MM-DD format
+   * @param {string} [options.date] - Single date in YYYY-MM-DD format
+   * @param {string[]} [options.platforms] - Filter by platforms
+   * @param {boolean} [options.breakdown] - Include per-platform and per-day breakdown
+   * @param {string[]} [options.metrics] - Specific metrics to aggregate (e.g., ['likes', 'comments', 'shares'])
+   * @returns {Promise<Object>} Total impressions data
+   */
+  async getTotalImpressions(profileUsername, options = {}) {
+    const params = {};
+    if (options.period) params.period = options.period;
+    if (options.startDate) params.start_date = options.startDate;
+    if (options.endDate) params.end_date = options.endDate;
+    if (options.date) params.date = options.date;
+    if (options.platforms && options.platforms.length > 0) {
+      params.platform = options.platforms.join(',');
+    }
+    if (options.breakdown) params.breakdown = 'true';
+    if (options.metrics && options.metrics.length > 0) {
+      params.metrics = options.metrics.join(',');
+    }
+    return this._request(`/uploadposts/total-impressions/${encodeURIComponent(profileUsername)}`, 'GET', params);
+  }
+
+  /**
+   * Get analytics for a specific post across all platforms it was published to
+   *
+   * @param {string} requestId - The request_id from the upload
+   * @returns {Promise<Object>} Post analytics with per-platform metrics
+   */
+  async getPostAnalytics(requestId) {
+    return this._request(`/uploadposts/post-analytics/${encodeURIComponent(requestId)}`, 'GET');
+  }
+
+  /**
+   * Get available metrics configuration for all supported platforms
+   *
+   * @returns {Promise<Object>} Platform metrics config (primary fields, available metrics, labels)
+   */
+  async getPlatformMetrics() {
+    return this._request('/uploadposts/platform-metrics', 'GET');
   }
 
   // ==================== Scheduled Posts ====================

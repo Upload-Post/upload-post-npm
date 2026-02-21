@@ -522,7 +522,62 @@ declare module 'upload-post' {
      * @param profileUsername - Profile username
      * @param options - Query options
      */
-    getAnalytics(profileUsername: string, options?: { platforms?: string[] }): Promise<AnalyticsResponse>;
+    getAnalytics(profileUsername: string, options?: { platforms?: string[]; pageId?: string; pageUrn?: string }): Promise<AnalyticsResponse>;
+
+    /**
+     * Get total impressions for a profile from daily snapshots
+     * @param profileUsername - Profile username
+     * @param options - Query options
+     */
+    getTotalImpressions(profileUsername: string, options?: {
+      period?: 'last_day' | 'last_week' | 'last_month' | 'last_3months' | 'last_year';
+      startDate?: string;
+      endDate?: string;
+      date?: string;
+      platforms?: string[];
+      breakdown?: boolean;
+      metrics?: string[];
+    }): Promise<{
+      success: boolean;
+      profile_username: string;
+      start_date: string;
+      end_date: string;
+      total_impressions?: number;
+      metrics?: Record<string, number>;
+      per_platform?: Record<string, number | Record<string, number>>;
+      per_day?: Record<string, number | Record<string, number>>;
+      platforms_filter?: string[];
+    }>;
+
+    /**
+     * Get analytics for a specific post across all platforms
+     * @param requestId - The request_id from the upload
+     */
+    getPostAnalytics(requestId: string): Promise<{
+      success: boolean;
+      post: { request_id: string; profile_username: string; post_title: string; post_caption: string; media_type: string; upload_timestamp: string };
+      platforms: Record<string, {
+        success: boolean;
+        platform_post_id?: string;
+        post_url?: string;
+        post_metrics?: Record<string, number>;
+        post_metrics_source?: string;
+        post_metrics_error?: string;
+        profile_snapshot_at_post_date?: Record<string, number>;
+        profile_snapshot_latest?: Record<string, number>;
+        profile_snapshot_latest_date?: string;
+        error_message?: string;
+      }>;
+    }>;
+
+    /**
+     * Get available metrics configuration for all supported platforms
+     */
+    getPlatformMetrics(): Promise<Record<string, {
+      primary_impressions_field: string;
+      available_metrics: string[];
+      metric_labels: Record<string, string>;
+    }>>;
 
     // Scheduled Posts
     /**
