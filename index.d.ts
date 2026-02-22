@@ -57,6 +57,8 @@ declare module 'upload-post' {
     timezone?: string;
     /** Add to posting queue instead of immediate post */
     addToQueue?: boolean;
+    /** Maximum number of posts allowed per queue slot (overrides profile setting). Only used when addToQueue is true. */
+    maxPostsPerSlot?: number;
     /** Process upload asynchronously (default: true) */
     asyncUpload?: boolean;
 
@@ -380,6 +382,8 @@ declare module 'upload-post' {
     timezone?: string;
     /** Add to posting queue */
     addToQueue?: boolean;
+    /** Maximum number of posts allowed per queue slot (overrides profile setting). Only used when addToQueue is true. */
+    maxPostsPerSlot?: number;
     /** Process upload asynchronously */
     asyncUpload?: boolean;
   }
