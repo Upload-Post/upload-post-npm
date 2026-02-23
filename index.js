@@ -75,6 +75,7 @@ export class UploadPost {
     if (options.scheduledDate) form.append('scheduled_date', options.scheduledDate);
     if (options.timezone) form.append('timezone', options.timezone);
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
+    if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
 
     // Platform-specific title overrides
@@ -579,6 +580,7 @@ export class UploadPost {
     if (options.scheduledDate) form.append('scheduled_date', options.scheduledDate);
     if (options.timezone) form.append('timezone', options.timezone);
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
+    if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
 
     this._addLinkedinParams(form, options);
