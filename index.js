@@ -29,7 +29,8 @@ export class UploadPost {
       method,
       url: `${this.baseUrl}${endpoint}`,
       headers: {
-        'Authorization': `Apikey ${this.apiKey}`
+        'Authorization': `Apikey ${this.apiKey}`,
+        'X-Upload-Post-Source': 'npm',
       },
       maxContentLength: Infinity,
       maxBodyLength: Infinity
