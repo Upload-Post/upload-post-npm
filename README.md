@@ -286,6 +286,7 @@ These options work across all upload methods:
 | `scheduledDate` | ISO date for scheduling |
 | `timezone` | Timezone for scheduled date |
 | `addToQueue` | Add to posting queue |
+| `maxPostsPerSlot` | Max posts per queue slot (overrides profile setting) |
 | `asyncUpload` | Process asynchronously (default: true) |
 
 ## TypeScript Support

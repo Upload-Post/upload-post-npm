@@ -29,7 +29,8 @@ export class UploadPost {
       method,
       url: `${this.baseUrl}${endpoint}`,
       headers: {
-        'Authorization': `Apikey ${this.apiKey}`
+        'Authorization': `Apikey ${this.apiKey}`,
+        'X-Upload-Post-Source': 'npm',
       },
       maxContentLength: Infinity,
       maxBodyLength: Infinity
@@ -62,7 +63,7 @@ export class UploadPost {
    */
   _addCommonParams(form, options) {
     form.append('user', options.user);
-    form.append('title', options.title);
+    if (options.title) form.append('title', options.title);
 
     // Platforms
     const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
@@ -74,6 +75,7 @@ export class UploadPost {
     if (options.scheduledDate) form.append('scheduled_date', options.scheduledDate);
     if (options.timezone) form.append('timezone', options.timezone);
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
+    if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
 
     // Platform-specific title overrides
@@ -175,9 +177,12 @@ export class UploadPost {
    * Add LinkedIn-specific parameters
    * @private
    */
-  _addLinkedinParams(form, options) {
+  _addLinkedinParams(form, options, isText = false) {
     if (options.linkedinVisibility) form.append('visibility', options.linkedinVisibility);
     if (options.targetLinkedinPageId) form.append('target_linkedin_page_id', options.targetLinkedinPageId);
+    if (isText && (options.linkedinLinkUrl || options.linkUrl)) {
+      form.append('linkedin_link_url', options.linkedinLinkUrl || options.linkUrl);
+    }
   }
 
   /**
@@ -482,13 +487,18 @@ export class UploadPost {
    * @param {string} [options.timezone] - Timezone for scheduled date
    * @param {boolean} [options.addToQueue] - Add to posting queue
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
-   * 
+   * @param {string} [options.linkUrl] - Generic URL for link preview card (works for LinkedIn, Bluesky, Facebook). Platform-specific params take priority.
+   *
    * LinkedIn options:
    * @param {string} [options.targetLinkedinPageId] - Page ID for organization posts
-   * 
+   * @param {string} [options.linkedinLinkUrl] - URL to attach as link preview on LinkedIn
+   *
+   * Bluesky options:
+   * @param {string} [options.blueskyLinkUrl] - URL to attach as external embed link preview on Bluesky
+   *
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
-   * @param {string} [options.facebookLinkUrl] - URL to attach as link preview
+   * @param {string} [options.facebookLinkUrl] - URL to attach as link preview on Facebook
    * 
    * X (Twitter) options:
    * @param {string} [options.xReplySettings] - Who can reply
@@ -512,15 +522,21 @@ export class UploadPost {
    */
   async uploadText(options) {
     const form = new FormData();
-    
+
     this._addCommonParams(form, options);
-    
+
+    // Generic link_url support
+    if (options.linkUrl) form.append('link_url', options.linkUrl);
+
     const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
-    if (platforms.includes('linkedin')) this._addLinkedinParams(form, options);
+    if (platforms.includes('linkedin')) this._addLinkedinParams(form, options, true);
     if (platforms.includes('facebook')) this._addFacebookParams(form, options, false, true);
     if (platforms.includes('x')) this._addXParams(form, options, true);
     if (platforms.includes('threads')) this._addThreadsParams(form, options);
     if (platforms.includes('reddit')) this._addRedditParams(form, options);
+    if (platforms.includes('bluesky') && (options.blueskyLinkUrl || options.linkUrl)) {
+      form.append('bluesky_link_url', options.blueskyLinkUrl || options.linkUrl);
+    }
 
     return this._request('/upload_text', 'POST', form, true);
   }
@@ -564,6 +580,7 @@ export class UploadPost {
     if (options.scheduledDate) form.append('scheduled_date', options.scheduledDate);
     if (options.timezone) form.append('timezone', options.timezone);
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
+    if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
 
     this._addLinkedinParams(form, options);
@@ -600,18 +617,71 @@ export class UploadPost {
 
   /**
    * Get analytics for a profile
-   * 
+   *
    * @param {string} profileUsername - Profile username
    * @param {Object} [options] - Query options
-   * @param {string[]} [options.platforms] - Filter by platforms (instagram, linkedin, facebook, x)
-   * @returns {Promise<Object>} Analytics data
+   * @param {string[]} [options.platforms] - Filter by platforms (instagram, linkedin, facebook, x, youtube, tiktok, threads, pinterest, reddit)
+   * @param {string} [options.pageId] - Facebook Page ID (required for Facebook analytics)
+   * @param {string} [options.pageUrn] - LinkedIn page URN (defaults to "me" for personal profile)
+   * @returns {Promise<Object>} Analytics data per platform
    */
   async getAnalytics(profileUsername, options = {}) {
     const params = {};
     if (options.platforms && options.platforms.length > 0) {
       params.platforms = options.platforms.join(',');
     }
+    if (options.pageId) params.page_id = options.pageId;
+    if (options.pageUrn) params.page_urn = options.pageUrn;
     return this._request(`/analytics/${encodeURIComponent(profileUsername)}`, 'GET', params);
+  }
+
+  /**
+   * Get total impressions for a profile from daily snapshots
+   *
+   * @param {string} profileUsername - Profile username
+   * @param {Object} [options] - Query options
+   * @param {string} [options.period] - Period shortcut: last_day, last_week, last_month, last_3months, last_year
+   * @param {string} [options.startDate] - Start date in YYYY-MM-DD format
+   * @param {string} [options.endDate] - End date in YYYY-MM-DD format
+   * @param {string} [options.date] - Single date in YYYY-MM-DD format
+   * @param {string[]} [options.platforms] - Filter by platforms
+   * @param {boolean} [options.breakdown] - Include per-platform and per-day breakdown
+   * @param {string[]} [options.metrics] - Specific metrics to aggregate (e.g., ['likes', 'comments', 'shares'])
+   * @returns {Promise<Object>} Total impressions data
+   */
+  async getTotalImpressions(profileUsername, options = {}) {
+    const params = {};
+    if (options.period) params.period = options.period;
+    if (options.startDate) params.start_date = options.startDate;
+    if (options.endDate) params.end_date = options.endDate;
+    if (options.date) params.date = options.date;
+    if (options.platforms && options.platforms.length > 0) {
+      params.platform = options.platforms.join(',');
+    }
+    if (options.breakdown) params.breakdown = 'true';
+    if (options.metrics && options.metrics.length > 0) {
+      params.metrics = options.metrics.join(',');
+    }
+    return this._request(`/uploadposts/total-impressions/${encodeURIComponent(profileUsername)}`, 'GET', params);
+  }
+
+  /**
+   * Get analytics for a specific post across all platforms it was published to
+   *
+   * @param {string} requestId - The request_id from the upload
+   * @returns {Promise<Object>} Post analytics with per-platform metrics
+   */
+  async getPostAnalytics(requestId) {
+    return this._request(`/uploadposts/post-analytics/${encodeURIComponent(requestId)}`, 'GET');
+  }
+
+  /**
+   * Get available metrics configuration for all supported platforms
+   *
+   * @returns {Promise<Object>} Platform metrics config (primary fields, available metrics, labels)
+   */
+  async getPlatformMetrics() {
+    return this._request('/uploadposts/platform-metrics', 'GET');
   }
 
   // ==================== Scheduled Posts ====================
