@@ -105,6 +105,23 @@ export class UploadPost {
     if (options.youtubeFirstComment) form.append('youtube_first_comment', options.youtubeFirstComment);
     if (options.redditFirstComment) form.append('reddit_first_comment', options.redditFirstComment);
     if (options.blueskyFirstComment) form.append('bluesky_first_comment', options.blueskyFirstComment);
+
+    if (options.firstCommentMedia) {
+      const mediaItems = Array.isArray(options.firstCommentMedia) ? options.firstCommentMedia : [options.firstCommentMedia];
+      for (const mediaItem of mediaItems) {
+        if (typeof mediaItem === 'string') {
+          if (mediaItem.toLowerCase().startsWith('http://') || mediaItem.toLowerCase().startsWith('https://')) {
+            form.append('first_comment_media[]', mediaItem);
+          } else {
+            if (fs.existsSync(mediaItem)) {
+              form.append('first_comment_media[]', createReadStream(mediaItem));
+            }
+          }
+        } else {
+          form.append('first_comment_media[]', mediaItem);
+        }
+      }
+    }
   }
 
   /**
@@ -269,9 +286,12 @@ export class UploadPost {
    * Add Reddit-specific parameters
    * @private
    */
-  _addRedditParams(form, options) {
+  _addRedditParams(form, options, isText = false) {
     if (options.redditSubreddit) form.append('subreddit', options.redditSubreddit);
     if (options.redditFlairId) form.append('flair_id', options.redditFlairId);
+    if (isText && (options.redditLinkUrl || options.linkUrl)) {
+      form.append('reddit_link_url', options.redditLinkUrl || options.linkUrl);
+    }
   }
 
   /**
@@ -533,7 +553,7 @@ export class UploadPost {
     if (platforms.includes('facebook')) this._addFacebookParams(form, options, false, true);
     if (platforms.includes('x')) this._addXParams(form, options, true);
     if (platforms.includes('threads')) this._addThreadsParams(form, options);
-    if (platforms.includes('reddit')) this._addRedditParams(form, options);
+    if (platforms.includes('reddit')) this._addRedditParams(form, options, true);
     if (platforms.includes('bluesky') && (options.blueskyLinkUrl || options.linkUrl)) {
       form.append('bluesky_link_url', options.blueskyLinkUrl || options.linkUrl);
     }
