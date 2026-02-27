@@ -364,7 +364,7 @@ export class UploadPost {
     const form = new FormData();
 
     // Handle video (file path or URL)
-    if (videoPathOrUrl.toLowerCase().startsWith('http://') || videoPathOrUrl.toLowerCase().startsWith('https://')) {
+    if (typeof videoPathOrUrl === 'string' && (videoPathOrUrl.toLowerCase().startsWith('http://') || videoPathOrUrl.toLowerCase().startsWith('https://'))) {
       form.append('video', videoPathOrUrl);
     } else {
       if (!fs.existsSync(videoPathOrUrl)) {
@@ -562,7 +562,7 @@ export class UploadPost {
     const form = new FormData();
 
     // Handle document (file path or URL)
-    if (documentPathOrUrl.toLowerCase().startsWith('http://') || documentPathOrUrl.toLowerCase().startsWith('https://')) {
+    if (typeof documentPathOrUrl === 'string' && (documentPathOrUrl.toLowerCase().startsWith('http://') || documentPathOrUrl.toLowerCase().startsWith('https://'))) {
       form.append('document', documentPathOrUrl);
     } else {
       if (!fs.existsSync(documentPathOrUrl)) {
