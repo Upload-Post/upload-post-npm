@@ -315,6 +315,8 @@ declare module 'upload-post' {
     redditSubreddit?: string;
     /** Flair template ID */
     redditFlairId?: string;
+    /** URL for a Reddit link post (kind=link) instead of a self post */
+    redditLinkUrl?: string;
   }
 
   // ==================== Combined Upload Options ====================

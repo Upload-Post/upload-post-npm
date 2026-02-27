@@ -272,6 +272,7 @@ export class UploadPost {
   _addRedditParams(form, options) {
     if (options.redditSubreddit) form.append('subreddit', options.redditSubreddit);
     if (options.redditFlairId) form.append('flair_id', options.redditFlairId);
+    if (options.redditLinkUrl) form.append('reddit_link_url', options.redditLinkUrl);
   }
 
   /**
