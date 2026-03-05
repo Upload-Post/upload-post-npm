@@ -105,6 +105,7 @@ export class UploadPost {
     if (options.youtubeFirstComment) form.append('youtube_first_comment', options.youtubeFirstComment);
     if (options.redditFirstComment) form.append('reddit_first_comment', options.redditFirstComment);
     if (options.blueskyFirstComment) form.append('bluesky_first_comment', options.blueskyFirstComment);
+    if (options.linkedinFirstComment) form.append('linkedin_first_comment', options.linkedinFirstComment);
 
     if (options.firstCommentMedia) {
       const mediaItems = Array.isArray(options.firstCommentMedia) ? options.firstCommentMedia : [options.firstCommentMedia];
