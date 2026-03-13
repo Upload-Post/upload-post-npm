@@ -845,6 +845,30 @@ export class UploadPost {
     const params = profile ? { profile } : {};
     return this._request('/uploadposts/pinterest/boards', 'GET', params);
   }
+
+  /**
+   * Get Google Business Profile locations for a connected account
+   *
+   * @param {string} [profile] - Profile username
+   * @returns {Promise<Object>} List of Google Business locations
+   */
+  async getGoogleBusinessLocations(profile) {
+    const params = profile ? { profile } : {};
+    return this._request('/uploadposts/google-business/locations', 'GET', params);
+  }
+
+  /**
+   * Select a specific Google Business Profile location for a profile
+   *
+   * @param {string} locationId - The location ID to select (e.g. "accounts/123/locations/456")
+   * @param {string} [profile] - Profile username
+   * @returns {Promise<Object>} Selection result with google_business_id and display_name
+   */
+  async selectGoogleBusinessLocation(locationId, profile) {
+    const data = { location_id: locationId };
+    if (profile) data.profile = profile;
+    return this._request('/uploadposts/google-business/locations/select', 'POST', data);
+  }
 }
 
 // Default export for CommonJS compatibility
