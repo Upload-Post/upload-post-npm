@@ -123,6 +123,13 @@ const status = await client.getStatus('request_id_from_upload');
 console.log(status);
 ```
 
+For scheduled or queued posts, check the status using the job_id:
+
+```javascript
+const status = await client.getJobStatus('job_id_from_scheduled_post');
+console.log(status);
+```
+
 ### Get Upload History
 
 ```javascript

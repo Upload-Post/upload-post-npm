@@ -622,6 +622,16 @@ export class UploadPost {
   }
 
   /**
+   * Get the status of a scheduled or queued upload by job ID
+   *
+   * @param {string} jobId - The job_id from a scheduled or queued upload
+   * @returns {Promise<Object>} Upload status
+   */
+  async getJobStatus(jobId) {
+    return this._request('/uploadposts/status', 'GET', { job_id: jobId });
+  }
+
+  /**
    * Get upload history
    * 
    * @param {Object} [options] - Query options
