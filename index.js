@@ -280,6 +280,7 @@ export class UploadPost {
   _addThreadsParams(form, options) {
     if (options.threadsLongTextAsPost !== undefined) form.append('threads_long_text_as_post', String(options.threadsLongTextAsPost));
     if (options.threadsThreadMediaLayout) form.append('threads_thread_media_layout', options.threadsThreadMediaLayout);
+    if (options.threadsTopicTag) form.append('threads_topic_tag', options.threadsTopicTag);
   }
 
   /**
@@ -377,6 +378,7 @@ export class UploadPost {
    * Threads options:
    * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post (vs thread)
    * @param {string} [options.threadsThreadMediaLayout] - Comma-separated list of how many media items per Threads post (e.g. "5,5")
+   * @param {string} [options.threadsTopicTag] - Topic tag for the Threads post (1-50 chars, no periods or ampersands)
    *
    * @returns {Promise<Object>} API response with request_id for async uploads
    */
@@ -458,6 +460,7 @@ export class UploadPost {
    * Threads options:
    * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post
    * @param {string} [options.threadsThreadMediaLayout] - Comma-separated list of how many media items per Threads post (e.g. "5,5")
+   * @param {string} [options.threadsTopicTag] - Topic tag for the Threads post (1-50 chars, no periods or ampersands)
    *
    * Reddit options:
    * @param {string} [options.redditSubreddit] - Subreddit name (without r/)
@@ -533,6 +536,7 @@ export class UploadPost {
    * Threads options:
    * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post
    * @param {string} [options.threadsThreadMediaLayout] - Comma-separated list of how many media items per Threads post (e.g. "5,5")
+   * @param {string} [options.threadsTopicTag] - Topic tag for the Threads post (1-50 chars, no periods or ampersands)
    *
    * Reddit options:
    * @param {string} [options.redditSubreddit] - Subreddit name (without r/)
