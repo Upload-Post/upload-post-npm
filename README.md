@@ -123,6 +123,13 @@ const status = await client.getStatus('request_id_from_upload');
 console.log(status);
 ```
 
+For scheduled or queued posts, check the status using the job_id:
+
+```javascript
+const status = await client.getJobStatus('job_id_from_scheduled_post');
+console.log(status);
+```
+
 ### Get Upload History
 
 ```javascript
@@ -267,6 +274,7 @@ const boards = await client.getPinterestBoards('my-profile');
 ### Threads
 - `threadsLongTextAsPost` - Post long text as single post (vs thread)
 - `threadsThreadMediaLayout` - Comma-separated list of how many media items to include in each Threads post. Each value must be 1-10, and the total must equal the number of files. Example: '5,5' splits 10 items into 2 posts with 5 each. If omitted and more than 10 items are provided, auto-chunks into groups of 10.
+- `threadsTopicTag` - Topic tag for the Threads post (1-50 characters, no periods or ampersands). One tag per post. Helps increase reach.
 
 ### Reddit
 - `redditSubreddit` - Subreddit name (without r/)

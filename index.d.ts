@@ -516,6 +516,12 @@ declare module 'upload-post' {
     getStatus(requestId: string): Promise<StatusResponse>;
 
     /**
+     * Get the status of a scheduled or queued upload by job ID
+     * @param jobId - The job_id from a scheduled or queued upload
+     */
+    getJobStatus(jobId: string): Promise<StatusResponse>;
+
+    /**
      * Get upload history
      * @param options - Query options
      */

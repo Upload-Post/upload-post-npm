@@ -105,6 +105,7 @@ export class UploadPost {
     if (options.youtubeFirstComment) form.append('youtube_first_comment', options.youtubeFirstComment);
     if (options.redditFirstComment) form.append('reddit_first_comment', options.redditFirstComment);
     if (options.blueskyFirstComment) form.append('bluesky_first_comment', options.blueskyFirstComment);
+    if (options.linkedinFirstComment) form.append('linkedin_first_comment', options.linkedinFirstComment);
 
     if (options.firstCommentMedia) {
       const mediaItems = Array.isArray(options.firstCommentMedia) ? options.firstCommentMedia : [options.firstCommentMedia];
@@ -280,6 +281,7 @@ export class UploadPost {
   _addThreadsParams(form, options) {
     if (options.threadsLongTextAsPost !== undefined) form.append('threads_long_text_as_post', String(options.threadsLongTextAsPost));
     if (options.threadsThreadMediaLayout) form.append('threads_thread_media_layout', options.threadsThreadMediaLayout);
+    if (options.threadsTopicTag) form.append('threads_topic_tag', options.threadsTopicTag);
   }
 
   /**
@@ -377,6 +379,7 @@ export class UploadPost {
    * Threads options:
    * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post (vs thread)
    * @param {string} [options.threadsThreadMediaLayout] - Comma-separated list of how many media items per Threads post (e.g. "5,5")
+   * @param {string} [options.threadsTopicTag] - Topic tag for the Threads post (1-50 chars, no periods or ampersands)
    *
    * @returns {Promise<Object>} API response with request_id for async uploads
    */
@@ -458,6 +461,7 @@ export class UploadPost {
    * Threads options:
    * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post
    * @param {string} [options.threadsThreadMediaLayout] - Comma-separated list of how many media items per Threads post (e.g. "5,5")
+   * @param {string} [options.threadsTopicTag] - Topic tag for the Threads post (1-50 chars, no periods or ampersands)
    *
    * Reddit options:
    * @param {string} [options.redditSubreddit] - Subreddit name (without r/)
@@ -533,6 +537,7 @@ export class UploadPost {
    * Threads options:
    * @param {boolean} [options.threadsLongTextAsPost] - Post long text as single post
    * @param {string} [options.threadsThreadMediaLayout] - Comma-separated list of how many media items per Threads post (e.g. "5,5")
+   * @param {string} [options.threadsTopicTag] - Topic tag for the Threads post (1-50 chars, no periods or ampersands)
    *
    * Reddit options:
    * @param {string} [options.redditSubreddit] - Subreddit name (without r/)
@@ -618,6 +623,16 @@ export class UploadPost {
    */
   async getStatus(requestId) {
     return this._request('/uploadposts/status', 'GET', { request_id: requestId });
+  }
+
+  /**
+   * Get the status of a scheduled or queued upload by job ID
+   *
+   * @param {string} jobId - The job_id from a scheduled or queued upload
+   * @returns {Promise<Object>} Upload status
+   */
+  async getJobStatus(jobId) {
+    return this._request('/uploadposts/status', 'GET', { job_id: jobId });
   }
 
   /**
@@ -844,6 +859,30 @@ export class UploadPost {
   async getPinterestBoards(profile) {
     const params = profile ? { profile } : {};
     return this._request('/uploadposts/pinterest/boards', 'GET', params);
+  }
+
+  /**
+   * Get Google Business Profile locations for a connected account
+   *
+   * @param {string} [profile] - Profile username
+   * @returns {Promise<Object>} List of Google Business locations
+   */
+  async getGoogleBusinessLocations(profile) {
+    const params = profile ? { profile } : {};
+    return this._request('/uploadposts/google-business/locations', 'GET', params);
+  }
+
+  /**
+   * Select a specific Google Business Profile location for a profile
+   *
+   * @param {string} locationId - The location ID to select (e.g. "accounts/123/locations/456")
+   * @param {string} [profile] - Profile username
+   * @returns {Promise<Object>} Selection result with google_business_id and display_name
+   */
+  async selectGoogleBusinessLocation(locationId, profile) {
+    const data = { location_id: locationId };
+    if (profile) data.profile = profile;
+    return this._request('/uploadposts/google-business/locations/select', 'POST', data);
   }
 }
 
