@@ -160,7 +160,16 @@ export class UploadPost {
 
     if (isVideo) {
       if (options.instagramShareToFeed !== undefined) form.append('share_to_feed', String(options.instagramShareToFeed));
-      if (options.instagramCoverUrl) form.append('cover_url', options.instagramCoverUrl);
+      if (options.instagramCoverUrl) {
+        const coverVal = options.instagramCoverUrl;
+        if (typeof coverVal === 'string' && (coverVal.toLowerCase().startsWith('http://') || coverVal.toLowerCase().startsWith('https://'))) {
+          form.append('cover_url', coverVal);
+        } else if (typeof coverVal === 'string') {
+          form.append('cover_image', createReadStream(coverVal));
+        } else {
+          form.append('cover_image', coverVal);
+        }
+      }
       if (options.instagramAudioName) form.append('audio_name', options.instagramAudioName);
       if (options.instagramThumbOffset) form.append('thumb_offset', options.instagramThumbOffset);
     }
@@ -326,7 +335,7 @@ export class UploadPost {
    * @param {string} [options.instagramMediaType] - REELS or STORIES
    * @param {boolean} [options.instagramShareToFeed] - Share to feed
    * @param {string} [options.instagramCollaborators] - Comma-separated collaborator usernames
-   * @param {string} [options.instagramCoverUrl] - Custom cover URL
+   * @param {string|Buffer|ReadableStream} [options.instagramCoverUrl] - Custom cover: URL string, file path, Buffer, or ReadableStream
    * @param {string} [options.instagramAudioName] - Audio track name
    * @param {string} [options.instagramUserTags] - Comma-separated user tags
    * @param {string} [options.instagramLocationId] - Location ID
@@ -711,6 +720,22 @@ export class UploadPost {
   }
 
   /**
+   * Get analytics for any post (including organic posts) using its native platform ID
+   *
+   * @param {string} platformPostId - The native post ID on the platform (e.g., Instagram media ID)
+   * @param {string} platform - The platform to query (instagram, youtube, tiktok, facebook, linkedin, x, threads, pinterest, reddit)
+   * @param {string} user - The profile_username that owns the social account
+   * @returns {Promise<Object>} Post analytics with live per-post metrics from the platform API
+   */
+  async getPostAnalyticsByPlatformId(platformPostId, platform, user) {
+    return this._request('/uploadposts/post-analytics', 'GET', {
+      platform_post_id: platformPostId,
+      platform,
+      user,
+    });
+  }
+
+  /**
    * Get available metrics configuration for all supported platforms
    *
    * @returns {Promise<Object>} Platform metrics config (primary fields, available metrics, labels)
@@ -824,6 +849,60 @@ export class UploadPost {
    */
   async validateJwt(jwt) {
     return this._request('/uploadposts/users/validate-jwt', 'POST', { jwt });
+  }
+
+  // ==================== Instagram Comments ====================
+
+  /**
+   * Get comments on an Instagram post
+   *
+   * @param {string} user - Profile username
+   * @param {Object} options - Query options
+   * @param {string} [options.postId] - Numeric media ID (provide postId or postUrl)
+   * @param {string} [options.postUrl] - Full Instagram post URL (provide postId or postUrl)
+   * @returns {Promise<Object>} Comments data
+   */
+  async getPostComments(user, options = {}) {
+    const params = { platform: 'instagram', user };
+    if (options.postId) params.post_id = options.postId;
+    if (options.postUrl) params.post_url = options.postUrl;
+    return this._request('/uploadposts/comments', 'GET', params);
+  }
+
+  /**
+   * Send a private reply (DM) to the author of an Instagram comment
+   *
+   * @param {Object} options - Reply options
+   * @param {string} options.user - Profile username
+   * @param {string} options.commentId - Comment ID from getPostComments
+   * @param {string} options.message - Reply message text
+   * @returns {Promise<Object>} Reply result
+   */
+  async replyToComment(options) {
+    return this._request('/uploadposts/comments/reply', 'POST', {
+      platform: 'instagram',
+      user: options.user,
+      comment_id: options.commentId,
+      message: options.message
+    });
+  }
+
+  /**
+   * Post a public reply to an Instagram comment (visible under the original comment)
+   *
+   * @param {Object} options - Reply options
+   * @param {string} options.user - Profile username
+   * @param {string} options.commentId - Comment ID from getPostComments
+   * @param {string} options.message - Reply message text
+   * @returns {Promise<Object>} Reply result with the new comment ID
+   */
+  async publicReplyToComment(options) {
+    return this._request('/uploadposts/comments/public-reply', 'POST', {
+      platform: 'instagram',
+      user: options.user,
+      comment_id: options.commentId,
+      message: options.message
+    });
   }
 
   // ==================== Helper Endpoints ====================

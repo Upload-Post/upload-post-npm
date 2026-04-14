@@ -136,8 +136,8 @@ declare module 'upload-post' {
     instagramShareToFeed?: boolean;
     /** Comma-separated collaborator usernames */
     instagramCollaborators?: string;
-    /** Custom cover URL */
-    instagramCoverUrl?: string;
+    /** Custom cover: URL string, file path, Buffer, or ReadableStream */
+    instagramCoverUrl?: string | Buffer | NodeJS.ReadableStream;
     /** Audio track name */
     instagramAudioName?: string;
     /** Comma-separated user tags */
@@ -647,6 +647,46 @@ declare module 'upload-post' {
      * @param jwt - JWT token to validate
      */
     validateJwt(jwt: string): Promise<{ success: boolean; valid?: boolean }>;
+
+    // Instagram Comments
+
+    /**
+     * Get comments on an Instagram post
+     * @param user - Profile username
+     * @param options - Query options
+     */
+    getPostComments(user: string, options?: { postId?: string; postUrl?: string }): Promise<{
+      success: boolean;
+      comments?: Array<{
+        id: string;
+        text: string;
+        timestamp: string;
+        user: { id: string; username: string };
+      }>;
+    }>;
+
+    /**
+     * Send a private reply (DM) to the author of an Instagram comment
+     * @param options - Reply options
+     */
+    replyToComment(options: { user: string; commentId: string; message: string }): Promise<{
+      success: boolean;
+      recipient_id?: string;
+      message_id?: string;
+      message?: string;
+      error?: string;
+    }>;
+
+    /**
+     * Post a public reply to an Instagram comment (visible under the original comment)
+     * @param options - Reply options
+     */
+    publicReplyToComment(options: { user: string; commentId: string; message: string }): Promise<{
+      success: boolean;
+      id?: string;
+      message?: string;
+      error?: string;
+    }>;
 
     // Helper Endpoints
     /**
