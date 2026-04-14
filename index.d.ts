@@ -136,7 +136,7 @@ declare module 'upload-post' {
     instagramShareToFeed?: boolean;
     /** Comma-separated collaborator usernames */
     instagramCollaborators?: string;
-    /** Custom cover URL, file path, or Buffer. URLs are sent directly; file paths and Buffers are uploaded as binary. */
+    /** Custom cover: URL string, file path, Buffer, or ReadableStream */
     instagramCoverUrl?: string | Buffer | NodeJS.ReadableStream;
     /** Audio track name */
     instagramAudioName?: string;

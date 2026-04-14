@@ -165,10 +165,8 @@ export class UploadPost {
         if (typeof coverVal === 'string' && (coverVal.toLowerCase().startsWith('http://') || coverVal.toLowerCase().startsWith('https://'))) {
           form.append('cover_url', coverVal);
         } else if (typeof coverVal === 'string') {
-          // File path — send as binary upload
           form.append('cover_image', createReadStream(coverVal));
         } else {
-          // Buffer or stream — send as binary upload
           form.append('cover_image', coverVal);
         }
       }
@@ -337,7 +335,7 @@ export class UploadPost {
    * @param {string} [options.instagramMediaType] - REELS or STORIES
    * @param {boolean} [options.instagramShareToFeed] - Share to feed
    * @param {string} [options.instagramCollaborators] - Comma-separated collaborator usernames
-   * @param {string|Buffer|ReadableStream} [options.instagramCoverUrl] - Custom cover URL, file path, or binary data. URLs are sent directly; file paths and Buffers are uploaded as binary.
+   * @param {string|Buffer|ReadableStream} [options.instagramCoverUrl] - Custom cover: URL string, file path, Buffer, or ReadableStream
    * @param {string} [options.instagramAudioName] - Audio track name
    * @param {string} [options.instagramUserTags] - Comma-separated user tags
    * @param {string} [options.instagramLocationId] - Location ID
