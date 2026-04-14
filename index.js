@@ -721,8 +721,8 @@ export class UploadPost {
   async getPostAnalyticsByPlatformId(platformPostId, platform, user) {
     return this._request('/uploadposts/post-analytics', 'GET', {
       platform_post_id: platformPostId,
-      platform: platform,
-      user: user,
+      platform,
+      user,
     });
   }
 
