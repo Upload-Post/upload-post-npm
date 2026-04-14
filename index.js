@@ -851,6 +851,52 @@ export class UploadPost {
     return this._request('/uploadposts/users/validate-jwt', 'POST', { jwt });
   }
 
+  /**
+   * Get user preferences (including calendar settings)
+   *
+   * @returns {Promise<Object>} User preferences
+   */
+  async getUserPreferences() {
+    return this._request('/uploadposts/users/preferences', 'GET');
+  }
+
+  /**
+   * Update user preferences (including calendar settings)
+   *
+   * @param {Object} options - Preferences options
+   * @param {number} [options.weekStartDay] - Week start day (0=Sunday, 1=Monday)
+   * @returns {Promise<Object>} Updated preferences
+   */
+  async updateUserPreferences(options = {}) {
+    const body = {};
+    if (options.weekStartDay !== undefined) body.week_start_day = options.weekStartDay;
+    return this._request('/uploadposts/users/preferences', 'POST', body);
+  }
+
+  /**
+   * Get notification configuration (including webhook settings)
+   *
+   * @returns {Promise<Object>} Notification config
+   */
+  async getNotificationConfig() {
+    return this._request('/uploadposts/notification-config', 'GET');
+  }
+
+  /**
+   * Update notification configuration (including webhook settings)
+   *
+   * @param {Object} options - Notification config options
+   * @param {string[]} [options.webhookEvents] - Webhook event types to subscribe to (upload_completed, social_account_connected, social_account_disconnected, social_account_reauth_required)
+   * @param {string} [options.webhookUrl] - Webhook URL for notifications
+   * @returns {Promise<Object>} Updated notification config
+   */
+  async updateNotificationConfig(options = {}) {
+    const body = {};
+    if (options.webhookEvents) body.webhook_events = options.webhookEvents;
+    if (options.webhookUrl) body.webhook_url = options.webhookUrl;
+    return this._request('/uploadposts/notification-config', 'POST', body);
+  }
+
   // ==================== Instagram Comments ====================
 
   /**

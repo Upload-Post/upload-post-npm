@@ -648,6 +648,28 @@ declare module 'upload-post' {
      */
     validateJwt(jwt: string): Promise<{ success: boolean; valid?: boolean }>;
 
+    /**
+     * Get user preferences (including calendar settings)
+     */
+    getUserPreferences(): Promise<{ success: boolean; preferences?: { week_start_day?: number; [key: string]: any } }>;
+
+    /**
+     * Update user preferences (including calendar settings)
+     * @param options - Preferences options
+     */
+    updateUserPreferences(options?: { weekStartDay?: number }): Promise<{ success: boolean; preferences?: { week_start_day?: number; [key: string]: any } }>;
+
+    /**
+     * Get notification configuration (including webhook settings)
+     */
+    getNotificationConfig(): Promise<{ success: boolean; config?: { webhook_events?: string[]; webhook_url?: string; [key: string]: any } }>;
+
+    /**
+     * Update notification configuration (including webhook settings)
+     * @param options - Notification config options
+     */
+    updateNotificationConfig(options?: { webhookEvents?: string[]; webhookUrl?: string }): Promise<{ success: boolean; config?: { webhook_events?: string[]; webhook_url?: string; [key: string]: any } }>;
+
     // Instagram Comments
 
     /**
