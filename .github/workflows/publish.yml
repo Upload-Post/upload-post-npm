@@ -60,4 +60,4 @@ jobs:
 
       - name: Publish to npm
         if: (steps.version_check.outputs.new == 'true' && inputs.dry_run != true) || github.event_name == 'release'
-        run: npm publish --access public --provenance
+        run: npm publish --access public
