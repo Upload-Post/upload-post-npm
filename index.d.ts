@@ -192,6 +192,17 @@ declare module 'upload-post' {
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
+    /** Subtitle/caption files to upload. Each entry needs a language code and either a file path or URL. */
+    youtubeSubtitles?: Array<{
+      /** BCP-47 language code (e.g. "en", "es") */
+      language: string;
+      /** Display name for the subtitle track (e.g. "English", "Español") */
+      name?: string;
+      /** Path to the subtitle file (SRT, VTT, SBV, SUB, ASS, SSA, TTML) */
+      file?: string;
+      /** URL to the subtitle file */
+      url?: string;
+    }>;
   }
 
   // ==================== LinkedIn Options ====================
