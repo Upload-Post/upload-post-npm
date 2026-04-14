@@ -648,6 +648,46 @@ declare module 'upload-post' {
      */
     validateJwt(jwt: string): Promise<{ success: boolean; valid?: boolean }>;
 
+    // Instagram Comments
+
+    /**
+     * Get comments on an Instagram post
+     * @param user - Profile username
+     * @param options - Query options
+     */
+    getPostComments(user: string, options?: { postId?: string; postUrl?: string }): Promise<{
+      success: boolean;
+      comments?: Array<{
+        id: string;
+        text: string;
+        timestamp: string;
+        user: { id: string; username: string };
+      }>;
+    }>;
+
+    /**
+     * Send a private reply (DM) to the author of an Instagram comment
+     * @param options - Reply options
+     */
+    replyToComment(options: { user: string; commentId: string; message: string }): Promise<{
+      success: boolean;
+      recipient_id?: string;
+      message_id?: string;
+      message?: string;
+      error?: string;
+    }>;
+
+    /**
+     * Post a public reply to an Instagram comment (visible under the original comment)
+     * @param options - Reply options
+     */
+    publicReplyToComment(options: { user: string; commentId: string; message: string }): Promise<{
+      success: boolean;
+      id?: string;
+      message?: string;
+      error?: string;
+    }>;
+
     // Helper Endpoints
     /**
      * Get Facebook pages for a profile

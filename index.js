@@ -826,6 +826,60 @@ export class UploadPost {
     return this._request('/uploadposts/users/validate-jwt', 'POST', { jwt });
   }
 
+  // ==================== Instagram Comments ====================
+
+  /**
+   * Get comments on an Instagram post
+   *
+   * @param {string} user - Profile username
+   * @param {Object} options - Query options
+   * @param {string} [options.postId] - Numeric media ID (provide postId or postUrl)
+   * @param {string} [options.postUrl] - Full Instagram post URL (provide postId or postUrl)
+   * @returns {Promise<Object>} Comments data
+   */
+  async getPostComments(user, options = {}) {
+    const params = { platform: 'instagram', user };
+    if (options.postId) params.post_id = options.postId;
+    if (options.postUrl) params.post_url = options.postUrl;
+    return this._request('/uploadposts/comments', 'GET', params);
+  }
+
+  /**
+   * Send a private reply (DM) to the author of an Instagram comment
+   *
+   * @param {Object} options - Reply options
+   * @param {string} options.user - Profile username
+   * @param {string} options.commentId - Comment ID from getPostComments
+   * @param {string} options.message - Reply message text
+   * @returns {Promise<Object>} Reply result
+   */
+  async replyToComment(options) {
+    return this._request('/uploadposts/comments/reply', 'POST', {
+      platform: 'instagram',
+      user: options.user,
+      comment_id: options.commentId,
+      message: options.message
+    });
+  }
+
+  /**
+   * Post a public reply to an Instagram comment (visible under the original comment)
+   *
+   * @param {Object} options - Reply options
+   * @param {string} options.user - Profile username
+   * @param {string} options.commentId - Comment ID from getPostComments
+   * @param {string} options.message - Reply message text
+   * @returns {Promise<Object>} Reply result with the new comment ID
+   */
+  async publicReplyToComment(options) {
+    return this._request('/uploadposts/comments/public-reply', 'POST', {
+      platform: 'instagram',
+      user: options.user,
+      comment_id: options.commentId,
+      message: options.message
+    });
+  }
+
   // ==================== Helper Endpoints ====================
 
   /**
