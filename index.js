@@ -711,6 +711,22 @@ export class UploadPost {
   }
 
   /**
+   * Get analytics for any post (including organic posts) using its native platform ID
+   *
+   * @param {string} platformPostId - The native post ID on the platform (e.g., Instagram media ID)
+   * @param {string} platform - The platform to query (instagram, youtube, tiktok, facebook, linkedin, x, threads, pinterest, reddit)
+   * @param {string} user - The profile_username that owns the social account
+   * @returns {Promise<Object>} Post analytics with live per-post metrics from the platform API
+   */
+  async getPostAnalyticsByPlatformId(platformPostId, platform, user) {
+    return this._request('/uploadposts/post-analytics', 'GET', {
+      platform_post_id: platformPostId,
+      platform: platform,
+      user: user,
+    });
+  }
+
+  /**
    * Get available metrics configuration for all supported platforms
    *
    * @returns {Promise<Object>} Platform metrics config (primary fields, available metrics, labels)
