@@ -194,8 +194,6 @@ declare module 'upload-post' {
     youtubeRecordingDate?: string;
     /** Playlist ID to add the uploaded video to (single id, array, or comma-separated) */
     youtubePlaylistId?: string | string[];
-    /** Alias for youtubePlaylistId — same semantics */
-    youtubePlaylistIds?: string | string[];
   }
 
   // ==================== LinkedIn Options ====================
