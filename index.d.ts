@@ -592,16 +592,7 @@ declare module 'upload-post' {
     /**
      * Get recent media from a connected social account.
      *
-     * Supports: instagram, tiktok, youtube, linkedin, facebook, x, threads,
-     * pinterest, bluesky, reddit.
-     *
-     * @param platform - Platform key
-     * @param user - Profile username
-     * @param options - LinkedIn-only options
-     * @param options.pageUrn - Numeric org ID, full org URN, or "me" to force the
-     *   personal profile. When omitted, accounts linked as an organization admin
-     *   auto-resolve to the first administered organization; otherwise the
-     *   personal profile is used.
+     * @param options.pageUrn - LinkedIn only. Numeric org ID, full org URN, or "me" to force the personal profile.
      */
     getMedia(
       platform: 'instagram' | 'tiktok' | 'youtube' | 'linkedin' | 'facebook' | 'x' | 'threads' | 'pinterest' | 'bluesky' | 'reddit' | string,

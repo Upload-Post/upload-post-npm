@@ -745,18 +745,13 @@ export class UploadPost {
   }
 
   /**
-   * Get recent media (posts, reels, videos, pins, tweets) from a connected
-   * social account. Supports instagram, tiktok, youtube, linkedin, facebook,
-   * x, threads, pinterest, bluesky, reddit.
+   * Get recent media from a connected social account.
    *
-   * @param {string} platform - Platform key
-   * @param {string} user - Profile username (as configured in Upload-Post)
+   * @param {string} platform - instagram, tiktok, youtube, linkedin, facebook, x, threads, pinterest, bluesky, reddit
+   * @param {string} user - Profile username
    * @param {Object} [options]
-   * @param {string} [options.pageUrn] - LinkedIn only. Numeric org ID (e.g. "12345"),
-   *   full URN ("urn:li:organization:12345"), or "me" to force the personal profile.
-   *   When omitted, accounts linked as an org admin auto-resolve to the first
-   *   administered organization; otherwise the personal profile is used.
-   * @returns {Promise<Object>} { success, media: Array<{ id, caption, media_type, media_url, permalink, timestamp, thumbnail_url }> }
+   * @param {string} [options.pageUrn] - LinkedIn only. Numeric org ID, full URN, or "me" to force the personal profile.
+   * @returns {Promise<Object>}
    */
   async getMedia(platform, user, options = {}) {
     const params = { platform, user };
