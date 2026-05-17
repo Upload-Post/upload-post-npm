@@ -744,6 +744,26 @@ export class UploadPost {
     return this._request('/uploadposts/platform-metrics', 'GET');
   }
 
+  /**
+   * Get recent media (posts, reels, videos, pins, tweets) from a connected
+   * social account. Supports instagram, tiktok, youtube, linkedin, facebook,
+   * x, threads, pinterest, bluesky, reddit.
+   *
+   * @param {string} platform - Platform key
+   * @param {string} user - Profile username (as configured in Upload-Post)
+   * @param {Object} [options]
+   * @param {string} [options.pageUrn] - LinkedIn only. Numeric org ID (e.g. "12345"),
+   *   full URN ("urn:li:organization:12345"), or "me" to force the personal profile.
+   *   When omitted, accounts linked as an org admin auto-resolve to the first
+   *   administered organization; otherwise the personal profile is used.
+   * @returns {Promise<Object>} { success, media: Array<{ id, caption, media_type, media_url, permalink, timestamp, thumbnail_url }> }
+   */
+  async getMedia(platform, user, options = {}) {
+    const params = { platform, user };
+    if (options.pageUrn) params.page_urn = options.pageUrn;
+    return this._request('/uploadposts/media', 'GET', params);
+  }
+
   // ==================== Scheduled Posts ====================
 
   /**
