@@ -237,6 +237,7 @@ const boards = await client.getPinterestBoards('my-profile');
 - `youtubeAllowedCountries` / `youtubeBlockedCountries` - Country restrictions
 - `youtubeHasPaidProductPlacement` - Paid placement flag
 - `youtubeRecordingDate` - Recording date (ISO 8601)
+- `youtubePlaylistId` - Playlist ID (or array / comma-separated list of IDs) to add the uploaded video to after publishing
 
 ### LinkedIn
 - `linkedinVisibility` - PUBLIC, CONNECTIONS, LOGGED_IN, CONTAINER

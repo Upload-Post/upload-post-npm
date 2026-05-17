@@ -198,6 +198,15 @@ export class UploadPost {
     if (options.youtubeBlockedCountries) form.append('blockedCountries', options.youtubeBlockedCountries);
     if (options.youtubeHasPaidProductPlacement !== undefined) form.append('hasPaidProductPlacement', String(options.youtubeHasPaidProductPlacement));
     if (options.youtubeRecordingDate) form.append('recordingDate', options.youtubeRecordingDate);
+    // Playlist: accept a single id, an array, or a comma-separated string. Sent as comma-separated
+    // so the API can add the uploaded video to one or more playlists on the same channel.
+    const playlistValue = options.youtubePlaylistId ?? options.youtubePlaylistIds;
+    if (playlistValue !== undefined && playlistValue !== null && playlistValue !== '') {
+      const playlistString = Array.isArray(playlistValue)
+        ? playlistValue.map((p) => String(p).trim()).filter(Boolean).join(',')
+        : String(playlistValue);
+      if (playlistString) form.append('youtube_playlist_id', playlistString);
+    }
   }
 
   /**
