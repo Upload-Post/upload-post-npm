@@ -181,6 +181,22 @@ const analytics = await client.getAnalytics('my-profile', {
 console.log(analytics);
 ```
 
+### Get Media
+
+Retrieve recent posts from a connected social account. Supported platforms:
+`instagram`, `tiktok`, `youtube`, `linkedin`, `facebook`, `x`, `threads`,
+`pinterest`, `bluesky`, `reddit`.
+
+```javascript
+const { media } = await client.getMedia('linkedin', 'my-profile');
+
+// Force the personal LinkedIn profile of an account connected as an org admin:
+await client.getMedia('linkedin', 'my-profile', { pageUrn: 'me' });
+
+// Target a specific LinkedIn organization page:
+await client.getMedia('linkedin', 'my-profile', { pageUrn: '12345' });
+```
+
 ### Helper Methods
 
 ```javascript

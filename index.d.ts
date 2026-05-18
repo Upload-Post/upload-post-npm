@@ -192,6 +192,17 @@ declare module 'upload-post' {
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
+    /** Subtitle/caption files to upload. Each entry needs a language code and either a file path or URL. */
+    youtubeSubtitles?: Array<{
+      /** BCP-47 language code (e.g. "en", "es") */
+      language: string;
+      /** Display name for the subtitle track (e.g. "English", "Español") */
+      name?: string;
+      /** Path to the subtitle file (SRT, VTT, SBV, SUB, ASS, SSA, TTML) */
+      file?: string;
+      /** URL to the subtitle file */
+      url?: string;
+    }>;
   }
 
   // ==================== LinkedIn Options ====================
@@ -588,6 +599,28 @@ declare module 'upload-post' {
       available_metrics: string[];
       metric_labels: Record<string, string>;
     }>>;
+
+    /**
+     * Get recent media from a connected social account.
+     *
+     * @param options.pageUrn - LinkedIn only. Numeric org ID, full org URN, or "me" to force the personal profile.
+     */
+    getMedia(
+      platform: 'instagram' | 'tiktok' | 'youtube' | 'linkedin' | 'facebook' | 'x' | 'threads' | 'pinterest' | 'bluesky' | 'reddit' | string,
+      user: string,
+      options?: { pageUrn?: string }
+    ): Promise<{
+      success: boolean;
+      media: Array<{
+        id: string;
+        caption: string | null;
+        media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM' | 'TEXT' | string;
+        media_url: string | null;
+        permalink: string | null;
+        timestamp: string | null;
+        thumbnail_url: string | null;
+      }>;
+    }>;
 
     // Scheduled Posts
     /**
