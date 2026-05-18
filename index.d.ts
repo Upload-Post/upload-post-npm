@@ -589,6 +589,28 @@ declare module 'upload-post' {
       metric_labels: Record<string, string>;
     }>>;
 
+    /**
+     * Get recent media from a connected social account.
+     *
+     * @param options.pageUrn - LinkedIn only. Numeric org ID, full org URN, or "me" to force the personal profile.
+     */
+    getMedia(
+      platform: 'instagram' | 'tiktok' | 'youtube' | 'linkedin' | 'facebook' | 'x' | 'threads' | 'pinterest' | 'bluesky' | 'reddit' | string,
+      user: string,
+      options?: { pageUrn?: string }
+    ): Promise<{
+      success: boolean;
+      media: Array<{
+        id: string;
+        caption: string | null;
+        media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM' | 'TEXT' | string;
+        media_url: string | null;
+        permalink: string | null;
+        timestamp: string | null;
+        thumbnail_url: string | null;
+      }>;
+    }>;
+
     // Scheduled Posts
     /**
      * List scheduled posts

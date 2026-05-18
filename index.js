@@ -744,6 +744,21 @@ export class UploadPost {
     return this._request('/uploadposts/platform-metrics', 'GET');
   }
 
+  /**
+   * Get recent media from a connected social account.
+   *
+   * @param {string} platform - instagram, tiktok, youtube, linkedin, facebook, x, threads, pinterest, bluesky, reddit
+   * @param {string} user - Profile username
+   * @param {Object} [options]
+   * @param {string} [options.pageUrn] - LinkedIn only. Numeric org ID, full URN, or "me" to force the personal profile.
+   * @returns {Promise<Object>}
+   */
+  async getMedia(platform, user, options = {}) {
+    const params = { platform, user };
+    if (options.pageUrn) params.page_urn = options.pageUrn;
+    return this._request('/uploadposts/media', 'GET', params);
+  }
+
   // ==================== Scheduled Posts ====================
 
   /**
