@@ -811,7 +811,7 @@ export class UploadPost {
     const body = {};
     if (options.scheduledDate) body.scheduled_date = options.scheduledDate;
     if (options.timezone) body.timezone = options.timezone;
-    return this._request(`/uploadposts/schedule/${jobId}`, 'POST', body);
+    return this._request(`/uploadposts/schedule/${jobId}`, 'PATCH', body);
   }
 
   // ==================== User Management ====================
