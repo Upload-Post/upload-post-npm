@@ -169,6 +169,10 @@ await client.deleteUser('old-profile');
 const jwt = await client.generateJwt('my-profile', {
   redirectUrl: 'https://yourapp.com/callback',
   platforms: ['tiktok', 'instagram'],
+  // Optional: force the connection page language for this profile.
+  // Supported: 'en' | 'es' | 'de' | 'fr' | 'pt'. When omitted, the page
+  // auto-detects the visitor's browser language and falls back to English.
+  language: 'es',
 });
 ```
 

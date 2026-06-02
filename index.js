@@ -859,6 +859,7 @@ export class UploadPost {
    * @param {boolean} [options.readonlyCalendar] - Show only a read-only calendar (no editing, no account connection)
    * @param {string} [options.connectTitle] - Custom title for the connection page
    * @param {string} [options.connectDescription] - Custom description for the connection page
+   * @param {('en'|'es'|'de'|'fr'|'pt')} [options.language] - Force the connection page language for this profile. When omitted, the page auto-detects the visitor's browser language and falls back to English.
    * @returns {Promise<Object>} JWT and connection URL
    */
   async generateJwt(username, options = {}) {
@@ -871,6 +872,7 @@ export class UploadPost {
     if (options.readonlyCalendar !== undefined) body.readonly_calendar = options.readonlyCalendar;
     if (options.connectTitle) body.connect_title = options.connectTitle;
     if (options.connectDescription) body.connect_description = options.connectDescription;
+    if (options.language) body.language = options.language;
     return this._request('/uploadposts/users/generate-jwt', 'POST', body);
   }
 

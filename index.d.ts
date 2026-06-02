@@ -673,6 +673,7 @@ declare module 'upload-post' {
       readonlyCalendar?: boolean;
       connectTitle?: string;
       connectDescription?: string;
+      language?: 'en' | 'es' | 'de' | 'fr' | 'pt';
     }): Promise<JwtResponse>;
 
     /**
