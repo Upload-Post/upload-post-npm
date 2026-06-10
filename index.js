@@ -8,8 +8,8 @@ const API_BASE_URL = 'https://api.upload-post.com/api';
 /**
  * Upload-Post API client
  * 
- * Supports uploading to: TikTok, Instagram, YouTube, LinkedIn, Facebook, 
- * Pinterest, Threads, Reddit, Bluesky, X (Twitter)
+ * Supports uploading to: TikTok, Instagram, YouTube, LinkedIn, Facebook,
+ * Pinterest, Threads, Reddit, Bluesky, X (Twitter), Discord, Telegram
  */
 export class UploadPost {
   /**
@@ -330,7 +330,7 @@ export class UploadPost {
    * @param {Object} options - Upload options
    * @param {string} options.title - Video title/caption
    * @param {string} options.user - User identifier (profile name)
-   * @param {string[]} options.platforms - Target platforms (tiktok, instagram, youtube, linkedin, facebook, pinterest, threads, bluesky, x)
+   * @param {string[]} options.platforms - Target platforms (tiktok, instagram, youtube, linkedin, facebook, pinterest, threads, bluesky, x, discord, telegram)
    * @param {string} [options.description] - Video description
    * @param {string} [options.firstComment] - First comment to post
    * @param {string} [options.scheduledDate] - ISO date for scheduling (e.g., "2024-12-25T10:00:00Z")
@@ -445,7 +445,7 @@ export class UploadPost {
    * @param {Object} options - Upload options
    * @param {string} options.title - Post title/caption
    * @param {string} options.user - User identifier (profile name)
-   * @param {string[]} options.platforms - Target platforms (tiktok, instagram, linkedin, facebook, x, threads, pinterest, reddit, bluesky)
+   * @param {string[]} options.platforms - Target platforms (tiktok, instagram, linkedin, facebook, x, threads, pinterest, reddit, bluesky, discord, telegram)
    * @param {string} [options.description] - Photo description
    * @param {string} [options.firstComment] - First comment to post
    * @param {string} [options.altText] - Alt text for accessibility
@@ -532,7 +532,7 @@ export class UploadPost {
    * @param {Object} options - Upload options
    * @param {string} options.title - Text content for the post
    * @param {string} options.user - User identifier (profile name)
-   * @param {string[]} options.platforms - Target platforms (x, linkedin, facebook, threads, reddit, bluesky)
+   * @param {string[]} options.platforms - Target platforms (x, linkedin, facebook, threads, reddit, bluesky, discord, telegram)
    * @param {string} [options.firstComment] - First comment to post
    * @param {string} [options.scheduledDate] - ISO date for scheduling
    * @param {string} [options.timezone] - Timezone for scheduled date
