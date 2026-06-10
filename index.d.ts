@@ -2,13 +2,13 @@ declare module 'upload-post' {
   // ==================== Common Types ====================
 
   /** Supported platforms for video upload */
-  export type VideoPlatform = 'tiktok' | 'instagram' | 'youtube' | 'linkedin' | 'facebook' | 'pinterest' | 'threads' | 'bluesky' | 'x' | 'google_business';
+  export type VideoPlatform = 'tiktok' | 'instagram' | 'youtube' | 'linkedin' | 'facebook' | 'pinterest' | 'threads' | 'bluesky' | 'x' | 'google_business' | 'discord' | 'telegram';
 
   /** Supported platforms for photo upload */
-  export type PhotoPlatform = 'tiktok' | 'instagram' | 'linkedin' | 'facebook' | 'pinterest' | 'threads' | 'reddit' | 'bluesky' | 'x' | 'google_business';
+  export type PhotoPlatform = 'tiktok' | 'instagram' | 'linkedin' | 'facebook' | 'pinterest' | 'threads' | 'reddit' | 'bluesky' | 'x' | 'google_business' | 'discord' | 'telegram';
 
   /** Supported platforms for text upload */
-  export type TextPlatform = 'x' | 'linkedin' | 'facebook' | 'threads' | 'reddit' | 'bluesky' | 'google_business';
+  export type TextPlatform = 'x' | 'linkedin' | 'facebook' | 'threads' | 'reddit' | 'bluesky' | 'google_business' | 'discord' | 'telegram';
 
   /** TikTok privacy levels */
   export type TikTokPrivacyLevel = 'PUBLIC_TO_EVERYONE' | 'MUTUAL_FOLLOW_FRIENDS' | 'FOLLOWER_OF_CREATOR' | 'SELF_ONLY';
@@ -482,7 +482,7 @@ declare module 'upload-post' {
    * Upload-Post API client
    * 
    * Supports uploading to: TikTok, Instagram, YouTube, LinkedIn, Facebook,
-   * Pinterest, Threads, Reddit, Bluesky, X (Twitter)
+   * Pinterest, Threads, Reddit, Bluesky, X (Twitter), Discord, Telegram
    */
   export class UploadPost {
     /**

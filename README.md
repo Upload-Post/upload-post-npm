@@ -2,7 +2,7 @@
 
 Official Node.js client for the [Upload-Post API](https://www.upload-post.com) - Cross-platform social media upload.
 
-Upload videos, photos, text posts, and documents to **TikTok, Instagram, YouTube, LinkedIn, Facebook, Pinterest, Threads, Reddit, Bluesky, and X (Twitter)** with a single API.
+Upload videos, photos, text posts, and documents to **TikTok, Instagram, YouTube, LinkedIn, Facebook, Pinterest, Threads, Reddit, Bluesky, X (Twitter), Discord, and Telegram** with a single API.
 
 ## Installation
 
@@ -29,9 +29,9 @@ console.log(response);
 
 ## Features
 
-- ✅ **Video Upload** - TikTok, Instagram, YouTube, LinkedIn, Facebook, Pinterest, Threads, Bluesky, X
-- ✅ **Photo Upload** - TikTok, Instagram, LinkedIn, Facebook, Pinterest, Threads, Reddit, Bluesky, X
-- ✅ **Text Posts** - X, LinkedIn, Facebook, Threads, Reddit, Bluesky
+- ✅ **Video Upload** - TikTok, Instagram, YouTube, LinkedIn, Facebook, Pinterest, Threads, Bluesky, X, Discord, Telegram
+- ✅ **Photo Upload** - TikTok, Instagram, LinkedIn, Facebook, Pinterest, Threads, Reddit, Bluesky, X, Discord, Telegram
+- ✅ **Text Posts** - X, LinkedIn, Facebook, Threads, Reddit, Bluesky, Discord, Telegram
 - ✅ **Document Upload** - LinkedIn (PDF, PPT, PPTX, DOC, DOCX)
 - ✅ **Scheduling** - Schedule posts for later
 - ✅ **Posting Queue** - Add posts to your configured queue
