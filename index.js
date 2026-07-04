@@ -203,6 +203,12 @@ export class UploadPost {
     if (options.youtubeBlockedCountries) form.append('blockedCountries', options.youtubeBlockedCountries);
     if (options.youtubeHasPaidProductPlacement !== undefined) form.append('hasPaidProductPlacement', String(options.youtubeHasPaidProductPlacement));
     if (options.youtubeRecordingDate) form.append('recordingDate', options.youtubeRecordingDate);
+    if (options.youtubePlaylistId) {
+      const playlistIds = Array.isArray(options.youtubePlaylistId)
+        ? options.youtubePlaylistId.join(',')
+        : options.youtubePlaylistId;
+      form.append('youtube_playlist_id', playlistIds);
+    }
     if (options.youtubeSubtitles && Array.isArray(options.youtubeSubtitles)) {
       options.youtubeSubtitles.forEach((sub, idx) => {
         if (sub.language) {

@@ -200,6 +200,8 @@ declare module 'upload-post' {
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
+    /** Playlist ID(s) to add the uploaded video to — one ID, an array, or a comma-separated list */
+    youtubePlaylistId?: string | string[];
     /** Subtitle/caption files to upload. Each entry needs a language code and either a file path or URL. */
     youtubeSubtitles?: Array<{
       /** BCP-47 language code (e.g. "en", "es") */
