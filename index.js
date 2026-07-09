@@ -24,13 +24,14 @@ export class UploadPost {
    * Make an API request
    * @private
    */
-  async _request(endpoint, method = 'GET', data = null, isFormData = false) {
+  async _request(endpoint, method = 'GET', data = null, isFormData = false, extraHeaders = {}) {
     const config = {
       method,
       url: `${this.baseUrl}${endpoint}`,
       headers: {
         'Authorization': `Apikey ${this.apiKey}`,
         'X-Upload-Post-Source': 'npm',
+        ...extraHeaders,
       },
       maxContentLength: Infinity,
       maxBodyLength: Infinity
@@ -55,6 +56,16 @@ export class UploadPost {
       const message = error.response?.data?.message || error.response?.data?.detail || error.message;
       throw new Error(`Upload-Post API error: ${message}`);
     }
+  }
+
+  /**
+   * The API collapses two uploads carrying the same key within 24 hours into a
+   * single post. Retrying an upload without one publishes it twice.
+   * @private
+   */
+  _idempotencyHeaders(options) {
+    const key = options.idempotencyKey || options.requestId;
+    return key ? { 'Idempotency-Key': String(key) } : {};
   }
 
   /**
@@ -445,8 +456,9 @@ export class UploadPost {
     if (platforms.includes('pinterest')) this._addPinterestParams(form, options, true);
     if (platforms.includes('x')) this._addXParams(form, options, false);
     if (platforms.includes('threads')) this._addThreadsParams(form, options);
+    if (platforms.includes('reddit')) this._addRedditParams(form, options);
 
-    return this._request('/upload', 'POST', form, true);
+    return this._request('/upload', 'POST', form, true, this._idempotencyHeaders(options));
   }
 
   /**
@@ -534,7 +546,7 @@ export class UploadPost {
     if (platforms.includes('threads')) this._addThreadsParams(form, options);
     if (platforms.includes('reddit')) this._addRedditParams(form, options);
 
-    return this._request('/upload_photos', 'POST', form, true);
+    return this._request('/upload_photos', 'POST', form, true, this._idempotencyHeaders(options));
   }
 
   /**
@@ -601,7 +613,7 @@ export class UploadPost {
       form.append('bluesky_link_url', options.blueskyLinkUrl || options.linkUrl);
     }
 
-    return this._request('/upload_text', 'POST', form, true);
+    return this._request('/upload_text', 'POST', form, true, this._idempotencyHeaders(options));
   }
 
   /**
@@ -653,7 +665,7 @@ export class UploadPost {
 
     this._addLinkedinParams(form, options);
 
-    return this._request('/upload_document', 'POST', form, true);
+    return this._request('/upload_document', 'POST', form, true, this._idempotencyHeaders(options));
   }
 
   // ==================== Status & History ====================
@@ -779,6 +791,16 @@ export class UploadPost {
   }
 
   /**
+   * Get detailed Reddit posts with full media information
+   *
+   * @param {string} profileUsername - Profile username
+   * @returns {Promise<Object>} Detailed Reddit posts
+   */
+  async getRedditDetailedPosts(profileUsername) {
+    return this._request('/uploadposts/reddit/detailed-posts/', 'GET', { profile_username: profileUsername });
+  }
+
+  /**
    * Get recent media from a connected social account.
    *
    * @param {string} platform - instagram, tiktok, youtube, linkedin, facebook, x, threads, pinterest, bluesky, reddit
@@ -899,7 +921,7 @@ export class UploadPost {
    * @returns {Promise<Object>} Validation result
    */
   async validateJwt(jwt) {
-    return this._request('/uploadposts/users/validate-jwt', 'POST', { jwt });
+    return this._request('/uploadposts/users/validate-jwt', 'GET', null, false, { Authorization: `Bearer ${jwt}` });
   }
 
   /**
@@ -930,7 +952,7 @@ export class UploadPost {
    * @returns {Promise<Object>} Notification config
    */
   async getNotificationConfig() {
-    return this._request('/uploadposts/notification-config', 'GET');
+    return this._request('/uploadposts/users/notifications', 'GET');
   }
 
   /**
@@ -945,7 +967,7 @@ export class UploadPost {
     const body = {};
     if (options.webhookEvents) body.webhook_events = options.webhookEvents;
     if (options.webhookUrl) body.webhook_url = options.webhookUrl;
-    return this._request('/uploadposts/notification-config', 'POST', body);
+    return this._request('/uploadposts/users/notifications', 'POST', body);
   }
 
   // ==================== Instagram Comments ====================

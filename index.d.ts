@@ -2,7 +2,7 @@ declare module 'upload-post' {
   // ==================== Common Types ====================
 
   /** Supported platforms for video upload */
-  export type VideoPlatform = 'tiktok' | 'instagram' | 'youtube' | 'linkedin' | 'facebook' | 'pinterest' | 'threads' | 'bluesky' | 'x' | 'google_business' | 'discord' | 'telegram';
+  export type VideoPlatform = 'tiktok' | 'instagram' | 'youtube' | 'linkedin' | 'facebook' | 'pinterest' | 'threads' | 'reddit' | 'bluesky' | 'x' | 'google_business' | 'discord' | 'telegram';
 
   /** Supported platforms for photo upload */
   export type PhotoPlatform = 'tiktok' | 'instagram' | 'linkedin' | 'facebook' | 'pinterest' | 'threads' | 'reddit' | 'bluesky' | 'x' | 'google_business' | 'discord' | 'telegram';
@@ -45,6 +45,13 @@ declare module 'upload-post' {
   export interface CommonUploadOptions {
     /** Post title/caption. Required for YouTube, Reddit, and text posts. Optional for TikTok, Instagram, Facebook, LinkedIn, X, Threads, Bluesky, Pinterest. */
     title?: string;
+    /**
+     * Key the API uses to collapse duplicate uploads within a 24-hour window.
+     * Pass the same value when retrying a failed upload, otherwise the retry publishes a second post.
+     */
+    idempotencyKey?: string;
+    /** Alias for {@link CommonUploadOptions.idempotencyKey}. */
+    requestId?: string;
     /** User identifier (profile name) */
     user: string;
     /** First comment to post after publishing */
@@ -327,6 +334,8 @@ declare module 'upload-post' {
     threadsLongTextAsPost?: boolean;
     /** Comma-separated list of how many media items per Threads post (e.g. "5,5"). Each value 1-10, total must equal file count. */
     threadsThreadMediaLayout?: string;
+    /** Topic tag for the Threads post */
+    threadsTopicTag?: string;
   }
 
   // ==================== Reddit Options ====================
@@ -772,6 +781,26 @@ declare module 'upload-post' {
      * @param profile - Profile username
      */
     getPinterestBoards(profile?: string): Promise<BoardsResponse>;
+
+    /**
+     * Get analytics for a post published outside Upload-Post, by its native platform ID
+     * @param platformPostId - The post ID assigned by the platform
+     * @param platform - Platform the post lives on
+     * @param user - Profile username that owns the connected account
+     */
+    getPostAnalyticsByPlatformId(platformPostId: string, platform: string, user: string): Promise<Record<string, unknown>>;
+
+    /**
+     * Get detailed Reddit posts with full media information
+     * @param profileUsername - Profile username
+     */
+    getRedditDetailedPosts(profileUsername: string): Promise<Record<string, unknown>>;
+
+    /**
+     * Get available Google Business locations for a profile
+     * @param profile - Profile username
+     */
+    getGoogleBusinessLocations(profile?: string): Promise<Record<string, unknown>>;
   }
 
   export default UploadPost;
