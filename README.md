@@ -321,6 +321,38 @@ These options work across all upload methods:
 | `autogenerateLanguage` | Force the AI output language (ISO code); omit to auto-detect from the media |
 | `idempotencyKey` | Collapses duplicate uploads within 24h. Reuse the same value when retrying. Alias: `requestId` |
 
+## Google Business Profile
+
+Pass the target location on the upload itself. There is no separate "select a location" call — the API resolves the location per post.
+
+```javascript
+const { locations } = await client.getGoogleBusinessLocations('myprofile');
+
+await client.upload('video.mp4', {
+  user: 'myprofile',
+  platforms: ['google_business'],
+  title: 'Now open on Sundays',
+  gbpLocationId: locations[0].name,   // "accounts/123/locations/456"
+});
+```
+
+`gbpLocationId` is **required when the account has more than one location** — the API only auto-selects when exactly one exists. Beyond a standard post you can publish an event or an offer:
+
+```javascript
+await client.uploadText({
+  user: 'myprofile',
+  platforms: ['google_business'],
+  title: 'Summer sale',
+  gbpLocationId: locations[0].name,
+  gbpTopicType: 'OFFER',
+  gbpOfferCoupon: 'SUMMER25',
+  gbpOfferRedeemUrl: 'https://example.com/redeem',
+  gbpOfferTerms: 'One per customer',
+});
+```
+
+Also available: `gbpTopicType: 'EVENT'` with `gbpEventTitle` / `gbpEventStartDate` / `gbpEventStartTime` / `gbpEventEndDate` / `gbpEventEndTime`, a call-to-action via `gbpCtaType` + `gbpCtaUrl`, and `gbpMediaUrl` / `gbpMediaFormat`.
+
 ## Retrying an upload safely
 
 An upload that times out may still have been accepted by the API. Retrying it without an idempotency key publishes the post a second time.

@@ -334,6 +334,30 @@ export class UploadPost {
   }
 
   /**
+   * Add Google Business Profile parameters
+   *
+   * gbpLocationId is required for accounts with more than one location; the API
+   * only auto-selects when exactly one location exists.
+   * @private
+   */
+  _addGoogleBusinessParams(form, options) {
+    if (options.gbpLocationId) form.append('gbp_location_id', options.gbpLocationId);
+    if (options.gbpTopicType) form.append('gbp_topic_type', String(options.gbpTopicType).toUpperCase());
+    if (options.gbpMediaUrl) form.append('gbp_media_url', options.gbpMediaUrl);
+    if (options.gbpMediaFormat) form.append('gbp_media_format', String(options.gbpMediaFormat).toUpperCase());
+    if (options.gbpCtaType) form.append('gbp_cta_type', String(options.gbpCtaType).toUpperCase());
+    if (options.gbpCtaUrl) form.append('gbp_cta_url', options.gbpCtaUrl);
+    if (options.gbpEventTitle) form.append('gbp_event_title', options.gbpEventTitle);
+    if (options.gbpEventStartDate) form.append('gbp_event_start_date', options.gbpEventStartDate);
+    if (options.gbpEventStartTime) form.append('gbp_event_start_time', options.gbpEventStartTime);
+    if (options.gbpEventEndDate) form.append('gbp_event_end_date', options.gbpEventEndDate);
+    if (options.gbpEventEndTime) form.append('gbp_event_end_time', options.gbpEventEndTime);
+    if (options.gbpOfferCoupon) form.append('gbp_offer_coupon', options.gbpOfferCoupon);
+    if (options.gbpOfferRedeemUrl) form.append('gbp_offer_redeem_url', options.gbpOfferRedeemUrl);
+    if (options.gbpOfferTerms) form.append('gbp_offer_terms', options.gbpOfferTerms);
+  }
+
+  /**
    * Add Reddit-specific parameters
    * @private
    */
@@ -457,6 +481,7 @@ export class UploadPost {
     if (platforms.includes('x')) this._addXParams(form, options, false);
     if (platforms.includes('threads')) this._addThreadsParams(form, options);
     if (platforms.includes('reddit')) this._addRedditParams(form, options);
+    if (platforms.includes('google_business')) this._addGoogleBusinessParams(form, options);
 
     return this._request('/upload', 'POST', form, true, this._idempotencyHeaders(options));
   }
@@ -545,6 +570,7 @@ export class UploadPost {
     if (platforms.includes('x')) this._addXParams(form, options, false);
     if (platforms.includes('threads')) this._addThreadsParams(form, options);
     if (platforms.includes('reddit')) this._addRedditParams(form, options);
+    if (platforms.includes('google_business')) this._addGoogleBusinessParams(form, options);
 
     return this._request('/upload_photos', 'POST', form, true, this._idempotencyHeaders(options));
   }
@@ -612,6 +638,7 @@ export class UploadPost {
     if (platforms.includes('bluesky') && (options.blueskyLinkUrl || options.linkUrl)) {
       form.append('bluesky_link_url', options.blueskyLinkUrl || options.linkUrl);
     }
+    if (platforms.includes('google_business')) this._addGoogleBusinessParams(form, options);
 
     return this._request('/upload_text', 'POST', form, true, this._idempotencyHeaders(options));
   }
@@ -967,7 +994,20 @@ export class UploadPost {
     const body = {};
     if (options.webhookEvents) body.webhook_events = options.webhookEvents;
     if (options.webhookUrl) body.webhook_url = options.webhookUrl;
+    if (options.channels) body.channels = options.channels;
+    if (options.telegramChatId) body.telegram_chat_id = options.telegramChatId;
+    if (options.slackWebhookUrl) body.slack_webhook_url = options.slackWebhookUrl;
+    if (options.whatsappToPhone) body.whatsapp_to_phone = options.whatsappToPhone;
     return this._request('/uploadposts/users/notifications', 'POST', body);
+  }
+
+  /**
+   * Send a test notification through the configured channels
+   *
+   * @returns {Promise<Object>} Test result
+   */
+  async testNotifications() {
+    return this._request('/uploadposts/users/notifications/test', 'POST', {});
   }
 
   // ==================== Instagram Comments ====================
@@ -1077,10 +1117,11 @@ export class UploadPost {
    * @param {string} [profile] - Profile username
    * @returns {Promise<Object>} Selection result with google_business_id and display_name
    */
-  async selectGoogleBusinessLocation(locationId, profile) {
-    const data = { location_id: locationId };
-    if (profile) data.profile = profile;
-    return this._request('/uploadposts/google-business/locations/select', 'POST', data);
+  async selectGoogleBusinessLocation() {
+    throw new Error(
+      'selectGoogleBusinessLocation is not supported: the API has no persistent location selection. ' +
+      'Pass gbpLocationId on the upload instead (list ids with getGoogleBusinessLocations).'
+    );
   }
 }
 

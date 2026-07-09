@@ -349,6 +349,37 @@ declare module 'upload-post' {
 
   // ==================== Combined Upload Options ====================
 
+  export interface GoogleBusinessOptions {
+    /** Google Business location id, e.g. "accounts/123/locations/456". Required when the account has more than one location; the API auto-selects only for single-location accounts. List them with getGoogleBusinessLocations(). */
+    gbpLocationId?: string;
+    /** Post type. Defaults to STANDARD. */
+    gbpTopicType?: 'STANDARD' | 'EVENT' | 'OFFER';
+    /** Media URL attached to the post */
+    gbpMediaUrl?: string;
+    /** Media format */
+    gbpMediaFormat?: 'PHOTO' | 'VIDEO';
+    /** Call-to-action button */
+    gbpCtaType?: 'BOOK' | 'ORDER' | 'SHOP' | 'LEARN_MORE' | 'SIGN_UP' | 'CALL';
+    /** URL the call-to-action button opens */
+    gbpCtaUrl?: string;
+    /** Event title. Used when gbpTopicType is EVENT. */
+    gbpEventTitle?: string;
+    /** Event start date, YYYY-MM-DD */
+    gbpEventStartDate?: string;
+    /** Event start time, HH:MM */
+    gbpEventStartTime?: string;
+    /** Event end date, YYYY-MM-DD */
+    gbpEventEndDate?: string;
+    /** Event end time, HH:MM */
+    gbpEventEndTime?: string;
+    /** Offer coupon code. Used when gbpTopicType is OFFER. */
+    gbpOfferCoupon?: string;
+    /** URL to redeem the offer */
+    gbpOfferRedeemUrl?: string;
+    /** Offer terms and conditions */
+    gbpOfferTerms?: string;
+  }
+
   export interface UploadVideoOptions extends CommonUploadOptions,
     TikTokVideoOptions,
     InstagramVideoOptions,
@@ -357,7 +388,9 @@ declare module 'upload-post' {
     FacebookVideoOptions,
     PinterestVideoOptions,
     XMediaOptions,
-    ThreadsOptions {
+    ThreadsOptions,
+    RedditOptions,
+    GoogleBusinessOptions {
     /** Target platforms */
     platforms: VideoPlatform[];
   }
@@ -370,7 +403,8 @@ declare module 'upload-post' {
     PinterestPhotoOptions,
     XMediaOptions,
     ThreadsOptions,
-    RedditOptions {
+    RedditOptions,
+    GoogleBusinessOptions {
     /** Target platforms */
     platforms: PhotoPlatform[];
   }
@@ -390,7 +424,8 @@ declare module 'upload-post' {
     XTextOptions,
     ThreadsOptions,
     RedditOptions,
-    LinkPreviewOptions {
+    LinkPreviewOptions,
+    GoogleBusinessOptions {
     /** Target platforms */
     platforms: TextPlatform[];
   }
@@ -721,7 +756,19 @@ declare module 'upload-post' {
      * Update notification configuration (including webhook settings)
      * @param options - Notification config options
      */
-    updateNotificationConfig(options?: { webhookEvents?: string[]; webhookUrl?: string }): Promise<{ success: boolean; config?: { webhook_events?: string[]; webhook_url?: string; [key: string]: any } }>;
+    updateNotificationConfig(options?: {
+      webhookEvents?: string[];
+      webhookUrl?: string;
+      channels?: string[];
+      telegramChatId?: string;
+      slackWebhookUrl?: string;
+      whatsappToPhone?: string;
+    }): Promise<{ success: boolean; config?: { webhook_events?: string[]; webhook_url?: string; [key: string]: any } }>;
+
+    /**
+     * Send a test notification through the configured channels
+     */
+    testNotifications(): Promise<{ success: boolean; [key: string]: any }>;
 
     // Instagram Comments
 
