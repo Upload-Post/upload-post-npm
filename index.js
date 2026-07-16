@@ -104,6 +104,16 @@ export class UploadPost {
     if (options.youtubeTitle) form.append('youtube_title', options.youtubeTitle);
     if (options.pinterestTitle) form.append('pinterest_title', options.pinterestTitle);
     if (options.threadsTitle) form.append('threads_title', options.threadsTitle);
+    // New credential-based platforms
+    if (options.slackTitle) form.append('slack_title', options.slackTitle);
+    if (options.mastodonTitle) form.append('mastodon_title', options.mastodonTitle);
+    if (options.nostrTitle) form.append('nostr_title', options.nostrTitle);
+    if (options.lemmyTitle) form.append('lemmy_title', options.lemmyTitle);
+    if (options.devtoTitle) form.append('devto_title', options.devtoTitle);
+    if (options.hashnodeTitle) form.append('hashnode_title', options.hashnodeTitle);
+    if (options.wordpressTitle) form.append('wordpress_title', options.wordpressTitle);
+    if (options.whopTitle) form.append('whop_title', options.whopTitle);
+    if (options.listmonkTitle) form.append('listmonk_title', options.listmonkTitle);
 
     // Platform-specific description overrides
     if (options.description) form.append('description', options.description);

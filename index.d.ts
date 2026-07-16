@@ -2,13 +2,13 @@ declare module 'upload-post' {
   // ==================== Common Types ====================
 
   /** Supported platforms for video upload */
-  export type VideoPlatform = 'tiktok' | 'instagram' | 'youtube' | 'linkedin' | 'facebook' | 'pinterest' | 'threads' | 'reddit' | 'bluesky' | 'x' | 'google_business' | 'discord' | 'telegram';
+  export type VideoPlatform = 'tiktok' | 'instagram' | 'youtube' | 'linkedin' | 'facebook' | 'pinterest' | 'threads' | 'reddit' | 'bluesky' | 'x' | 'google_business' | 'discord' | 'telegram' | 'mastodon' | 'wordpress';
 
   /** Supported platforms for photo upload */
-  export type PhotoPlatform = 'tiktok' | 'instagram' | 'linkedin' | 'facebook' | 'pinterest' | 'threads' | 'reddit' | 'bluesky' | 'x' | 'google_business' | 'discord' | 'telegram';
+  export type PhotoPlatform = 'tiktok' | 'instagram' | 'linkedin' | 'facebook' | 'pinterest' | 'threads' | 'reddit' | 'bluesky' | 'x' | 'google_business' | 'discord' | 'telegram' | 'mastodon' | 'lemmy' | 'wordpress';
 
   /** Supported platforms for text upload */
-  export type TextPlatform = 'x' | 'linkedin' | 'facebook' | 'threads' | 'reddit' | 'bluesky' | 'google_business' | 'discord' | 'telegram';
+  export type TextPlatform = 'x' | 'linkedin' | 'facebook' | 'threads' | 'reddit' | 'bluesky' | 'google_business' | 'discord' | 'telegram' | 'slack' | 'mastodon' | 'nostr' | 'lemmy' | 'devto' | 'hashnode' | 'wordpress' | 'whop' | 'listmonk';
 
   /** TikTok privacy levels */
   export type TikTokPrivacyLevel = 'PUBLIC_TO_EVERYONE' | 'MUTUAL_FOLLOW_FRIENDS' | 'FOLLOWER_OF_CREATOR' | 'SELF_ONLY';
@@ -87,6 +87,15 @@ declare module 'upload-post' {
     youtubeTitle?: string;
     pinterestTitle?: string;
     threadsTitle?: string;
+    slackTitle?: string;
+    mastodonTitle?: string;
+    nostrTitle?: string;
+    lemmyTitle?: string;
+    devtoTitle?: string;
+    hashnodeTitle?: string;
+    wordpressTitle?: string;
+    whopTitle?: string;
+    listmonkTitle?: string;
 
     // Platform-specific description overrides
     description?: string;
