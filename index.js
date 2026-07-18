@@ -160,13 +160,17 @@ export class UploadPost {
     if (options.brandContentToggle !== undefined) form.append('brand_content_toggle', String(options.brandContentToggle));
     if (options.brandOrganicToggle !== undefined) form.append('brand_organic_toggle', String(options.brandOrganicToggle));
 
+    // Shared by TikTok video AND photo uploads: the backend reads privacy_level and
+    // post_mode for both /upload and /upload_photos. Gating them behind isVideo made
+    // photo carousels always publish as PUBLIC_TO_EVERYONE / DIRECT_POST.
+    if (options.tiktokPrivacyLevel) form.append('privacy_level', options.tiktokPrivacyLevel);
+    if (options.tiktokPostMode) form.append('post_mode', options.tiktokPostMode);
+
     if (isVideo) {
-      if (options.tiktokPrivacyLevel) form.append('privacy_level', options.tiktokPrivacyLevel);
       if (options.tiktokDisableDuet !== undefined) form.append('disable_duet', String(options.tiktokDisableDuet));
       if (options.tiktokDisableStitch !== undefined) form.append('disable_stitch', String(options.tiktokDisableStitch));
       if (options.tiktokCoverTimestamp !== undefined) form.append('cover_timestamp', options.tiktokCoverTimestamp);
       if (options.tiktokIsAigc !== undefined) form.append('is_aigc', String(options.tiktokIsAigc));
-      if (options.tiktokPostMode) form.append('post_mode', options.tiktokPostMode);
     } else {
       // Photo-specific
       if (options.tiktokAutoAddMusic !== undefined) form.append('auto_add_music', String(options.tiktokAutoAddMusic));

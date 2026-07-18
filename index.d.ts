@@ -145,6 +145,10 @@ declare module 'upload-post' {
     tiktokDisableComment?: boolean;
     /** Index of photo for cover (0-based) */
     tiktokPhotoCoverIndex?: number;
+    /** Privacy level, e.g. PUBLIC_TO_EVERYONE, SELF_ONLY, MUTUAL_FOLLOW_FRIENDS */
+    tiktokPrivacyLevel?: string;
+    /** Post mode, e.g. DIRECT_POST or MEDIA_UPLOAD (inbox) */
+    tiktokPostMode?: string;
     /** Branded content toggle */
     brandContentToggle?: boolean;
     /** Brand organic toggle */
