@@ -749,7 +749,7 @@ export class UploadPost {
    * @param {Object} [options] - Query options
    * @param {string[]} [options.platforms] - Filter by platforms (instagram, linkedin, facebook, x, youtube, tiktok, threads, pinterest, reddit)
    * @param {string} [options.pageId] - Facebook Page ID (required for Facebook analytics)
-   * @param {string} [options.pageUrn] - LinkedIn page URN (defaults to "me" for personal profile)
+   * @param {string} [options.pageUrn] - LinkedIn organization/company page URN or numeric ID. LinkedIn analytics are only available for pages you administer; personal profiles are not supported (LinkedIn exposes no member-level analytics). Defaults to the first administered organization page.
    * @returns {Promise<Object>} Analytics data per platform
    */
   async getAnalytics(profileUsername, options = {}) {
