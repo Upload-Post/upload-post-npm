@@ -782,7 +782,27 @@ declare module 'upload-post' {
     // Instagram Comments
 
     /**
-     * Get comments on an Instagram post
+     * Get comments on a post
+     * @param options - Query options
+     */
+    getPostComments(options: {
+      user: string;
+      platform?: 'instagram' | 'facebook' | 'youtube' | 'linkedin';
+      postId?: string;
+      postUrl?: string;
+      limit?: number;
+      after?: string;
+    }): Promise<{
+      success: boolean;
+      comments?: Array<{
+        id: string;
+        text: string;
+        timestamp: string;
+        user: { id: string; username: string };
+      }>;
+    }>;
+    /**
+     * Get comments on an Instagram post (legacy positional signature)
      * @param user - Profile username
      * @param options - Query options
      */
@@ -815,6 +835,68 @@ declare module 'upload-post' {
     publicReplyToComment(options: { user: string; commentId: string; message: string }): Promise<{
       success: boolean;
       id?: string;
+      message?: string;
+      error?: string;
+    }>;
+
+    /**
+     * Create a comment on a post, or reply to an existing comment.
+     * One of postId, postUrl, or commentId is required.
+     * @param options - Comment options
+     */
+    createComment(options: {
+      user: string;
+      platform: 'instagram' | 'facebook' | 'youtube' | 'linkedin';
+      message: string;
+      postId?: string;
+      postUrl?: string;
+      commentId?: string;
+    }): Promise<{
+      success: boolean;
+      id?: string;
+      message?: string;
+      error?: string;
+    }>;
+
+    /**
+     * Delete a comment on a post
+     * @param options - Delete options
+     */
+    deleteComment(options: {
+      user: string;
+      platform: 'instagram' | 'facebook' | 'youtube' | 'linkedin';
+      commentId: string;
+      /** Post identifier (the post URN for LinkedIn) */
+      postId?: string;
+    }): Promise<{
+      success: boolean;
+      message?: string;
+      error?: string;
+    }>;
+
+    // Post Management
+    /**
+     * Retry a failed post. Provide requestId or jobId.
+     * @param options - Retry options
+     */
+    retryPost(options: { requestId?: string; jobId?: string }): Promise<{
+      success: boolean;
+      request_id?: string;
+      job_id?: string;
+      message?: string;
+      error?: string;
+    }>;
+
+    /**
+     * Unpublish (delete) a post from the platform
+     * @param options - Unpublish options
+     */
+    unpublishPost(options: {
+      user: string;
+      platform: 'facebook' | 'youtube' | 'x' | 'linkedin' | 'threads';
+      postId: string;
+    }): Promise<{
+      success: boolean;
       message?: string;
       error?: string;
     }>;

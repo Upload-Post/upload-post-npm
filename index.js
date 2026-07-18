@@ -1023,18 +1023,27 @@ export class UploadPost {
   // ==================== Instagram Comments ====================
 
   /**
-   * Get comments on an Instagram post
+   * Get comments on a post
    *
-   * @param {string} user - Profile username
    * @param {Object} options - Query options
-   * @param {string} [options.postId] - Numeric media ID (provide postId or postUrl)
-   * @param {string} [options.postUrl] - Full Instagram post URL (provide postId or postUrl)
+   * @param {string} options.user - Profile username
+   * @param {string} [options.platform='instagram'] - Platform (instagram, facebook, youtube, linkedin)
+   * @param {string} [options.postId] - Native post/media ID (provide postId or postUrl)
+   * @param {string} [options.postUrl] - Full post URL (provide postId or postUrl)
+   * @param {number} [options.limit] - Max number of comments to return
+   * @param {string} [options.after] - Pagination cursor for the next page
    * @returns {Promise<Object>} Comments data
    */
-  async getPostComments(user, options = {}) {
-    const params = { platform: 'instagram', user };
+  async getPostComments(options = {}) {
+    // Backwards compatibility: getPostComments(user, { postId, postUrl })
+    if (typeof options === 'string') {
+      options = { user: options, ...(arguments[1] || {}) };
+    }
+    const params = { platform: options.platform || 'instagram', user: options.user };
     if (options.postId) params.post_id = options.postId;
     if (options.postUrl) params.post_url = options.postUrl;
+    if (options.limit !== undefined) params.limit = options.limit;
+    if (options.after) params.after = options.after;
     return this._request('/uploadposts/comments', 'GET', params);
   }
 
@@ -1075,6 +1084,90 @@ export class UploadPost {
       user: options.user,
       comment_id: options.commentId,
       message: options.message
+    });
+  }
+
+  /**
+   * Create a comment on a post, or reply to an existing comment
+   *
+   * One of postId, postUrl, or commentId is required. Pass commentId to reply
+   * to an existing comment; pass postId/postUrl to comment on the post itself.
+   *
+   * @param {Object} options - Comment options
+   * @param {string} options.user - Profile username
+   * @param {string} options.platform - Platform (instagram, facebook, youtube, linkedin)
+   * @param {string} options.message - Comment text
+   * @param {string} [options.postId] - Native post/media ID to comment on
+   * @param {string} [options.postUrl] - Full post URL to comment on
+   * @param {string} [options.commentId] - Existing comment ID to reply to
+   * @returns {Promise<Object>} Created comment result
+   */
+  async createComment(options) {
+    const body = {
+      platform: options.platform,
+      user: options.user,
+      message: options.message
+    };
+    if (options.commentId) body.comment_id = options.commentId;
+    if (options.postId) body.post_id = options.postId;
+    if (options.postUrl) body.post_url = options.postUrl;
+    return this._request('/uploadposts/comments/create', 'POST', body);
+  }
+
+  /**
+   * Delete a comment on a post
+   *
+   * @param {Object} options - Delete options
+   * @param {string} options.user - Profile username
+   * @param {string} options.platform - Platform (instagram, facebook, youtube, linkedin)
+   * @param {string} options.commentId - Comment ID to delete
+   * @param {string} [options.postId] - Post identifier (the post URN for LinkedIn)
+   * @returns {Promise<Object>} Deletion result
+   */
+  async deleteComment(options) {
+    const body = {
+      platform: options.platform,
+      user: options.user,
+      comment_id: options.commentId
+    };
+    if (options.postId) body.post_id = options.postId;
+    return this._request('/uploadposts/comments/delete', 'DELETE', body);
+  }
+
+  // ==================== Post Management ====================
+
+  /**
+   * Retry a failed post
+   *
+   * Provide the request_id (from an async upload) or the job_id (from a
+   * scheduled/queued upload).
+   *
+   * @param {Object} options - Retry options
+   * @param {string} [options.requestId] - The request_id of the post to retry
+   * @param {string} [options.jobId] - The job_id of the post to retry
+   * @returns {Promise<Object>} Retry result
+   */
+  async retryPost(options = {}) {
+    const body = {};
+    if (options.requestId) body.request_id = options.requestId;
+    if (options.jobId) body.job_id = options.jobId;
+    return this._request('/uploadposts/posts/retry', 'POST', body);
+  }
+
+  /**
+   * Unpublish (delete) a post from the platform
+   *
+   * @param {Object} options - Unpublish options
+   * @param {string} options.user - Profile username
+   * @param {string} options.platform - Platform (facebook, youtube, x, linkedin, threads)
+   * @param {string} options.postId - Native post ID to unpublish
+   * @returns {Promise<Object>} Unpublish result
+   */
+  async unpublishPost(options) {
+    return this._request('/uploadposts/posts/unpublish', 'POST', {
+      platform: options.platform,
+      user: options.user,
+      post_id: options.postId
     });
   }
 
