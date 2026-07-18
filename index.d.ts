@@ -800,7 +800,7 @@ declare module 'upload-post' {
      * Send a private reply (DM) to the author of an Instagram comment
      * @param options - Reply options
      */
-    replyToComment(options: { user: string; commentId: string; message: string }): Promise<{
+    replyToComment(options: { user: string; commentId: string; message: string; buttons?: Array<{ title: string; url: string }> }): Promise<{
       success: boolean;
       recipient_id?: string;
       message_id?: string;

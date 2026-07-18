@@ -1045,15 +1045,19 @@ export class UploadPost {
    * @param {string} options.user - Profile username
    * @param {string} options.commentId - Comment ID from getPostComments
    * @param {string} options.message - Reply message text
+   * @param {Array<{title: string, url: string}>} [options.buttons] - Optional web_url
+   *   buttons (max 3) rendered in the Instagram DM. Each item is `{ title, url }`.
    * @returns {Promise<Object>} Reply result
    */
   async replyToComment(options) {
-    return this._request('/uploadposts/comments/reply', 'POST', {
+    const body = {
       platform: 'instagram',
       user: options.user,
       comment_id: options.commentId,
       message: options.message
-    });
+    };
+    if (options.buttons) body.buttons = options.buttons;
+    return this._request('/uploadposts/comments/reply', 'POST', body);
   }
 
   /**
