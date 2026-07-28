@@ -358,9 +358,28 @@ declare module 'upload-post' {
 
   // ==================== Combined Upload Options ====================
 
+  export type GoogleBusinessMediaCategory =
+    | 'COVER'
+    | 'PROFILE'
+    | 'LOGO'
+    | 'EXTERIOR'
+    | 'INTERIOR'
+    | 'PRODUCT'
+    | 'AT_WORK'
+    | 'FOOD_AND_DRINK'
+    | 'MENU'
+    | 'COMMON_AREA'
+    | 'ROOMS'
+    | 'TEAMS'
+    | 'ADDITIONAL';
+
   export interface GoogleBusinessOptions {
     /** Google Business location id, e.g. "accounts/123/locations/456". Required when the account has more than one location; the API auto-selects only for single-location accounts. List them with getGoogleBusinessLocations(). */
     gbpLocationId?: string;
+    /** Publish to the location's gallery instead of creating a Local Post. Omitting it (or sending any other value) keeps the Local Post behaviour. */
+    gbpPostType?: 'MEDIA' | 'PHOTO' | 'GALLERY';
+    /** Gallery category for the uploaded photo. Only used with gbpPostType. Defaults to ADDITIONAL. */
+    gbpMediaCategory?: GoogleBusinessMediaCategory;
     /** Post type. Defaults to STANDARD. */
     gbpTopicType?: 'STANDARD' | 'EVENT' | 'OFFER';
     /** Media URL attached to the post */
@@ -496,9 +515,31 @@ declare module 'upload-post' {
     [key: string]: any;
   }
 
+  /**
+   * Instagram audience breakdown. Each key maps a bucket (age range, gender,
+   * country code, city name) to a follower/engager count.
+   */
+  export interface DemographicsBreakdown {
+    age?: Record<string, number>;
+    gender?: Record<string, number>;
+    country?: Record<string, number>;
+    city?: Record<string, number>;
+  }
+
+  export interface InstagramAnalytics {
+    /** Breakdown of the account's followers. */
+    follower_demographics?: DemographicsBreakdown;
+    /** Breakdown of the accounts that engaged with the profile's content. Same shape as follower_demographics. */
+    engaged_audience_demographics?: DemographicsBreakdown;
+    [key: string]: any;
+  }
+
   export interface AnalyticsResponse {
     success: boolean;
-    analytics?: any;
+    analytics?: {
+      instagram?: InstagramAnalytics;
+      [platform: string]: any;
+    };
     [key: string]: any;
   }
 
@@ -655,6 +696,48 @@ declare module 'upload-post' {
     }>;
 
     /**
+     * Get per-post metrics from the daily snapshot cache instead of querying
+     * the platforms live. Not subject to the live post-analytics rate limit
+     * (100 requests / 5 minutes), so it is the right call for paging through a
+     * profile's whole post history.
+     *
+     * @param user - Profile username
+     * @param options - Query options
+     */
+    getCachedPostAnalytics(user: string, options?: {
+      platform?: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'linkedin' | 'threads' | 'pinterest' | 'reddit';
+      /** Posts per page. Default 50, max 200. */
+      limit?: number;
+      /** Opaque cursor from a previous response's next_cursor. */
+      cursor?: string;
+      /** Start date, YYYY-MM-DD. Defaults to 30 days ago. */
+      since?: string;
+      /** End date, YYYY-MM-DD. Defaults to today. */
+      until?: string;
+    }): Promise<{
+      success: boolean;
+      profile_username: string;
+      platform: string | null;
+      since: string;
+      until: string;
+      source: 'snapshot_cache';
+      posts: Array<{
+        post_id: string;
+        platform: string;
+        profile_username: string;
+        date: string;
+        captured_at: string;
+        metrics: Record<string, number>;
+        post_url?: string | null;
+        media_type?: string | null;
+        upload_timestamp?: string | null;
+      }>;
+      limit: number;
+      next_cursor: string | null;
+      has_more: boolean;
+    }>;
+
+    /**
      * Get available metrics configuration for all supported platforms
      */
     getPlatformMetrics(): Promise<Record<string, {
@@ -667,11 +750,13 @@ declare module 'upload-post' {
      * Get recent media from a connected social account.
      *
      * @param options.pageUrn - LinkedIn only. Numeric org ID, full org URN, or "me" to force the personal profile.
+     * @param options.limit - Items per page. Default 25, clamped to 1-100. Per-platform caps: TikTok 20, YouTube 50, everything else 100.
+     * @param options.cursor - Opaque cursor from a previous response's `pagination.next_cursor`. LinkedIn, Discord and Telegram do not support cursors: passing one there returns HTTP 400.
      */
     getMedia(
       platform: 'instagram' | 'tiktok' | 'youtube' | 'linkedin' | 'facebook' | 'x' | 'threads' | 'pinterest' | 'bluesky' | 'reddit' | string,
       user: string,
-      options?: { pageUrn?: string }
+      options?: { pageUrn?: string; limit?: number; cursor?: string }
     ): Promise<{
       success: boolean;
       media: Array<{
@@ -683,6 +768,12 @@ declare module 'upload-post' {
         timestamp: string | null;
         thumbnail_url: string | null;
       }>;
+      pagination?: {
+        limit: number;
+        /** null on the last page. */
+        next_cursor: string | null;
+        has_more: boolean;
+      };
     }>;
 
     // Scheduled Posts
@@ -736,14 +827,32 @@ declare module 'upload-post' {
       readonlyCalendar?: boolean;
       connectTitle?: string;
       connectDescription?: string;
-      language?: 'en' | 'es' | 'de' | 'fr' | 'pt';
+      language?: 'en' | 'es' | 'de' | 'fr' | 'pt' | 'pl' | 'tr';
+      /**
+       * Flat map of i18n dot-path keys to replacement strings, e.g.
+       * `{ 'connect.title': 'Link your accounts' }`. Max 100 entries; keys must
+       * match `^[a-zA-Z0-9_.]+$` and values are strings of up to 300 characters.
+       * Returned back in the `profile` object of validateJwt.
+       */
+      uiLabels?: Record<string, string>;
     }): Promise<JwtResponse>;
 
     /**
      * Validate a JWT token
      * @param jwt - JWT token to validate
      */
-    validateJwt(jwt: string): Promise<{ success: boolean; valid?: boolean }>;
+    validateJwt(jwt: string): Promise<{
+      success: boolean;
+      valid?: boolean;
+      profile?: {
+        username?: string;
+        language?: 'en' | 'es' | 'de' | 'fr' | 'pt' | 'pl' | 'tr';
+        /** The ui_labels sent to generateJwt, echoed back for the connection page. */
+        ui_labels?: Record<string, string>;
+        [key: string]: any;
+      };
+      [key: string]: any;
+    }>;
 
     /**
      * Get user preferences (including calendar settings)

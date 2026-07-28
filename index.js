@@ -348,10 +348,16 @@ export class UploadPost {
    *
    * gbpLocationId is required for accounts with more than one location; the API
    * only auto-selects when exactly one location exists.
+   *
+   * gbpPostType switches the call from the default Local Post to a gallery
+   * photo upload (MEDIA / PHOTO / GALLERY). Any other value, or omitting it,
+   * keeps the Local Post behaviour.
    * @private
    */
   _addGoogleBusinessParams(form, options) {
     if (options.gbpLocationId) form.append('gbp_location_id', options.gbpLocationId);
+    if (options.gbpPostType) form.append('gbp_post_type', String(options.gbpPostType).toUpperCase());
+    if (options.gbpMediaCategory) form.append('gbp_media_category', String(options.gbpMediaCategory).toUpperCase());
     if (options.gbpTopicType) form.append('gbp_topic_type', String(options.gbpTopicType).toUpperCase());
     if (options.gbpMediaUrl) form.append('gbp_media_url', options.gbpMediaUrl);
     if (options.gbpMediaFormat) form.append('gbp_media_format', String(options.gbpMediaFormat).toUpperCase());
@@ -815,6 +821,33 @@ export class UploadPost {
   }
 
   /**
+   * Get per-post metrics from the daily snapshot cache instead of querying the
+   * platforms live.
+   *
+   * Because it never calls the platform APIs it is not subject to the live
+   * post-analytics rate limit (100 requests / 5 minutes), which makes it the
+   * right method for paging through a profile's whole post history.
+   *
+   * @param {string} user - Profile username
+   * @param {Object} [options] - Query options
+   * @param {string} [options.platform] - Filter by platform (instagram, tiktok, youtube, facebook, linkedin, threads, pinterest, reddit)
+   * @param {number} [options.limit=50] - Posts per page (max 200)
+   * @param {string} [options.cursor] - Opaque cursor from a previous response's next_cursor
+   * @param {string} [options.since] - Start date in YYYY-MM-DD format (defaults to 30 days ago)
+   * @param {string} [options.until] - End date in YYYY-MM-DD format (defaults to today)
+   * @returns {Promise<Object>} Cached post metrics with next_cursor and has_more
+   */
+  async getCachedPostAnalytics(user, options = {}) {
+    const params = { user };
+    if (options.platform) params.platform = options.platform;
+    if (options.limit !== undefined) params.limit = options.limit;
+    if (options.cursor) params.cursor = options.cursor;
+    if (options.since) params.since = options.since;
+    if (options.until) params.until = options.until;
+    return this._request('/uploadposts/post-analytics/cached', 'GET', params);
+  }
+
+  /**
    * Get available metrics configuration for all supported platforms
    *
    * @returns {Promise<Object>} Platform metrics config (primary fields, available metrics, labels)
@@ -840,11 +873,16 @@ export class UploadPost {
    * @param {string} user - Profile username
    * @param {Object} [options]
    * @param {string} [options.pageUrn] - LinkedIn only. Numeric org ID, full URN, or "me" to force the personal profile.
-   * @returns {Promise<Object>}
+   * @param {number} [options.limit=25] - Items per page, clamped to 1-100. Per-platform caps: TikTok 20, YouTube 50, everything else 100.
+   * @param {string} [options.cursor] - Opaque cursor from a previous response's `pagination.next_cursor`.
+   *   LinkedIn, Discord and Telegram do not support cursors: passing one there returns HTTP 400.
+   * @returns {Promise<Object>} `{ success, media, pagination: { limit, next_cursor, has_more } }`
    */
   async getMedia(platform, user, options = {}) {
     const params = { platform, user };
     if (options.pageUrn) params.page_urn = options.pageUrn;
+    if (options.limit !== undefined) params.limit = options.limit;
+    if (options.cursor) params.cursor = options.cursor;
     return this._request('/uploadposts/media', 'GET', params);
   }
 
@@ -930,7 +968,8 @@ export class UploadPost {
    * @param {boolean} [options.readonlyCalendar] - Show only a read-only calendar (no editing, no account connection)
    * @param {string} [options.connectTitle] - Custom title for the connection page
    * @param {string} [options.connectDescription] - Custom description for the connection page
-   * @param {('en'|'es'|'de'|'fr'|'pt')} [options.language] - Force the connection page language for this profile. When omitted, the page auto-detects the visitor's browser language and falls back to English.
+   * @param {('en'|'es'|'de'|'fr'|'pt'|'pl'|'tr')} [options.language] - Force the connection page language for this profile. When omitted, the page auto-detects the visitor's browser language and falls back to English.
+   * @param {Object.<string, string>} [options.uiLabels] - Flat map of i18n dot-path keys to replacement strings, e.g. `{ 'connect.title': 'Link your accounts' }`. Max 100 entries; keys must match `^[a-zA-Z0-9_.]+$` and values are strings of up to 300 characters. Returned back in the `profile` object of validateJwt.
    * @returns {Promise<Object>} JWT and connection URL
    */
   async generateJwt(username, options = {}) {
@@ -944,6 +983,7 @@ export class UploadPost {
     if (options.connectTitle) body.connect_title = options.connectTitle;
     if (options.connectDescription) body.connect_description = options.connectDescription;
     if (options.language) body.language = options.language;
+    if (options.uiLabels) body.ui_labels = options.uiLabels;
     return this._request('/uploadposts/users/generate-jwt', 'POST', body);
   }
 

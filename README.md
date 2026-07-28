@@ -202,9 +202,16 @@ const jwt = await client.generateJwt('my-profile', {
   redirectUrl: 'https://yourapp.com/callback',
   platforms: ['tiktok', 'instagram'],
   // Optional: force the connection page language for this profile.
-  // Supported: 'en' | 'es' | 'de' | 'fr' | 'pt'. When omitted, the page
-  // auto-detects the visitor's browser language and falls back to English.
+  // Supported: 'en' | 'es' | 'de' | 'fr' | 'pt' | 'pl' | 'tr'. When omitted, the
+  // page auto-detects the visitor's browser language and falls back to English.
   language: 'es',
+  // Optional: override individual connection-page strings. Flat object of i18n
+  // dot-path keys to strings. Max 100 entries, keys ^[a-zA-Z0-9_.]+$, values
+  // up to 300 chars. Echoed back in the `profile` object of validateJwt.
+  uiLabels: {
+    'connect.title': 'Link your accounts',
+    'connect.subtitle': 'Publish everywhere from one place',
+  },
 });
 ```
 
@@ -215,6 +222,34 @@ const analytics = await client.getAnalytics('my-profile', {
   platforms: ['instagram', 'tiktok'],
 });
 console.log(analytics);
+
+// Instagram returns two audience breakdowns with the same shape
+// ({ age, gender, country, city }):
+console.log(analytics.analytics.instagram.follower_demographics);
+console.log(analytics.analytics.instagram.engaged_audience_demographics);
+```
+
+### Cached Post Analytics
+
+Per-post metrics served from the daily snapshot cache instead of live platform
+calls, so it is not subject to the live post-analytics rate limit
+(100 requests / 5 minutes). Use it to page through a profile's post history.
+
+```javascript
+let cursor;
+do {
+  const page = await client.getCachedPostAnalytics('my-profile', {
+    platform: 'youtube',   // optional: instagram, tiktok, youtube, facebook, linkedin, threads, pinterest, reddit
+    limit: 50,             // default 50, max 200
+    since: '2026-06-01',   // defaults to 30 days ago
+    until: '2026-07-01',   // defaults to today
+    cursor,
+  });
+  for (const post of page.posts) {
+    console.log(post.platform, post.post_id, post.metrics);
+  }
+  cursor = page.next_cursor;
+} while (cursor);
 ```
 
 ### Get Media
@@ -232,6 +267,22 @@ await client.getMedia('linkedin', 'my-profile', { pageUrn: 'me' });
 // Target a specific LinkedIn organization page:
 await client.getMedia('linkedin', 'my-profile', { pageUrn: '12345' });
 ```
+
+The response carries a `pagination` object — `{ limit, next_cursor, has_more }`,
+with `next_cursor: null` and `has_more: false` on the last page:
+
+```javascript
+let cursor;
+do {
+  const page = await client.getMedia('instagram', 'my-profile', { limit: 50, cursor });
+  console.log(page.media.length);
+  cursor = page.pagination.next_cursor;
+} while (cursor);
+```
+
+`limit` defaults to 25 and is clamped to 1-100, with per-platform caps of 20 for
+TikTok and 50 for YouTube. **LinkedIn, Discord and Telegram do not support
+cursors** — they accept `limit` only, and passing a `cursor` returns HTTP 400.
 
 ### Helper Methods
 
@@ -381,6 +432,22 @@ await client.uploadText({
 ```
 
 Also available: `gbpTopicType: 'EVENT'` with `gbpEventTitle` / `gbpEventStartDate` / `gbpEventStartTime` / `gbpEventEndDate` / `gbpEventEndTime`, a call-to-action via `gbpCtaType` + `gbpCtaUrl`, and `gbpMediaUrl` / `gbpMediaFormat`.
+
+### Gallery photos
+
+Set `gbpPostType` to publish straight into the location's photo gallery instead of creating a Local Post:
+
+```javascript
+await client.uploadPhotos(['storefront.jpg'], {
+  user: 'myprofile',
+  platforms: ['google_business'],
+  gbpLocationId: locations[0].name,
+  gbpPostType: 'GALLERY',        // MEDIA | PHOTO | GALLERY
+  gbpMediaCategory: 'EXTERIOR',  // defaults to ADDITIONAL
+});
+```
+
+Omitting `gbpPostType` (or sending any other value) keeps the existing Local Post behaviour. `gbpMediaCategory` accepts `COVER`, `PROFILE`, `LOGO`, `EXTERIOR`, `INTERIOR`, `PRODUCT`, `AT_WORK`, `FOOD_AND_DRINK`, `MENU`, `COMMON_AREA`, `ROOMS`, `TEAMS` and `ADDITIONAL`.
 
 ## Retrying an upload safely
 
