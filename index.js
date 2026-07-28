@@ -821,7 +821,7 @@ export class UploadPost {
   }
 
   /**
-   * Get per-post metrics from the daily snapshot cache instead of querying the
+   * Replay per-post metrics already fetched, instead of querying the
    * platforms live.
    *
    * Because it never calls the platform APIs it is not subject to the live

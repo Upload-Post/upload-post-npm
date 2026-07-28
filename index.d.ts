@@ -696,7 +696,7 @@ declare module 'upload-post' {
     }>;
 
     /**
-     * Get per-post metrics from the daily snapshot cache instead of querying
+     * Replay per-post metrics already fetched, instead of querying
      * the platforms live. Not subject to the live post-analytics rate limit
      * (100 requests / 5 minutes), so it is the right call for paging through a
      * profile's whole post history.

@@ -231,7 +231,7 @@ console.log(analytics.analytics.instagram.engaged_audience_demographics);
 
 ### Cached Post Analytics
 
-Per-post metrics served from the daily snapshot cache instead of live platform
+Replays per-post metrics already fetched, instead of calling the platforms again. Only contains posts previously fetched through a live per-post endpoint; there is no background refresh, so captured_at is the last time that post was read live. Not subject to the live
 calls, so it is not subject to the live post-analytics rate limit
 (100 requests / 5 minutes). Use it to page through a profile's post history.
 
