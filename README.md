@@ -39,6 +39,38 @@ console.log(response);
 - ✅ **Analytics** - Get engagement metrics
 - ✅ **Full TypeScript Support**
 
+## Using this from an AI agent? Use the MCP server instead
+
+If you are wiring Upload-Post into ChatGPT, Claude, Cursor, Claude Code or any
+other MCP-compatible agent, you do not need to write a client on top of this
+SDK. The official **[Model Context Protocol server](https://github.com/Upload-Post/upload-post-mcp)**
+already wraps the whole API as 50 tools the agent can call directly.
+
+```jsonc
+// Hosted (OAuth or API key) — nothing to install
+{
+  "mcpServers": {
+    "upload-post": { "url": "https://mcp.upload-post.com/mcp" }
+  }
+}
+```
+
+```jsonc
+// Local stdio, built on this SDK
+{
+  "mcpServers": {
+    "upload-post": {
+      "command": "npx",
+      "args": ["-y", "@upload-post/mcp"],
+      "env": { "UPLOAD_POST_API_KEY": "YOUR_API_KEY" }
+    }
+  }
+}
+```
+
+See the [MCP integration guide](https://docs.upload-post.com/guides/mcp-server-integration).
+Keep using this SDK when you are writing your own application code.
+
 ## API Reference
 
 ### Upload Video
@@ -407,6 +439,7 @@ try {
 - [Upload-Post Website](https://www.upload-post.com)
 - [API Documentation](https://docs.upload-post.com)
 - [Dashboard](https://app.upload-post.com)
+- [MCP Server](https://www.upload-post.com/mcp) — connect ChatGPT, Claude, Cursor and any AI agent ([source](https://github.com/Upload-Post/upload-post-mcp), [npm](https://www.npmjs.com/package/@upload-post/mcp))
 
 ## License
 

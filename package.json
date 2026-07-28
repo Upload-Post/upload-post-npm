@@ -26,7 +26,10 @@
     "x",
     "api-client",
     "social-media-api",
-    "upload-post"
+    "upload-post",
+    "mcp",
+    "model-context-protocol",
+    "ai-agent"
   ],
   "repository": {
     "type": "git",
