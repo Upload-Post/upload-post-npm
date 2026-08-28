@@ -167,6 +167,22 @@ export class UploadPost {
       if (options.tiktokDisableStitch !== undefined) form.append('disable_stitch', String(options.tiktokDisableStitch));
       if (options.tiktokCoverTimestamp !== undefined) form.append('cover_timestamp', options.tiktokCoverTimestamp);
       if (options.tiktokIsAigc !== undefined) form.append('is_aigc', String(options.tiktokIsAigc));
+
+      // TikTok Business only (requires a TikTok Business account connected through
+      // the business OAuth flow). On a standard TikTok connection the API ignores
+      // these and returns a warning in the response.
+      if (options.tiktokMusicId) form.append('tiktok_music_id', options.tiktokMusicId);
+      if (options.tiktokMusicVolume !== undefined) form.append('tiktok_music_volume', String(options.tiktokMusicVolume));
+      if (options.tiktokMusicStart !== undefined) form.append('tiktok_music_start', String(options.tiktokMusicStart));
+      if (options.tiktokMusicEnd !== undefined) form.append('tiktok_music_end', String(options.tiktokMusicEnd));
+      if (options.tiktokOriginalSoundVolume !== undefined) {
+        form.append('tiktok_original_sound_volume', String(options.tiktokOriginalSoundVolume));
+      }
+      if (options.tiktokLocationId) form.append('tiktok_location_id', options.tiktokLocationId);
+      if (options.tiktokLocationName) form.append('tiktok_location_name', options.tiktokLocationName);
+      if (options.tiktokCoverImageUrl) form.append('tiktok_cover_image_url', options.tiktokCoverImageUrl);
+      if (options.tiktokIsAiGenerated !== undefined) form.append('tiktok_is_ai_generated', String(options.tiktokIsAiGenerated));
+      if (options.tiktokUploadToDraft !== undefined) form.append('tiktok_upload_to_draft', String(options.tiktokUploadToDraft));
     } else {
       // Photo-specific
       if (options.tiktokAutoAddMusic !== undefined) form.append('auto_add_music', String(options.tiktokAutoAddMusic));
@@ -410,7 +426,20 @@ export class UploadPost {
    * @param {string} [options.tiktokPostMode] - DIRECT_POST or MEDIA_UPLOAD
    * @param {boolean} [options.brandContentToggle] - Branded content toggle
    * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
-   * 
+   *
+   * TikTok Business options (require a TikTok Business account; ignored with a
+   * warning on standard TikTok connections):
+   * @param {string} [options.tiktokMusicId] - Commercial Music Library track id (see getTiktokTrendingMusic)
+   * @param {number} [options.tiktokMusicVolume] - Music volume 0-100 (defaults to 50 when music is set)
+   * @param {number} [options.tiktokMusicStart] - Music start offset in ms
+   * @param {number} [options.tiktokMusicEnd] - Music end offset in ms
+   * @param {number} [options.tiktokOriginalSoundVolume] - Original video audio volume 0-100 (defaults to 50 when music is set, so the original audio is not muted)
+   * @param {string} [options.tiktokLocationId] - Location id (see getTiktokLocations)
+   * @param {string} [options.tiktokLocationName] - Location name, required whenever tiktokLocationId is set
+   * @param {string} [options.tiktokCoverImageUrl] - Custom cover image URL
+   * @param {boolean} [options.tiktokIsAiGenerated] - AI-generated content disclosure
+   * @param {boolean} [options.tiktokUploadToDraft] - Publish to drafts. When true TikTok ignores the rest of the post settings
+   *
    * Instagram options:
    * @param {string} [options.instagramMediaType] - REELS or STORIES
    * @param {boolean} [options.instagramShareToFeed] - Share to feed
@@ -521,7 +550,7 @@ export class UploadPost {
    * TikTok options:
    * @param {boolean} [options.tiktokAutoAddMusic] - Auto add music
    * @param {boolean} [options.tiktokDisableComment] - Disable comments
-   * @param {number} [options.tiktokPhotoCoverIndex] - Index of photo for cover (0-based)
+   * @param {number} [options.tiktokPhotoCoverIndex] - Index of photo for cover (0-based). Sent as `photo_cover_index`; also honoured by TikTok Business photo posts
    * @param {boolean} [options.brandContentToggle] - Branded content toggle
    * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
    * 
@@ -1240,6 +1269,43 @@ export class UploadPost {
   async getPinterestBoards(profile) {
     const params = profile ? { profile } : {};
     return this._request('/uploadposts/pinterest/boards', 'GET', params);
+  }
+
+  /**
+   * Get trending tracks from the TikTok Commercial Music Library.
+   *
+   * Requires the profile to have a TikTok Business account connected. The
+   * returned `commercial_music_id` is what you pass as `tiktokMusicId` on an
+   * upload.
+   *
+   * @param {string} profile - Profile username
+   * @param {Object} [options] - Query options
+   * @param {string} [options.genre] - Genre filter (e.g. ALL, POP). Defaults to ALL upstream.
+   * @param {string} [options.countryCode] - ISO country code. Defaults to US upstream.
+   * @param {('1DAY'|'7DAY'|'30DAY'|'90DAY')} [options.dateRange] - Trending window. Defaults to 7DAY upstream.
+   * @returns {Promise<Object>} Trending tracks
+   */
+  async getTiktokTrendingMusic(profile, options = {}) {
+    const params = { profile };
+    if (options.genre) params.genre = options.genre;
+    if (options.countryCode) params.country_code = options.countryCode;
+    if (options.dateRange) params.date_range = options.dateRange;
+    return this._request('/uploadposts/tiktok/music/trending', 'GET', params);
+  }
+
+  /**
+   * Search TikTok locations (places) to tag on a post.
+   *
+   * Requires the profile to have a TikTok Business account connected. Pass the
+   * returned `location_id` as `tiktokLocationId` and `location_name` as
+   * `tiktokLocationName` on an upload; TikTok requires both together.
+   *
+   * @param {string} profile - Profile username
+   * @param {string} query - Search query (max 100 characters)
+   * @returns {Promise<Object>} Matching locations (up to 20)
+   */
+  async getTiktokLocations(profile, query) {
+    return this._request('/uploadposts/tiktok/locations', 'GET', { profile, q: query });
   }
 
   /**

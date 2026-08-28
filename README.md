@@ -295,7 +295,66 @@ const liPages = await client.getLinkedinPages('my-profile');
 
 // Get Pinterest boards for a profile
 const boards = await client.getPinterestBoards('my-profile');
+
+// TikTok Business only: trending Commercial Music Library tracks
+const music = await client.getTiktokTrendingMusic('my-profile', {
+  genre: 'POP',
+  countryCode: 'ES',
+  dateRange: '7DAY', // 1DAY, 7DAY, 30DAY, 90DAY
+});
+
+// TikTok Business only: search locations to tag
+const locations = await client.getTiktokLocations('my-profile', 'Madrid');
 ```
+
+## TikTok Business
+
+> **Requires a TikTok Business account.** These options and endpoints only work
+> for profiles whose TikTok account is connected through the TikTok Business
+> flow. On a standard TikTok connection the API ignores the fields and returns a
+> warning in the response, so the post still publishes.
+
+```javascript
+// 1. Pick a track and a place
+const { tracks } = await client.getTiktokTrendingMusic('my-profile', { countryCode: 'ES' });
+const { locations } = await client.getTiktokLocations('my-profile', 'Madrid');
+
+// 2. Publish with them
+await client.upload('./video.mp4', {
+  title: 'Shot in Madrid',
+  user: 'my-profile',
+  platforms: ['tiktok'],
+
+  tiktokMusicId: tracks[0].commercial_music_id,
+  tiktokMusicVolume: 70,            // 0-100, defaults to 50 when music is set
+  tiktokMusicStart: 0,              // ms
+  tiktokMusicEnd: 15000,            // ms
+  tiktokOriginalSoundVolume: 30,    // 0-100, defaults to 50 so the original audio is not muted
+
+  tiktokLocationId: locations[0].location_id,
+  tiktokLocationName: locations[0].location_name, // required together with the id
+
+  tiktokCoverImageUrl: 'https://example.com/cover.jpg',
+  tiktokIsAiGenerated: false,
+  tiktokUploadToDraft: false,       // true sends it to drafts and ignores the rest
+});
+```
+
+### TikTok Business options
+
+| Option | Type | Notes |
+| --- | --- | --- |
+| `tiktokMusicId` | string | `commercial_music_id` from `getTiktokTrendingMusic()` |
+| `tiktokMusicVolume` | number | 0-100. Defaults to 50 when music is set |
+| `tiktokMusicStart` | number | Music start offset in ms |
+| `tiktokMusicEnd` | number | Music end offset in ms |
+| `tiktokOriginalSoundVolume` | number | 0-100. Defaults to 50 when music is set, so the original audio is not muted |
+| `tiktokLocationId` | string | `location_id` from `getTiktokLocations()` |
+| `tiktokLocationName` | string | Required whenever `tiktokLocationId` is set |
+| `tiktokCoverImageUrl` | string | Custom cover image URL |
+| `tiktokIsAiGenerated` | boolean | AI-generated content disclosure |
+| `tiktokUploadToDraft` | boolean | Publish to drafts; TikTok ignores the rest of the post settings |
+| `tiktokPhotoCoverIndex` | number | Cover photo index for photo posts (0-based) |
 
 ## Platform-Specific Options
 
@@ -309,6 +368,9 @@ const boards = await client.getPinterestBoards('my-profile');
 - `tiktokPostMode` - DIRECT_POST or MEDIA_UPLOAD
 - `brandContentToggle` - Branded content toggle
 - `brandOrganicToggle` - Brand organic toggle
+
+See [TikTok Business](#tiktok-business) for the music, location, cover and draft
+options, which require a TikTok Business account.
 
 ### TikTok (Photos)
 - `tiktokAutoAddMusic` - Auto add music

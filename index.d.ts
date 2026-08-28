@@ -132,6 +132,32 @@ declare module 'upload-post' {
     brandContentToggle?: boolean;
     /** Brand organic toggle */
     brandOrganicToggle?: boolean;
+
+    // ---- TikTok Business only ----
+    // These require a TikTok Business account connected through the business
+    // OAuth flow. On a standard TikTok connection the API ignores them and
+    // returns a warning in the response.
+
+    /** Commercial Music Library track id (see getTiktokTrendingMusic) */
+    tiktokMusicId?: string;
+    /** Music volume, 0-100. Defaults to 50 when music is set */
+    tiktokMusicVolume?: number;
+    /** Music start offset in ms */
+    tiktokMusicStart?: number;
+    /** Music end offset in ms */
+    tiktokMusicEnd?: number;
+    /** Original video audio volume, 0-100. Defaults to 50 when music is set, so the original audio is not muted */
+    tiktokOriginalSoundVolume?: number;
+    /** Location id to tag (see getTiktokLocations) */
+    tiktokLocationId?: string;
+    /** Location name. Required whenever tiktokLocationId is set */
+    tiktokLocationName?: string;
+    /** Custom cover image URL */
+    tiktokCoverImageUrl?: string;
+    /** AI-generated content disclosure */
+    tiktokIsAiGenerated?: boolean;
+    /** Publish to drafts. When true TikTok ignores the rest of the post settings */
+    tiktokUploadToDraft?: boolean;
   }
 
   export interface TikTokPhotoOptions {
@@ -139,7 +165,7 @@ declare module 'upload-post' {
     tiktokAutoAddMusic?: boolean;
     /** Disable comments */
     tiktokDisableComment?: boolean;
-    /** Index of photo for cover (0-based) */
+    /** Index of photo for cover (0-based). Sent as `photo_cover_index`; also honoured by TikTok Business photo posts */
     tiktokPhotoCoverIndex?: number;
     /** Privacy level, e.g. PUBLIC_TO_EVERYONE, SELF_ONLY, MUTUAL_FOLLOW_FRIENDS */
     tiktokPrivacyLevel?: string;
@@ -577,6 +603,40 @@ declare module 'upload-post' {
   export interface BoardsResponse {
     success: boolean;
     boards?: Array<{ id: string; name?: string }>;
+    [key: string]: any;
+  }
+
+  /** Trending window accepted by the TikTok Commercial Music Library. */
+  export type TikTokMusicDateRange = '1DAY' | '7DAY' | '30DAY' | '90DAY';
+
+  export interface TikTokMusicTrack {
+    /** Pass this as `tiktokMusicId` on an upload. */
+    commercial_music_id: string;
+    title?: string;
+    artist?: string;
+    /** Track duration in seconds. */
+    duration?: number;
+    genres?: string[];
+    rank?: number;
+    [key: string]: any;
+  }
+
+  export interface TikTokTrendingMusicResponse {
+    success: boolean;
+    tracks?: TikTokMusicTrack[];
+    [key: string]: any;
+  }
+
+  export interface TikTokLocation {
+    location_id: string;
+    location_name?: string;
+    location_address?: string;
+    [key: string]: any;
+  }
+
+  export interface TikTokLocationsResponse {
+    success: boolean;
+    locations?: TikTokLocation[];
     [key: string]: any;
   }
 
@@ -1048,6 +1108,36 @@ declare module 'upload-post' {
      * @param profile - Profile username
      */
     getGoogleBusinessLocations(profile?: string): Promise<Record<string, unknown>>;
+
+    /**
+     * Get trending tracks from the TikTok Commercial Music Library.
+     *
+     * Requires a TikTok Business account on the profile. Pass the returned
+     * `commercial_music_id` as `tiktokMusicId` on an upload.
+     *
+     * @param profile - Profile username
+     * @param options - Query options
+     */
+    getTiktokTrendingMusic(
+      profile: string,
+      options?: {
+        genre?: string;
+        countryCode?: string;
+        dateRange?: TikTokMusicDateRange;
+      }
+    ): Promise<TikTokTrendingMusicResponse>;
+
+    /**
+     * Search TikTok locations (places) to tag on a post.
+     *
+     * Requires a TikTok Business account on the profile. TikTok requires both
+     * the id and the name, so pass `location_id` as `tiktokLocationId` and
+     * `location_name` as `tiktokLocationName`.
+     *
+     * @param profile - Profile username
+     * @param query - Search query (max 100 characters)
+     */
+    getTiktokLocations(profile: string, query: string): Promise<TikTokLocationsResponse>;
   }
 
   export default UploadPost;
