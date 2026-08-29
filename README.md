@@ -319,7 +319,7 @@ const locations = await client.getTiktokLocations('my-profile', 'Madrid');
 > matching capability — `music`, `location`, `cover_image`, `draft` — in the
 > `capabilities` array of the TikTok account returned by `listUsers()`
 > (other values you may see there: `cover_timestamp`, `photo_privacy`,
-> `video_privacy`, `inbox_fallback`, `comments`, `profile_analytics`)
+> `video_privacy`, `inbox_fallback`, `profile_analytics`)
 > (`GET /api/uploadposts/users`). If your connection does not have it, the field
 > is ignored, the post still publishes, and the response includes a per-field
 > `warnings` entry — reconnect the TikTok account to enable it.
