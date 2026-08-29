@@ -1302,6 +1302,37 @@ export class UploadPost {
   }
 
   /**
+   * Search the TikTok Commercial Music Library by song title or artist.
+   *
+   * TikTok itself has no music search endpoint — its only catalogue read is the
+   * trending chart for a genre/country/period. Upload-Post caches those charts
+   * and matches your text against them, so this searches the trending charts,
+   * not TikTok's whole catalogue. Matching is case- and accent-insensitive and
+   * every word must match.
+   *
+   * Returns the same track objects as getTiktokTrendingMusic(), so the `id` is
+   * again what you pass as `tiktokMusicId` on an upload.
+   *
+   * @param {string} profile - Profile username
+   * @param {Object} [options] - Query options
+   * @param {string} [options.q] - Text matched against titles and artists (max 80 chars). Omit for the chart in trending order.
+   * @param {string} [options.genre] - Genre filter (e.g. ALL, POP). Defaults to ALL upstream.
+   * @param {string} [options.countryCode] - ISO country code choosing which chart is searched. Defaults to US upstream.
+   * @param {('1DAY'|'7DAY'|'30DAY'|'90DAY')} [options.dateRange] - Chart window. Defaults to 7DAY upstream.
+   * @param {number} [options.limit] - Maximum tracks to return (capped at 100 upstream).
+   * @returns {Promise<Object>} Matching tracks plus a `catalog` block describing the corpus searched
+   */
+  async searchTiktokMusic(profile, options = {}) {
+    const params = { profile };
+    if (options.q) params.q = options.q;
+    if (options.genre) params.genre = options.genre;
+    if (options.countryCode) params.country_code = options.countryCode;
+    if (options.dateRange) params.date_range = options.dateRange;
+    if (options.limit !== undefined && options.limit !== null) params.limit = options.limit;
+    return this._request('/uploadposts/tiktok/music/search', 'GET', params);
+  }
+
+  /**
    * Search TikTok locations (places) to tag on a post.
    *
    * Available on connections that declare the `location` capability (see

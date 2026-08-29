@@ -303,6 +303,12 @@ const music = await client.getTiktokTrendingMusic('my-profile', {
   dateRange: '7DAY', // 1DAY, 7DAY, 30DAY, 90DAY
 });
 
+// TikTok: find a track by song or artist
+const found = await client.searchTiktokMusic('my-profile', {
+  q: 'bad bunny',
+  countryCode: 'ES',
+});
+
 // TikTok: search locations to tag
 const locations = await client.getTiktokLocations('my-profile', 'Madrid');
 ```
@@ -321,6 +327,9 @@ const locations = await client.getTiktokLocations('my-profile', 'Madrid');
 ```javascript
 // 1. Pick a track and a place
 const { tracks } = await client.getTiktokTrendingMusic('my-profile', { countryCode: 'ES' });
+// ...or find one by name. TikTok has no music search endpoint, so this searches
+// the trending charts Upload-Post caches, not TikTok's whole catalogue.
+// const { tracks } = await client.searchTiktokMusic('my-profile', { q: 'bossa', countryCode: 'ES' });
 const { locations } = await client.getTiktokLocations('my-profile', 'Madrid');
 
 // 2. Publish with them
@@ -348,7 +357,7 @@ await client.upload('./video.mp4', {
 
 | Option | Type | Notes |
 | --- | --- | --- |
-| `tiktokMusicId` | string | The track `id` from `getTiktokTrendingMusic()` (not `commercial_music_id`) |
+| `tiktokMusicId` | string | The track `id` from `getTiktokTrendingMusic()` or `searchTiktokMusic()` (not `commercial_music_id`) |
 | `tiktokMusicVolume` | number | 0-100. Defaults to 50 when music is set |
 | `tiktokMusicStart` | number | Music start offset in ms |
 | `tiktokMusicEnd` | number | Music end offset in ms |

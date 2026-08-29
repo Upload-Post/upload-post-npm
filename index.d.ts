@@ -644,6 +644,25 @@ declare module 'upload-post' {
     [key: string]: any;
   }
 
+  export interface TikTokMusicSearchResponse {
+    success: boolean;
+    /** Matches, ranked by relevance; same shape as the trending endpoint. */
+    tracks?: TikTokMusicTrack[];
+    /** How many tracks matched before `limit` was applied. */
+    total?: number;
+    query?: string;
+    /** What the search actually ran against. */
+    catalog?: {
+      /** Number of tracks in the searched corpus. */
+      tracks_indexed?: number;
+      /** Genre charts currently loaded for this country and period. */
+      genres_indexed?: string[];
+      /** False when this request had to load a chart from TikTok. */
+      cached?: boolean;
+    };
+    [key: string]: any;
+  }
+
   export interface TikTokLocation {
     location_id: string;
     location_name?: string;
@@ -1146,6 +1165,28 @@ declare module 'upload-post' {
         dateRange?: TikTokMusicDateRange;
       }
     ): Promise<TikTokTrendingMusicResponse>;
+
+    /**
+     * Search the TikTok Commercial Music Library by song title or artist.
+     *
+     * TikTok has no music search endpoint, so this searches the trending charts
+     * Upload-Post caches (per genre / country / period), not TikTok's whole
+     * catalogue. Matching is case- and accent-insensitive and every word must
+     * match. Returns the same track objects as getTiktokTrendingMusic().
+     *
+     * @param profile - Profile username
+     * @param options - Query options
+     */
+    searchTiktokMusic(
+      profile: string,
+      options?: {
+        q?: string;
+        genre?: string;
+        countryCode?: string;
+        dateRange?: TikTokMusicDateRange;
+        limit?: number;
+      }
+    ): Promise<TikTokMusicSearchResponse>;
 
     /**
      * Search TikTok locations (places) to tag on a post.
