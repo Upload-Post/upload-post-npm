@@ -419,7 +419,7 @@ export class UploadPost {
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
    * 
    * TikTok options:
-   * @param {string} [options.tiktokPrivacyLevel] - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY. Note: TikTok does not accept a privacy level on video posts — the video is published public, or sent to drafts with tiktokUploadToDraft. It is accepted on TikTok photo posts.
+   * @param {string} [options.tiktokPrivacyLevel] - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY. TikTok decides per account which of these are available (a private account has no PUBLIC_TO_EVERYONE); asking for another one fails with error_code tiktok_privacy_unavailable listing the allowed ones. Omit it to keep the account's own default.
    * @param {boolean} [options.tiktokDisableDuet] - Disable duet
    * @param {boolean} [options.tiktokDisableComment] - Disable comments
    * @param {boolean} [options.tiktokDisableStitch] - Disable stitch

@@ -115,9 +115,10 @@ declare module 'upload-post' {
 
   export interface TikTokVideoOptions {
     /**
-     * Privacy setting. TikTok does not accept a privacy level on video posts: the
-     * video is published public, or sent to drafts with `tiktokUploadToDraft`.
-     * (It is accepted on TikTok photo posts, see TikTokPhotoOptions.)
+     * Privacy setting. TikTok decides per account which levels are available (a
+     * private account has no `PUBLIC_TO_EVERYONE`); asking for another one fails
+     * with `error_code: "tiktok_privacy_unavailable"` listing the allowed ones.
+     * Omit it to keep the account's own default.
      */
     tiktokPrivacyLevel?: TikTokPrivacyLevel;
     /** Disable duet */

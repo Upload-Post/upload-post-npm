@@ -373,9 +373,13 @@ await client.upload('./video.mp4', {
 - `brandContentToggle` - Branded content toggle
 - `brandOrganicToggle` - Brand organic toggle
 
-> TikTok does not accept a privacy level on **video** posts: the video is
-> published public, or sent to drafts with `tiktokUploadToDraft`.
-> `tiktokPrivacyLevel` **is** accepted on TikTok **photo** posts.
+> **Which privacy levels are available is decided by TikTok per account.** A
+> private account, for example, is offered `FOLLOWER_OF_CREATOR`,
+> `MUTUAL_FOLLOW_FRIENDS` and `SELF_ONLY` and has no `PUBLIC_TO_EVERYONE`.
+> Asking for one the account does not have fails with
+> `error_code: "tiktok_privacy_unavailable"` and an error listing the ones it
+> does have. Omit `tiktokPrivacyLevel` on video and TikTok keeps the account's
+> own default; on **photo** posts it defaults to `PUBLIC_TO_EVERYONE`.
 
 See [TikTok music, location, cover and drafts](#tiktok-music-location-cover-and-drafts)
 for those options.
@@ -384,7 +388,7 @@ for those options.
 - `tiktokAutoAddMusic` - Auto add music
 - `tiktokPhotoCoverIndex` - Index of photo for cover (0-based)
 - `tiktokDisableComment` - Disable comments
-- `tiktokPrivacyLevel` - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY (accepted on photo posts)
+- `tiktokPrivacyLevel` - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY (same field and same per-account limits as video)
 
 ### Instagram
 - `instagramMediaType` - REELS, STORIES, IMAGE
