@@ -296,23 +296,25 @@ const liPages = await client.getLinkedinPages('my-profile');
 // Get Pinterest boards for a profile
 const boards = await client.getPinterestBoards('my-profile');
 
-// TikTok Business only: trending Commercial Music Library tracks
+// TikTok: trending Commercial Music Library tracks
 const music = await client.getTiktokTrendingMusic('my-profile', {
   genre: 'POP',
   countryCode: 'ES',
   dateRange: '7DAY', // 1DAY, 7DAY, 30DAY, 90DAY
 });
 
-// TikTok Business only: search locations to tag
+// TikTok: search locations to tag
 const locations = await client.getTiktokLocations('my-profile', 'Madrid');
 ```
 
-## TikTok Business
+## TikTok music, location, cover and drafts
 
-> **Requires a TikTok Business account.** These options and endpoints only work
-> for profiles whose TikTok account is connected through the TikTok Business
-> flow. On a standard TikTok connection the API ignores the fields and returns a
-> warning in the response, so the post still publishes.
+> **Capabilities.** These options are available on connections that declare the
+> matching capability — `music`, `location`, `cover_image`, `draft` — in the
+> `capabilities` array of the TikTok account returned by `listUsers()`
+> (`GET /api/uploadposts/users`). If your connection does not have it, the field
+> is ignored, the post still publishes, and the response includes a per-field
+> `warnings` entry — reconnect the TikTok account to enable it.
 
 ```javascript
 // 1. Pick a track and a place
@@ -340,7 +342,7 @@ await client.upload('./video.mp4', {
 });
 ```
 
-### TikTok Business options
+### Options
 
 | Option | Type | Notes |
 | --- | --- | --- |
@@ -369,13 +371,18 @@ await client.upload('./video.mp4', {
 - `brandContentToggle` - Branded content toggle
 - `brandOrganicToggle` - Brand organic toggle
 
-See [TikTok Business](#tiktok-business) for the music, location, cover and draft
-options, which require a TikTok Business account.
+> TikTok does not accept a privacy level on **video** posts: the video is
+> published public, or sent to drafts with `tiktokUploadToDraft`.
+> `tiktokPrivacyLevel` **is** accepted on TikTok **photo** posts.
+
+See [TikTok music, location, cover and drafts](#tiktok-music-location-cover-and-drafts)
+for those options.
 
 ### TikTok (Photos)
 - `tiktokAutoAddMusic` - Auto add music
 - `tiktokPhotoCoverIndex` - Index of photo for cover (0-based)
 - `tiktokDisableComment` - Disable comments
+- `tiktokPrivacyLevel` - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY (accepted on photo posts)
 
 ### Instagram
 - `instagramMediaType` - REELS, STORIES, IMAGE

@@ -114,7 +114,11 @@ declare module 'upload-post' {
   // ==================== TikTok Options ====================
 
   export interface TikTokVideoOptions {
-    /** Privacy setting */
+    /**
+     * Privacy setting. TikTok does not accept a privacy level on video posts: the
+     * video is published public, or sent to drafts with `tiktokUploadToDraft`.
+     * (It is accepted on TikTok photo posts, see TikTokPhotoOptions.)
+     */
     tiktokPrivacyLevel?: TikTokPrivacyLevel;
     /** Disable duet */
     tiktokDisableDuet?: boolean;
@@ -133,10 +137,13 @@ declare module 'upload-post' {
     /** Brand organic toggle */
     brandOrganicToggle?: boolean;
 
-    // ---- TikTok Business only ----
-    // These require a TikTok Business account connected through the business
-    // OAuth flow. On a standard TikTok connection the API ignores them and
-    // returns a warning in the response.
+    // ---- Music, location, cover and draft ----
+    // Available on connections that declare the matching capability (`music`,
+    // `location`, `cover_image`, `draft`) — see `capabilities` on the TikTok
+    // account returned by listUsers() / GET /api/uploadposts/users. If your
+    // connection does not have it, the field is ignored, the post still
+    // publishes, and the response includes a per-field `warnings` entry —
+    // reconnect the TikTok account to enable it.
 
     /** Commercial Music Library track id (see getTiktokTrendingMusic) */
     tiktokMusicId?: string;
@@ -165,9 +172,9 @@ declare module 'upload-post' {
     tiktokAutoAddMusic?: boolean;
     /** Disable comments */
     tiktokDisableComment?: boolean;
-    /** Index of photo for cover (0-based). Sent as `photo_cover_index`; also honoured by TikTok Business photo posts */
+    /** Index of photo for cover (0-based). Sent as `photo_cover_index` */
     tiktokPhotoCoverIndex?: number;
-    /** Privacy level, e.g. PUBLIC_TO_EVERYONE, SELF_ONLY, MUTUAL_FOLLOW_FRIENDS */
+    /** Privacy level, e.g. PUBLIC_TO_EVERYONE, SELF_ONLY, MUTUAL_FOLLOW_FRIENDS. Accepted on TikTok photo posts (unlike TikTok video posts) */
     tiktokPrivacyLevel?: string;
     /** Post mode, e.g. DIRECT_POST or MEDIA_UPLOAD (inbox) */
     tiktokPostMode?: string;
@@ -1112,8 +1119,10 @@ declare module 'upload-post' {
     /**
      * Get trending tracks from the TikTok Commercial Music Library.
      *
-     * Requires a TikTok Business account on the profile. Pass the returned
-     * `commercial_music_id` as `tiktokMusicId` on an upload.
+     * Available on connections that declare the `music` capability (see
+     * `capabilities` on the TikTok account returned by listUsers() /
+     * GET /api/uploadposts/users). Pass the returned `commercial_music_id` as
+     * `tiktokMusicId` on an upload.
      *
      * @param profile - Profile username
      * @param options - Query options
@@ -1130,9 +1139,11 @@ declare module 'upload-post' {
     /**
      * Search TikTok locations (places) to tag on a post.
      *
-     * Requires a TikTok Business account on the profile. TikTok requires both
-     * the id and the name, so pass `location_id` as `tiktokLocationId` and
-     * `location_name` as `tiktokLocationName`.
+     * Available on connections that declare the `location` capability (see
+     * `capabilities` on the TikTok account returned by listUsers() /
+     * GET /api/uploadposts/users). TikTok requires both the id and the name, so
+     * pass `location_id` as `tiktokLocationId` and `location_name` as
+     * `tiktokLocationName`.
      *
      * @param profile - Profile username
      * @param query - Search query (max 100 characters)

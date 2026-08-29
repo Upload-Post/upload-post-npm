@@ -168,9 +168,11 @@ export class UploadPost {
       if (options.tiktokCoverTimestamp !== undefined) form.append('cover_timestamp', options.tiktokCoverTimestamp);
       if (options.tiktokIsAigc !== undefined) form.append('is_aigc', String(options.tiktokIsAigc));
 
-      // TikTok Business only (requires a TikTok Business account connected through
-      // the business OAuth flow). On a standard TikTok connection the API ignores
-      // these and returns a warning in the response.
+      // Music, location, cover and draft options. Available on connections that
+      // declare the matching capability (see `capabilities` on the TikTok account
+      // returned by listUsers() / GET /api/uploadposts/users). Without it the field
+      // is ignored, the post still publishes, and the response carries a per-field
+      // `warnings` entry.
       if (options.tiktokMusicId) form.append('tiktok_music_id', options.tiktokMusicId);
       if (options.tiktokMusicVolume !== undefined) form.append('tiktok_music_volume', String(options.tiktokMusicVolume));
       if (options.tiktokMusicStart !== undefined) form.append('tiktok_music_start', String(options.tiktokMusicStart));
@@ -417,7 +419,7 @@ export class UploadPost {
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
    * 
    * TikTok options:
-   * @param {string} [options.tiktokPrivacyLevel] - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY
+   * @param {string} [options.tiktokPrivacyLevel] - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY. Note: TikTok does not accept a privacy level on video posts — the video is published public, or sent to drafts with tiktokUploadToDraft. It is accepted on TikTok photo posts.
    * @param {boolean} [options.tiktokDisableDuet] - Disable duet
    * @param {boolean} [options.tiktokDisableComment] - Disable comments
    * @param {boolean} [options.tiktokDisableStitch] - Disable stitch
@@ -427,8 +429,12 @@ export class UploadPost {
    * @param {boolean} [options.brandContentToggle] - Branded content toggle
    * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
    *
-   * TikTok Business options (require a TikTok Business account; ignored with a
-   * warning on standard TikTok connections):
+   * TikTok music, location, cover and draft options. Available on connections that
+   * declare the matching `capabilities` (music, location, cover_image, draft) on the
+   * TikTok account returned by listUsers() / GET /api/uploadposts/users. If your
+   * connection does not have it, the field is ignored, the post still publishes, and
+   * the response includes a per-field `warnings` entry — reconnect the TikTok account
+   * to enable it.
    * @param {string} [options.tiktokMusicId] - Commercial Music Library track id (see getTiktokTrendingMusic)
    * @param {number} [options.tiktokMusicVolume] - Music volume 0-100 (defaults to 50 when music is set)
    * @param {number} [options.tiktokMusicStart] - Music start offset in ms
@@ -550,7 +556,7 @@ export class UploadPost {
    * TikTok options:
    * @param {boolean} [options.tiktokAutoAddMusic] - Auto add music
    * @param {boolean} [options.tiktokDisableComment] - Disable comments
-   * @param {number} [options.tiktokPhotoCoverIndex] - Index of photo for cover (0-based). Sent as `photo_cover_index`; also honoured by TikTok Business photo posts
+   * @param {number} [options.tiktokPhotoCoverIndex] - Index of photo for cover (0-based). Sent as `photo_cover_index`
    * @param {boolean} [options.brandContentToggle] - Branded content toggle
    * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
    * 
@@ -1274,9 +1280,10 @@ export class UploadPost {
   /**
    * Get trending tracks from the TikTok Commercial Music Library.
    *
-   * Requires the profile to have a TikTok Business account connected. The
-   * returned `commercial_music_id` is what you pass as `tiktokMusicId` on an
-   * upload.
+   * Available on connections that declare the `music` capability (see
+   * `capabilities` on the TikTok account returned by listUsers() /
+   * GET /api/uploadposts/users). The returned `commercial_music_id` is what you
+   * pass as `tiktokMusicId` on an upload.
    *
    * @param {string} profile - Profile username
    * @param {Object} [options] - Query options
@@ -1296,9 +1303,11 @@ export class UploadPost {
   /**
    * Search TikTok locations (places) to tag on a post.
    *
-   * Requires the profile to have a TikTok Business account connected. Pass the
-   * returned `location_id` as `tiktokLocationId` and `location_name` as
-   * `tiktokLocationName` on an upload; TikTok requires both together.
+   * Available on connections that declare the `location` capability (see
+   * `capabilities` on the TikTok account returned by listUsers() /
+   * GET /api/uploadposts/users). Pass the returned `location_id` as
+   * `tiktokLocationId` and `location_name` as `tiktokLocationName` on an upload;
+   * TikTok requires both together.
    *
    * @param {string} profile - Profile username
    * @param {string} query - Search query (max 100 characters)
