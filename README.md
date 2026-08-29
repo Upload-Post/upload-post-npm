@@ -398,6 +398,13 @@ for those options.
 - `tiktokPhotoCoverIndex` - Index of photo for cover (0-based)
 - `tiktokDisableComment` - Disable comments
 - `tiktokPrivacyLevel` - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY (same field and same per-account limits as video)
+- `tiktokMusicId` - Commercial Music Library track id (see `getTiktokTrendingMusic`)
+- `tiktokLocationId` / `tiktokLocationName` - Location tag, both required together
+- `tiktokIsAiGenerated` - AI-generated content disclosure
+
+> TikTok's photo contract takes the music track id alone: `tiktokMusicVolume`,
+> `tiktokMusicStart`, `tiktokMusicEnd`, `tiktokOriginalSoundVolume`,
+> `tiktokCoverImageUrl` and `tiktokUploadToDraft` are video-only.
 
 ### Instagram
 - `instagramMediaType` - REELS, STORIES, IMAGE

@@ -175,14 +175,37 @@ declare module 'upload-post' {
     tiktokDisableComment?: boolean;
     /** Index of photo for cover (0-based). Sent as `photo_cover_index` */
     tiktokPhotoCoverIndex?: number;
-    /** Privacy level, e.g. PUBLIC_TO_EVERYONE, SELF_ONLY, MUTUAL_FOLLOW_FRIENDS. Accepted on TikTok photo posts (unlike TikTok video posts) */
-    tiktokPrivacyLevel?: string;
+    /**
+     * Privacy setting. TikTok REQUIRES one on photo posts, so it defaults to
+     * `PUBLIC_TO_EVERYONE`. Which values the account may use is decided by TikTok
+     * (a private account has no `PUBLIC_TO_EVERYONE`); asking for another one
+     * fails with `error_code: "tiktok_privacy_unavailable"` listing the allowed
+     * ones.
+     */
+    tiktokPrivacyLevel?: TikTokPrivacyLevel;
     /** Post mode, e.g. DIRECT_POST or MEDIA_UPLOAD (inbox) */
     tiktokPostMode?: string;
     /** Branded content toggle */
     brandContentToggle?: boolean;
     /** Brand organic toggle */
     brandOrganicToggle?: boolean;
+
+    // ---- Music, location and AI disclosure ----
+    // Photo posts accept the track id, the location pair and the AI disclosure —
+    // not the volume/trim, cover-image or draft fields, which are video-only.
+    // Available on connections that declare the matching capability (`music`,
+    // `location`) — see `capabilities` on the TikTok account returned by
+    // listUsers(). Without it the field is ignored, the post still publishes, and
+    // the response includes a per-field `warnings` entry.
+
+    /** Commercial Music Library track id (see getTiktokTrendingMusic) */
+    tiktokMusicId?: string;
+    /** Location id to tag (see getTiktokLocations) */
+    tiktokLocationId?: string;
+    /** Location name. Required whenever tiktokLocationId is set */
+    tiktokLocationName?: string;
+    /** AI-generated content disclosure */
+    tiktokIsAiGenerated?: boolean;
   }
 
   // ==================== Instagram Options ====================
@@ -673,6 +696,18 @@ declare module 'upload-post' {
   export interface TikTokLocationsResponse {
     success: boolean;
     locations?: TikTokLocation[];
+    [key: string]: any;
+  }
+
+  export interface TikTokPublishingSettingsResponse {
+    success: boolean;
+    /** The privacy levels THIS account may use — a subset of the four. */
+    privacy_level_options?: TikTokPrivacyLevel[];
+    /** Longest video the account can publish, in seconds. */
+    max_video_post_duration_sec?: number;
+    comment_disabled?: boolean;
+    duet_disabled?: boolean;
+    stitch_disabled?: boolean;
     [key: string]: any;
   }
 
@@ -1201,6 +1236,19 @@ declare module 'upload-post' {
      * @param query - Search query (max 100 characters)
      */
     getTiktokLocations(profile: string, query: string): Promise<TikTokLocationsResponse>;
+
+    /**
+     * Get what the connected TikTok account is allowed to publish.
+     *
+     * The point of this call is `privacy_level_options`: TikTok narrows the four
+     * privacy values per account (a private account has no `PUBLIC_TO_EVERYONE`),
+     * and sending one the account does not have fails the upload with
+     * `error_code: "tiktok_privacy_unavailable"`. Ask here to offer only the
+     * values that will work, instead of the full enum.
+     *
+     * @param profile - Profile username
+     */
+    getTiktokPublishingSettings(profile: string): Promise<TikTokPublishingSettingsResponse>;
   }
 
   export default UploadPost;
