@@ -312,6 +312,8 @@ const locations = await client.getTiktokLocations('my-profile', 'Madrid');
 > **Capabilities.** These options are available on connections that declare the
 > matching capability — `music`, `location`, `cover_image`, `draft` — in the
 > `capabilities` array of the TikTok account returned by `listUsers()`
+> (other values you may see there: `cover_timestamp`, `photo_privacy`,
+> `video_privacy`, `inbox_fallback`, `comments`, `profile_analytics`)
 > (`GET /api/uploadposts/users`). If your connection does not have it, the field
 > is ignored, the post still publishes, and the response includes a per-field
 > `warnings` entry — reconnect the TikTok account to enable it.
@@ -327,7 +329,7 @@ await client.upload('./video.mp4', {
   user: 'my-profile',
   platforms: ['tiktok'],
 
-  tiktokMusicId: tracks[0].commercial_music_id,
+  tiktokMusicId: tracks[0].id,
   tiktokMusicVolume: 70,            // 0-100, defaults to 50 when music is set
   tiktokMusicStart: 0,              // ms
   tiktokMusicEnd: 15000,            // ms
@@ -346,7 +348,7 @@ await client.upload('./video.mp4', {
 
 | Option | Type | Notes |
 | --- | --- | --- |
-| `tiktokMusicId` | string | `commercial_music_id` from `getTiktokTrendingMusic()` |
+| `tiktokMusicId` | string | The track `id` from `getTiktokTrendingMusic()` (not `commercial_music_id`) |
 | `tiktokMusicVolume` | number | 0-100. Defaults to 50 when music is set |
 | `tiktokMusicStart` | number | Music start offset in ms |
 | `tiktokMusicEnd` | number | Music end offset in ms |

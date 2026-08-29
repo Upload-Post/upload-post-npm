@@ -618,12 +618,21 @@ declare module 'upload-post' {
 
   export interface TikTokMusicTrack {
     /** Pass this as `tiktokMusicId` on an upload. */
-    commercial_music_id: string;
+    id: string;
+    /**
+     * TikTok's catalogue id for the same track, returned for reference only.
+     * Do NOT send it as `tiktokMusicId`: TikTok rejects it on public posts.
+     */
+    commercial_music_id?: string;
     title?: string;
     artist?: string;
     /** Track duration in seconds. */
     duration?: number;
     genres?: string[];
+    /** Artwork image URL. */
+    cover_url?: string;
+    /** Audio preview URL. */
+    preview_url?: string;
     rank?: number;
     [key: string]: any;
   }
@@ -1121,8 +1130,9 @@ declare module 'upload-post' {
      *
      * Available on connections that declare the `music` capability (see
      * `capabilities` on the TikTok account returned by listUsers() /
-     * GET /api/uploadposts/users). Pass the returned `commercial_music_id` as
-     * `tiktokMusicId` on an upload.
+     * GET /api/uploadposts/users). Pass the returned `id` as `tiktokMusicId`
+     * on an upload (NOT `commercial_music_id` — TikTok rejects that one on
+     * public posts).
      *
      * @param profile - Profile username
      * @param options - Query options

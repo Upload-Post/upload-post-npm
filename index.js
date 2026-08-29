@@ -1282,8 +1282,9 @@ export class UploadPost {
    *
    * Available on connections that declare the `music` capability (see
    * `capabilities` on the TikTok account returned by listUsers() /
-   * GET /api/uploadposts/users). The returned `commercial_music_id` is what you
-   * pass as `tiktokMusicId` on an upload.
+   * GET /api/uploadposts/users). The returned `id` is what you pass as
+   * `tiktokMusicId` on an upload — not `commercial_music_id`, which TikTok
+   * rejects on public posts.
    *
    * @param {string} profile - Profile username
    * @param {Object} [options] - Query options
