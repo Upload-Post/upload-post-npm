@@ -152,50 +152,54 @@ export class UploadPost {
    * @private
    */
   _addTiktokParams(form, options, isVideo = true) {
-    if (options.tiktokDisableComment !== undefined) form.append('disable_comment', String(options.tiktokDisableComment));
-    if (options.brandContentToggle !== undefined) form.append('brand_content_toggle', String(options.brandContentToggle));
-    if (options.brandOrganicToggle !== undefined) form.append('brand_organic_toggle', String(options.brandOrganicToggle));
+    // [form field, option key, "flag" when the value is a boolean/number sent as
+    // soon as it is defined, "text" when an empty value means "not set"].
+    //
+    // The shared block is shared on purpose: the backend reads privacy_level and
+    // post_mode on both /upload and /upload_photos, and TikTok's photo endpoint
+    // also accepts the music track id, the location pair and is_ai_generated.
+    // Gating them behind isVideo made photo carousels always publish as
+    // PUBLIC_TO_EVERYONE / DIRECT_POST and unable to carry music or a location.
+    //
+    // The music/location/cover/draft fields need the matching capability on the
+    // connection (see `capabilities` on the TikTok account returned by
+    // listUsers() / GET /api/uploadposts/users). Without it the field is ignored,
+    // the post still publishes, and the response carries a per-field `warnings`
+    // entry.
+    const shared = [
+      ['disable_comment', 'tiktokDisableComment', 'flag'],
+      ['brand_content_toggle', 'brandContentToggle', 'flag'],
+      ['brand_organic_toggle', 'brandOrganicToggle', 'flag'],
+      ['privacy_level', 'tiktokPrivacyLevel', 'text'],
+      ['post_mode', 'tiktokPostMode', 'text'],
+      ['tiktok_music_id', 'tiktokMusicId', 'text'],
+      ['tiktok_location_id', 'tiktokLocationId', 'text'],
+      ['tiktok_location_name', 'tiktokLocationName', 'text'],
+      ['tiktok_is_ai_generated', 'tiktokIsAiGenerated', 'flag'],
+    ];
+    // Video-only: TikTok's photo contract takes the track id alone, with no
+    // volume or trim, and has no custom cover or draft switch.
+    const videoOnly = [
+      ['disable_duet', 'tiktokDisableDuet', 'flag'],
+      ['disable_stitch', 'tiktokDisableStitch', 'flag'],
+      ['cover_timestamp', 'tiktokCoverTimestamp', 'flag'],
+      ['is_aigc', 'tiktokIsAigc', 'flag'],
+      ['tiktok_music_volume', 'tiktokMusicVolume', 'flag'],
+      ['tiktok_music_start', 'tiktokMusicStart', 'flag'],
+      ['tiktok_music_end', 'tiktokMusicEnd', 'flag'],
+      ['tiktok_original_sound_volume', 'tiktokOriginalSoundVolume', 'flag'],
+      ['tiktok_cover_image_url', 'tiktokCoverImageUrl', 'text'],
+      ['tiktok_upload_to_draft', 'tiktokUploadToDraft', 'flag'],
+    ];
+    const photoOnly = [
+      ['auto_add_music', 'tiktokAutoAddMusic', 'flag'],
+      ['photo_cover_index', 'tiktokPhotoCoverIndex', 'flag'],
+    ];
 
-    // Shared by TikTok video AND photo uploads: the backend reads privacy_level and
-    // post_mode for both /upload and /upload_photos. Gating them behind isVideo made
-    // photo carousels always publish as PUBLIC_TO_EVERYONE / DIRECT_POST.
-    if (options.tiktokPrivacyLevel) form.append('privacy_level', options.tiktokPrivacyLevel);
-    if (options.tiktokPostMode) form.append('post_mode', options.tiktokPostMode);
-
-    // Music, location and the AI disclosure work on TikTok PHOTO posts too, not
-    // just video: the photo endpoint accepts the track id, the location pair and
-    // is_ai_generated. Gating them behind isVideo made them impossible to send on
-    // a carousel. The volume/trim fields are the video-only part (TikTok's photo
-    // contract has no equivalent), so they stay below.
-    // Available on connections that declare the matching capability (see
-    // `capabilities` on the TikTok account returned by listUsers() /
-    // GET /api/uploadposts/users). Without it the field is ignored, the post still
-    // publishes, and the response carries a per-field `warnings` entry.
-    if (options.tiktokMusicId) form.append('tiktok_music_id', options.tiktokMusicId);
-    if (options.tiktokLocationId) form.append('tiktok_location_id', options.tiktokLocationId);
-    if (options.tiktokLocationName) form.append('tiktok_location_name', options.tiktokLocationName);
-    if (options.tiktokIsAiGenerated !== undefined) form.append('tiktok_is_ai_generated', String(options.tiktokIsAiGenerated));
-
-    if (isVideo) {
-      if (options.tiktokDisableDuet !== undefined) form.append('disable_duet', String(options.tiktokDisableDuet));
-      if (options.tiktokDisableStitch !== undefined) form.append('disable_stitch', String(options.tiktokDisableStitch));
-      if (options.tiktokCoverTimestamp !== undefined) form.append('cover_timestamp', options.tiktokCoverTimestamp);
-      if (options.tiktokIsAigc !== undefined) form.append('is_aigc', String(options.tiktokIsAigc));
-
-      // Video-only: TikTok's photo endpoint takes the track id alone, with no
-      // volume or trim, and has no custom cover or draft switch.
-      if (options.tiktokMusicVolume !== undefined) form.append('tiktok_music_volume', String(options.tiktokMusicVolume));
-      if (options.tiktokMusicStart !== undefined) form.append('tiktok_music_start', String(options.tiktokMusicStart));
-      if (options.tiktokMusicEnd !== undefined) form.append('tiktok_music_end', String(options.tiktokMusicEnd));
-      if (options.tiktokOriginalSoundVolume !== undefined) {
-        form.append('tiktok_original_sound_volume', String(options.tiktokOriginalSoundVolume));
-      }
-      if (options.tiktokCoverImageUrl) form.append('tiktok_cover_image_url', options.tiktokCoverImageUrl);
-      if (options.tiktokUploadToDraft !== undefined) form.append('tiktok_upload_to_draft', String(options.tiktokUploadToDraft));
-    } else {
-      // Photo-specific
-      if (options.tiktokAutoAddMusic !== undefined) form.append('auto_add_music', String(options.tiktokAutoAddMusic));
-      if (options.tiktokPhotoCoverIndex !== undefined) form.append('photo_cover_index', options.tiktokPhotoCoverIndex);
+    for (const [field, key, kind] of shared.concat(isVideo ? videoOnly : photoOnly)) {
+      const value = options[key];
+      if (kind === 'flag' ? value === undefined : !value) continue;
+      form.append(field, String(value));
     }
   }
 
@@ -1297,6 +1301,19 @@ export class UploadPost {
   }
 
   /**
+   * Catalogue filters shared by the trending and search endpoints, so both
+   * address the same cached chart slice.
+   * @private
+   */
+  _tiktokMusicParams(profile, options = {}) {
+    const params = { profile };
+    if (options.genre) params.genre = options.genre;
+    if (options.countryCode) params.country_code = options.countryCode;
+    if (options.dateRange) params.date_range = options.dateRange;
+    return params;
+  }
+
+  /**
    * Get trending tracks from the TikTok Commercial Music Library.
    *
    * Available on connections that declare the `music` capability (see
@@ -1313,11 +1330,8 @@ export class UploadPost {
    * @returns {Promise<Object>} Trending tracks
    */
   async getTiktokTrendingMusic(profile, options = {}) {
-    const params = { profile };
-    if (options.genre) params.genre = options.genre;
-    if (options.countryCode) params.country_code = options.countryCode;
-    if (options.dateRange) params.date_range = options.dateRange;
-    return this._request('/uploadposts/tiktok/music/trending', 'GET', params);
+    return this._request('/uploadposts/tiktok/music/trending', 'GET',
+      this._tiktokMusicParams(profile, options));
   }
 
   /**
@@ -1342,11 +1356,8 @@ export class UploadPost {
    * @returns {Promise<Object>} Matching tracks plus a `catalog` block describing the corpus searched
    */
   async searchTiktokMusic(profile, options = {}) {
-    const params = { profile };
+    const params = this._tiktokMusicParams(profile, options);
     if (options.q) params.q = options.q;
-    if (options.genre) params.genre = options.genre;
-    if (options.countryCode) params.country_code = options.countryCode;
-    if (options.dateRange) params.date_range = options.dateRange;
     if (options.limit !== undefined && options.limit !== null) params.limit = options.limit;
     return this._request('/uploadposts/tiktok/music/search', 'GET', params);
   }
