@@ -109,6 +109,11 @@ declare module 'upload-post' {
     youtubeFirstComment?: string;
     redditFirstComment?: string;
     blueskyFirstComment?: string;
+    /**
+     * Needs the `comments` capability on the connection: without it the post
+     * still publishes and the response carries a warning instead of the comment.
+     */
+    tiktokFirstComment?: string;
   }
 
   // ==================== TikTok Options ====================
@@ -711,6 +716,134 @@ declare module 'upload-post' {
     [key: string]: any;
   }
 
+  /** Which toggle `tiktokCommentAction` flips. */
+  export type TikTokCommentActionType = 'hide' | 'like' | 'pin';
+
+  /** The value that toggle takes. Each type accepts only its own pair. */
+  export type TikTokCommentActionValue =
+    | 'HIDE' | 'UNHIDE'
+    | 'LIKE' | 'UNLIKE'
+    | 'PIN' | 'UNPIN';
+
+  /** TikTok's own cursor pagination: no cursor left means no next page. */
+  export interface TikTokCursorPagination {
+    next_cursor?: string | null;
+    has_next?: boolean;
+  }
+
+  export interface TikTokCommentRepliesResponse {
+    success: boolean;
+    comments?: Array<{
+      id?: string;
+      text?: string;
+      create_time?: number;
+      username?: string;
+      like_count?: number;
+      reply_count?: number;
+      [key: string]: any;
+    }>;
+    pagination?: TikTokCursorPagination;
+    [key: string]: any;
+  }
+
+  export interface TikTokCommentActionResponse {
+    success: boolean;
+    type?: TikTokCommentActionType;
+    action?: TikTokCommentActionValue;
+    comment_id?: string;
+    result?: Record<string, any>;
+    [key: string]: any;
+  }
+
+  export interface TikTokKeywordSearchResponse {
+    success: boolean;
+    query?: string | null;
+    data?: {
+      search_keywords?: Array<Record<string, any>>;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  }
+
+  /** One row of an audience breakdown: a bucket and its share. */
+  export interface TikTokAudienceSlice {
+    name?: string;
+    value?: number;
+    percentage?: number;
+    [key: string]: any;
+  }
+
+  export interface TikTokAccountInsightsResponse {
+    success: boolean;
+    /** The window actually used after TikTok's 60-day / not-today clamps. */
+    range?: { start_date?: string; end_date?: string };
+    audience?: {
+      countries?: TikTokAudienceSlice[];
+      cities?: TikTokAudienceSlice[];
+      ages?: TikTokAudienceSlice[];
+      genders?: TikTokAudienceSlice[];
+    };
+    /** Followers online per hour of the day. */
+    activity_by_hour?: Array<Record<string, any>>;
+    /** Follower count per day inside the window. */
+    followers_daily?: Array<Record<string, any>>;
+    /** Taps on the profile: bio link, address, app download, email, phone, leads. */
+    profile_actions?: Record<string, number>;
+    bio_description?: string | null;
+    [key: string]: any;
+  }
+
+  export interface TikTokVideoInsight {
+    item_id?: string;
+    create_time?: number;
+    caption?: string;
+    share_url?: string;
+    thumbnail_url?: string;
+    video_duration?: number;
+    video_views?: number;
+    likes?: number;
+    comments?: number;
+    shares?: number;
+    reach?: number;
+    favorites?: number;
+    new_followers?: number;
+    profile_views?: number;
+    full_video_watched_rate?: number;
+    average_time_watched?: number;
+    total_time_watched?: number;
+    /** Retention curve: how much of the audience was still watching, second by second. */
+    video_view_retention?: Array<Record<string, any>>;
+    /** Where the impressions came from (For You, search, profile...). */
+    impression_sources?: Array<Record<string, any>>;
+    /** Followers vs non-followers. */
+    audience_types?: Array<Record<string, any>>;
+    [key: string]: any;
+  }
+
+  export interface TikTokVideoInsightsResponse {
+    success: boolean;
+    videos?: TikTokVideoInsight[];
+    pagination?: TikTokCursorPagination;
+    [key: string]: any;
+  }
+
+  export interface TikTokHashtagSuggestionsResponse {
+    success: boolean;
+    query?: string;
+    hashtags?: Array<{ name?: string; view_count?: number; [key: string]: any }>;
+    [key: string]: any;
+  }
+
+  export interface TikTokBenchmarkResponse {
+    success: boolean;
+    /** Returned when no category was asked for. */
+    categories?: string[];
+    category?: string;
+    /** Category averages: likes, comments, shares, engagement rate, followers... */
+    benchmark?: Record<string, number>;
+    [key: string]: any;
+  }
+
   // ==================== Client Class ====================
 
   /**
@@ -1027,7 +1160,7 @@ declare module 'upload-post' {
      */
     getPostComments(options: {
       user: string;
-      platform?: 'instagram' | 'facebook' | 'youtube' | 'linkedin';
+      platform?: 'instagram' | 'facebook' | 'youtube' | 'linkedin' | 'tiktok';
       postId?: string;
       postUrl?: string;
       limit?: number;
@@ -1086,7 +1219,7 @@ declare module 'upload-post' {
      */
     createComment(options: {
       user: string;
-      platform: 'instagram' | 'facebook' | 'youtube' | 'linkedin';
+      platform: 'instagram' | 'facebook' | 'youtube' | 'linkedin' | 'tiktok';
       message: string;
       postId?: string;
       postUrl?: string;
@@ -1104,7 +1237,7 @@ declare module 'upload-post' {
      */
     deleteComment(options: {
       user: string;
-      platform: 'instagram' | 'facebook' | 'youtube' | 'linkedin';
+      platform: 'instagram' | 'facebook' | 'youtube' | 'linkedin' | 'tiktok';
       commentId: string;
       /** Post identifier (the post URN for LinkedIn) */
       postId?: string;
@@ -1249,6 +1382,125 @@ declare module 'upload-post' {
      * @param profile - Profile username
      */
     getTiktokPublishingSettings(profile: string): Promise<TikTokPublishingSettingsResponse>;
+
+    /**
+     * Get the replies hanging from one TikTok comment.
+     *
+     * Top-level comments go through the multi-platform methods
+     * (`getPostComments`, `createComment`, `deleteComment` with
+     * `platform: 'tiktok'`); replies have their own call because no other
+     * platform models them as a separate resource.
+     *
+     * Needs the `comments` capability on the connection (see `capabilities` on
+     * the TikTok account returned by listUsers()). TikTok grants it at connect
+     * time, so an account connected earlier has to be reconnected.
+     *
+     * @param profile - Profile username
+     * @param postId - Native TikTok video id the comment belongs to
+     * @param commentId - Comment whose replies you want
+     * @param options - Query options
+     */
+    getTiktokCommentReplies(
+      profile: string,
+      postId: string,
+      commentId: string,
+      options?: { limit?: number; cursor?: string }
+    ): Promise<TikTokCommentRepliesResponse>;
+
+    /**
+     * Hide, like or pin a TikTok comment — and undo any of the three.
+     *
+     * `postId` is required for `hide` and `pin`; `like` takes the comment alone
+     * and never sends it.
+     *
+     * Needs the `comments` capability on the connection (see `capabilities` on
+     * the TikTok account returned by listUsers()). TikTok grants it at connect
+     * time, so an account connected earlier has to be reconnected.
+     *
+     * @param profile - Profile username
+     * @param options - Action options
+     */
+    tiktokCommentAction(
+      profile: string,
+      options: {
+        type: TikTokCommentActionType;
+        commentId: string;
+        action: TikTokCommentActionValue;
+        postId?: string;
+      }
+    ): Promise<TikTokCommentActionResponse>;
+
+    /**
+     * Search what people look for on TikTok around a keyword.
+     *
+     * Needs the `trend_search` capability on the connection (see `capabilities`
+     * on the TikTok account returned by listUsers()). TikTok grants it at
+     * connect time, so an account connected earlier has to be reconnected.
+     *
+     * @param profile - Profile username
+     * @param query - Keyword to search around
+     */
+    searchTiktokKeywords(profile: string, query: string): Promise<TikTokKeywordSearchResponse>;
+
+    /**
+     * Get who follows the account, when they are online and what they tap.
+     *
+     * Available on any recent TikTok connection — the one that declares the
+     * `profile_analytics` capability. The window is at most 60 days, must end
+     * before today, and defaults to the last 30 days ending yesterday; a wider
+     * one is trimmed rather than rejected.
+     *
+     * @param profile - Profile username
+     * @param options - Window, as ISO `YYYY-MM-DD` dates
+     */
+    getTiktokInsights(
+      profile: string,
+      options?: { startDate?: string; endDate?: string }
+    ): Promise<TikTokAccountInsightsResponse>;
+
+    /**
+     * Get the per-video breakdown of the account's most recent posts: retention
+     * curve, impression sources, audience types, followers gained and watch times.
+     *
+     * Available on any recent TikTok connection — the one that declares the
+     * `profile_analytics` capability.
+     *
+     * @param profile - Profile username
+     * @param options - Query options. `limit` is capped at 20.
+     */
+    getTiktokVideoInsights(
+      profile: string,
+      options?: { limit?: number; cursor?: string }
+    ): Promise<TikTokVideoInsightsResponse>;
+
+    /**
+     * Get the hashtags TikTok suggests pairing with a keyword.
+     *
+     * Available on any recent TikTok connection — the one that declares the
+     * `profile_analytics` capability.
+     *
+     * @param profile - Profile username
+     * @param query - Keyword to get hashtags for
+     * @param options - Optional country and language bias
+     */
+    getTiktokHashtags(
+      profile: string,
+      query: string,
+      options?: { countryCode?: string; language?: string }
+    ): Promise<TikTokHashtagSuggestionsResponse>;
+
+    /**
+     * Compare the account against the average of its category. Called without a
+     * category it answers the list of categories alone, so a UI can render the
+     * picker without a second call.
+     *
+     * Available on any recent TikTok connection — the one that declares the
+     * `profile_analytics` capability.
+     *
+     * @param profile - Profile username
+     * @param category - Category to compare against (e.g. `SOFTWARE_AND_APPS`)
+     */
+    getTiktokBenchmark(profile: string, category?: string): Promise<TikTokBenchmarkResponse>;
   }
 
   export default UploadPost;

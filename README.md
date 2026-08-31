@@ -313,16 +313,168 @@ const found = await client.searchTiktokMusic('my-profile', {
 const locations = await client.getTiktokLocations('my-profile', 'Madrid');
 ```
 
+### Comments
+
+The same three methods cover every platform that has comments — Instagram,
+Facebook, YouTube, LinkedIn and TikTok:
+
+```javascript
+// Read the comments on a post
+const { comments } = await client.getPostComments({
+  user: 'my-profile',
+  platform: 'tiktok',
+  postId: '7412345678901234567', // TikTok has no post-URL lookup, pass the video id
+  limit: 20,
+});
+
+// Comment on the post, or reply to a comment
+await client.createComment({
+  user: 'my-profile',
+  platform: 'tiktok',
+  postId: '7412345678901234567',
+  message: 'Thanks for watching!',
+});
+
+await client.createComment({
+  user: 'my-profile',
+  platform: 'tiktok',
+  commentId: comments[0].id,
+  message: 'Glad you liked it',
+});
+
+// Delete one
+await client.deleteComment({
+  user: 'my-profile',
+  platform: 'tiktok',
+  commentId: comments[0].id,
+});
+```
+
+You can also have the first comment posted for you right after publishing, with
+`firstComment` for every platform or `tiktokFirstComment` for TikTok alone.
+
+On TikTok all of this needs the `comments` capability, which the account grants
+when it connects — see
+[What a TikTok connection can do](#what-a-tiktok-connection-can-do-capabilities).
+
+#### TikTok replies, hide, like and pin
+
+Replies live in their own call because no other platform models them as a
+separate resource:
+
+```javascript
+const replies = await client.getTiktokCommentReplies(
+  'my-profile', '7412345678901234567', '7412345678909999999', { limit: 20 }
+);
+console.log(replies.comments, replies.pagination.next_cursor);
+```
+
+Hiding, liking and pinning share one method. `postId` is required for `hide` and
+`pin`; `like` takes the comment alone:
+
+```javascript
+await client.tiktokCommentAction('my-profile', {
+  type: 'hide', action: 'HIDE',
+  commentId: '7412345678909999999',
+  postId: '7412345678901234567',
+});
+
+await client.tiktokCommentAction('my-profile', {
+  type: 'like', action: 'LIKE',
+  commentId: '7412345678909999999',
+});
+
+await client.tiktokCommentAction('my-profile', {
+  type: 'pin', action: 'UNPIN',
+  commentId: '7412345678909999999',
+  postId: '7412345678901234567',
+});
+```
+
+| `type` | `action` | `postId` |
+| --- | --- | --- |
+| `hide` | `HIDE` / `UNHIDE` | required |
+| `like` | `LIKE` / `UNLIKE` | not sent |
+| `pin` | `PIN` / `UNPIN` | required |
+
+### TikTok audience insights and discovery
+
+Where the analytics methods answer *how did my posts do*, these answer *who is
+my audience* and *what is worth posting about*. All four work on any recent
+TikTok connection — the ones that list the `profile_analytics` capability.
+
+```javascript
+// Who follows the account, when they are online, what they tap on the profile
+const insights = await client.getTiktokInsights('my-profile', {
+  startDate: '2026-07-01',
+  endDate: '2026-07-30',
+});
+console.log(insights.audience.countries, insights.audience.ages);
+console.log(insights.activity_by_hour, insights.followers_daily);
+console.log(insights.profile_actions); // bio link, address, email, phone, leads
+
+// Per-video breakdown: retention curve, impression sources, audience types,
+// followers gained and watch times
+const videos = await client.getTiktokVideoInsights('my-profile', { limit: 20 });
+console.log(videos.videos[0].video_view_retention);
+console.log(videos.videos[0].impression_sources);
+
+// Hashtags to pair with a keyword
+const { hashtags } = await client.getTiktokHashtags('my-profile', 'pilates', {
+  countryCode: 'ES',
+  language: 'es',
+});
+console.log(hashtags); // [{ name, view_count }, ...]
+
+// The account against the average of its category
+const { categories } = await client.getTiktokBenchmark('my-profile');
+const { benchmark } = await client.getTiktokBenchmark('my-profile', 'SOFTWARE_AND_APPS');
+```
+
+The window for `getTiktokInsights()` is at most 60 days and has to end before
+today; it defaults to the 30 days ending yesterday. A wider window is trimmed to
+what TikTok accepts instead of failing.
+
+Searching what people look for on TikTok is a separate capability,
+`trend_search`, which also needs the account to have been reconnected:
+
+```javascript
+const { data } = await client.searchTiktokKeywords('my-profile', 'pilates');
+console.log(data.search_keywords);
+```
+
+## What a TikTok connection can do (`capabilities`)
+
+Not every TikTok connection can do the same things. `listUsers()`
+(`GET /api/uploadposts/users`) returns a `capabilities` array on each profile's
+TikTok account; check it before offering a feature.
+
+| Capability | What it unlocks |
+| --- | --- |
+| `music` | `tiktokMusicId` and the volume/trim fields, plus `getTiktokTrendingMusic()` and `searchTiktokMusic()` |
+| `location` | `tiktokLocationId` / `tiktokLocationName`, plus `getTiktokLocations()` |
+| `cover_image` | `tiktokCoverImageUrl` |
+| `cover_timestamp` | `tiktokCoverTimestamp` |
+| `draft` | `tiktokUploadToDraft` |
+| `video_privacy` | `tiktokPrivacyLevel` on video |
+| `photo_privacy` | `tiktokPrivacyLevel` on photo posts |
+| `profile_analytics` | `getTiktokInsights()`, `getTiktokVideoInsights()`, `getTiktokHashtags()`, `getTiktokBenchmark()` |
+| `comments` | Comments on TikTok: `getPostComments()`, `createComment()`, `deleteComment()`, `getTiktokCommentReplies()`, `tiktokCommentAction()` and `tiktokFirstComment` |
+| `trend_search` | `searchTiktokKeywords()` |
+
+> **`comments` and `trend_search` need the account to be reconnected.** TikTok
+> grants them at connect time, so an account linked before they existed keeps
+> working for everything else but will not list them — reconnect it from Manage
+> Users to enable them.
+
+If a connection lacks a capability the upload field is simply ignored: the post
+still publishes and the response carries a per-field `warnings` entry. The
+methods above answer with an error asking for a reconnection.
+
 ## TikTok music, location, cover and drafts
 
-> **Capabilities.** These options are available on connections that declare the
-> matching capability — `music`, `location`, `cover_image`, `draft` — in the
-> `capabilities` array of the TikTok account returned by `listUsers()`
-> (other values you may see there: `cover_timestamp`, `photo_privacy`,
-> `video_privacy`, `inbox_fallback`, `profile_analytics`)
-> (`GET /api/uploadposts/users`). If your connection does not have it, the field
-> is ignored, the post still publishes, and the response includes a per-field
-> `warnings` entry — reconnect the TikTok account to enable it.
+> Needs the `music`, `location`, `cover_image` or `draft` capability — see
+> [What a TikTok connection can do](#what-a-tiktok-connection-can-do-capabilities).
 
 ```javascript
 // 1. Pick a track and a place
@@ -484,6 +636,7 @@ These options work across all upload methods:
 | `user` | Profile name (required) |
 | `platforms` | Target platforms array (required) |
 | `firstComment` | First comment to post |
+| `tiktokFirstComment` | First comment for TikTok only (needs the `comments` capability) |
 | `altText` | Alt text for accessibility |
 | `scheduledDate` | ISO date for scheduling |
 | `timezone` | Timezone for scheduled date |

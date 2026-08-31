@@ -1,12 +1,12 @@
 {
   "name": "upload-post",
-  "version": "2.10.0",
+  "version": "2.11.0",
   "description": "Official client library for Upload-Post API - Cross-platform social media upload for TikTok, Instagram, YouTube, LinkedIn, Facebook, Pinterest, Threads, Reddit, Bluesky, and X (Twitter)",
   "main": "index.js",
   "types": "index.d.ts",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/"
   },
   "license": "MIT",
   "keywords": [
