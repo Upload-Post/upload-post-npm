@@ -37,6 +37,8 @@ console.log(response);
 - ✅ **Posting Queue** - Add posts to your configured queue
 - ✅ **First Comments** - Auto-post first comment after publishing
 - ✅ **Analytics** - Get engagement metrics
+- ✅ **Audience** - Who follows a profile, per platform
+- ✅ **Suggestions** - Hashtags and searches to post about, per platform
 - ✅ **Full TypeScript Support**
 
 ## Using this from an AI agent? Use the MCP server instead
@@ -313,16 +315,204 @@ const found = await client.searchTiktokMusic('my-profile', {
 const locations = await client.getTiktokLocations('my-profile', 'Madrid');
 ```
 
+### Comments
+
+The same methods cover every platform that has comments — Instagram, Facebook,
+YouTube, LinkedIn and TikTok. There is no per-network method: the endpoint
+answers one question and `platform` says who to ask.
+
+```javascript
+// Read the comments on a post
+const { comments } = await client.getPostComments({
+  user: 'my-profile',
+  platform: 'tiktok',
+  postId: '7412345678901234567', // TikTok has no post-URL lookup, pass the video id
+  limit: 20,
+});
+
+// Read the replies hanging from one of them — same question, one more parameter
+const { comments: replies } = await client.getPostComments({
+  user: 'my-profile',
+  platform: 'tiktok',
+  postId: '7412345678901234567',
+  commentId: comments[0].id,
+});
+
+// Comment on the post, or reply to a comment
+await client.createComment({
+  user: 'my-profile',
+  platform: 'tiktok',
+  postId: '7412345678901234567',
+  message: 'Thanks for watching!',
+});
+
+await client.createComment({
+  user: 'my-profile',
+  platform: 'tiktok',
+  commentId: comments[0].id,
+  message: 'Glad you liked it',
+});
+
+// Delete one
+await client.deleteComment({
+  user: 'my-profile',
+  platform: 'tiktok',
+  commentId: comments[0].id,
+});
+```
+
+You can also have the first comment posted for you right after publishing, with
+`firstComment` for every platform or `tiktokFirstComment` for TikTok alone.
+
+On TikTok all of this needs the `comments` capability, which the account grants
+when it connects — see
+[What a TikTok connection can do](#what-a-tiktok-connection-can-do-capabilities).
+
+#### Moderating a comment: hide, like, pin
+
+`commentAction()` does the three and undoes them, on any platform that supports
+it. Each action carries its own inverse, and `postId` is only sent when the
+platform needs it:
+
+```javascript
+await client.commentAction({
+  user: 'my-profile',
+  platform: 'tiktok',
+  action: 'hide',
+  commentId: '7412345678909999999',
+  postId: '7412345678901234567',
+});
+
+await client.commentAction({
+  user: 'my-profile',
+  platform: 'tiktok',
+  action: 'like',
+  commentId: '7412345678909999999',
+});
+
+await client.commentAction({
+  user: 'my-profile',
+  platform: 'tiktok',
+  action: 'unpin',
+  commentId: '7412345678909999999',
+  postId: '7412345678901234567',
+});
+```
+
+| `action` | Undo | `postId` |
+| --- | --- | --- |
+| `hide` | `unhide` | required |
+| `like` | `unlike` | not sent |
+| `pin` | `unpin` | required |
+
+### Audience
+
+Where the analytics methods answer *how did my posts do*, `getAudience()`
+answers *who is following me*. One endpoint, one `platform` parameter, like
+every other question in the API.
+
+```javascript
+const audience = await client.getAudience({
+  user: 'my-profile',
+  platform: 'tiktok',
+  startDate: '2026-07-01',
+  endDate: '2026-07-30',
+});
+
+console.log(audience.range);              // the window actually used
+console.log(audience.audience.countries); // and .cities, .ages, .genders
+console.log(audience.activity_by_hour);   // [{ hour: '14', followers_online: 1494 }, ...]
+console.log(audience.followers_daily);    // [{ date, total, new, lost }, ...]
+console.log(audience.profile_actions);    // bio link, address, email, phone, leads
+console.log(audience.bio_description);
+```
+
+The window is clamped on the server: at most 60 days, and `endDate` always
+before today. A wider window is trimmed to what the platform accepts instead of
+failing.
+
+Ask for a `benchmarkCategory` and the same call also returns how the account
+compares with the average of that category. The accepted categories come back in
+`benchmark_categories` on every response, so a picker needs no second call:
+
+```javascript
+const { benchmark_categories } = await client.getAudience({
+  user: 'my-profile', platform: 'tiktok',
+});
+
+const { benchmark } = await client.getAudience({
+  user: 'my-profile',
+  platform: 'tiktok',
+  benchmarkCategory: 'SOFTWARE_AND_APPS',
+});
+console.log(benchmark.average_engagement_rate, benchmark.average_video_views);
+```
+
+### Suggestions
+
+`getSuggestions()` answers *what is worth posting about*: the hashtags or the
+searches a platform suggests around a keyword. One endpoint for both, told apart
+by `type`.
+
+```javascript
+const { hashtags } = await client.getSuggestions({
+  user: 'my-profile',
+  platform: 'tiktok',
+  type: 'hashtags',
+  q: 'pilates',
+  countryCode: 'ES',
+  language: 'es',
+});
+console.log(hashtags); // [{ name, view_count }, ...]
+
+const { keywords } = await client.getSuggestions({
+  user: 'my-profile',
+  platform: 'tiktok',
+  type: 'keywords',
+  q: 'pilates',
+});
+```
+
+Per-post numbers stay in `getPostAnalytics()`. On TikTok that response carries
+more than the usual counters: `retention` (the curve, second by second),
+`impression_sources` (For You, search, profile...), `audience_types` (followers
+vs non-followers), `new_followers`, `reach` and the watch times.
+
+Asking a platform a question it cannot answer fails with
+`platform_not_supported` and the list of the ones that can.
+
+## What a TikTok connection can do (`capabilities`)
+
+Not every TikTok connection can do the same things. `listUsers()`
+(`GET /api/uploadposts/users`) returns a `capabilities` array on each profile's
+TikTok account; check it before offering a feature.
+
+| Capability | What it unlocks |
+| --- | --- |
+| `music` | `tiktokMusicId` and the volume/trim fields, plus `getTiktokTrendingMusic()` and `searchTiktokMusic()` |
+| `location` | `tiktokLocationId` / `tiktokLocationName`, plus `getTiktokLocations()` |
+| `cover_image` | `tiktokCoverImageUrl` |
+| `cover_timestamp` | `tiktokCoverTimestamp` |
+| `draft` | `tiktokUploadToDraft` |
+| `video_privacy` | `tiktokPrivacyLevel` on video |
+| `photo_privacy` | `tiktokPrivacyLevel` on photo posts |
+| `profile_analytics` | `getAudience()` and `getSuggestions({ type: 'hashtags' })` with `platform: 'tiktok'` |
+| `comments` | Comments on TikTok: `getPostComments()` (top-level and replies), `createComment()`, `deleteComment()`, `commentAction()` and `tiktokFirstComment` |
+| `trend_search` | `getSuggestions({ type: 'keywords' })` with `platform: 'tiktok'` |
+
+> **`comments` and `trend_search` need the account to be reconnected.** TikTok
+> grants them at connect time, so an account linked before they existed keeps
+> working for everything else but will not list them — reconnect it from Manage
+> Users to enable them.
+
+If a connection lacks a capability the upload field is simply ignored: the post
+still publishes and the response carries a per-field `warnings` entry. The
+methods above answer with an error asking for a reconnection.
+
 ## TikTok music, location, cover and drafts
 
-> **Capabilities.** These options are available on connections that declare the
-> matching capability — `music`, `location`, `cover_image`, `draft` — in the
-> `capabilities` array of the TikTok account returned by `listUsers()`
-> (other values you may see there: `cover_timestamp`, `photo_privacy`,
-> `video_privacy`, `inbox_fallback`, `profile_analytics`)
-> (`GET /api/uploadposts/users`). If your connection does not have it, the field
-> is ignored, the post still publishes, and the response includes a per-field
-> `warnings` entry — reconnect the TikTok account to enable it.
+> Needs the `music`, `location`, `cover_image` or `draft` capability — see
+> [What a TikTok connection can do](#what-a-tiktok-connection-can-do-capabilities).
 
 ```javascript
 // 1. Pick a track and a place
@@ -484,6 +674,7 @@ These options work across all upload methods:
 | `user` | Profile name (required) |
 | `platforms` | Target platforms array (required) |
 | `firstComment` | First comment to post |
+| `tiktokFirstComment` | First comment for TikTok only (needs the `comments` capability) |
 | `altText` | Alt text for accessibility |
 | `scheduledDate` | ISO date for scheduling |
 | `timezone` | Timezone for scheduled date |

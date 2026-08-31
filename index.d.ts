@@ -109,6 +109,11 @@ declare module 'upload-post' {
     youtubeFirstComment?: string;
     redditFirstComment?: string;
     blueskyFirstComment?: string;
+    /**
+     * Needs the `comments` capability on the connection: without it the post
+     * still publishes and the response carries a warning instead of the comment.
+     */
+    tiktokFirstComment?: string;
   }
 
   // ==================== TikTok Options ====================
@@ -711,6 +716,82 @@ declare module 'upload-post' {
     [key: string]: any;
   }
 
+  // ==================== Audience, Suggestions and Comment Actions ====================
+
+  /** One row of an audience breakdown: a bucket and its share. */
+  export interface AudienceSlice {
+    name?: string;
+    value?: number;
+    percentage?: number;
+    [key: string]: any;
+  }
+
+  /** Category averages returned when `benchmarkCategory` is asked for. */
+  export interface AudienceBenchmark {
+    category?: string;
+    average_comments?: number;
+    average_engagement_rate?: number;
+    average_follower_count?: number;
+    average_follower_growth?: number;
+    average_likes?: number;
+    average_shares?: number;
+    average_video_count?: number;
+    average_video_views?: number;
+    [key: string]: any;
+  }
+
+  export interface AudienceResponse {
+    success: boolean;
+    platform?: string;
+    /** The window actually used after the 60-day / not-today clamps. */
+    range?: { start_date?: string; end_date?: string };
+    audience?: {
+      countries?: AudienceSlice[];
+      cities?: AudienceSlice[];
+      ages?: AudienceSlice[];
+      genders?: AudienceSlice[];
+    };
+    /** Followers online per hour of the day, e.g. `{ hour: '14', followers_online: 1494 }`. */
+    activity_by_hour?: Array<{ hour?: string; followers_online?: number; [key: string]: any }>;
+    /** Follower count per day inside the window. */
+    followers_daily?: Array<{ date?: string; total?: number; new?: number; lost?: number; [key: string]: any }>;
+    /** Taps on the profile: bio link, address, app download, email, phone, leads. */
+    profile_actions?: Record<string, number>;
+    bio_description?: string | null;
+    /** Every category `benchmarkCategory` accepts, so a picker needs no extra call. */
+    benchmark_categories?: string[];
+    /** Only when a `benchmarkCategory` was asked for. */
+    benchmark?: AudienceBenchmark;
+    [key: string]: any;
+  }
+
+  /** Which kind of suggestion `getSuggestions` asks for. */
+  export type SuggestionType = 'hashtags' | 'keywords';
+
+  export interface SuggestionsResponse {
+    success: boolean;
+    platform?: string;
+    type?: SuggestionType;
+    query?: string | null;
+    /** With `type: 'hashtags'`. */
+    hashtags?: Array<{ name?: string; view_count?: number; [key: string]: any }>;
+    /** With `type: 'keywords'`. */
+    keywords?: Array<Record<string, any>>;
+    [key: string]: any;
+  }
+
+  /** What `commentAction` does to a comment. Each action carries its own inverse. */
+  export type CommentActionValue = 'hide' | 'unhide' | 'like' | 'unlike' | 'pin' | 'unpin';
+
+  export interface CommentActionResponse {
+    success: boolean;
+    platform?: string;
+    action?: CommentActionValue;
+    comment_id?: string;
+    result?: Record<string, any>;
+    [key: string]: any;
+  }
+
   // ==================== Client Class ====================
 
   /**
@@ -806,7 +887,15 @@ declare module 'upload-post' {
     }>;
 
     /**
-     * Get analytics for a specific post across all platforms
+     * Get analytics for a specific post across all platforms.
+     *
+     * `post_metrics` carries whatever the platform reports, so it is not the
+     * same shape everywhere: TikTok adds `retention` (the curve, second by
+     * second), `impression_sources` (For You, search, profile...),
+     * `audience_types` (followers vs non-followers), `new_followers`, `reach`
+     * and the watch times (`average_time_watched`, `total_time_watched`,
+     * `full_video_watched_rate`) on top of the usual counters.
+     *
      * @param requestId - The request_id from the upload
      */
     getPostAnalytics(requestId: string): Promise<{
@@ -816,7 +905,8 @@ declare module 'upload-post' {
         success: boolean;
         platform_post_id?: string;
         post_url?: string;
-        post_metrics?: Record<string, number>;
+        /** Counters plus, on TikTok, retention / impression_sources / audience_types and watch times. */
+        post_metrics?: Record<string, any>;
         post_metrics_source?: string;
         post_metrics_error?: string;
         profile_snapshot_at_post_date?: Record<string, number>;
@@ -867,6 +957,47 @@ declare module 'upload-post' {
       next_cursor: string | null;
       has_more: boolean;
     }>;
+
+    /**
+     * Get who the audience is: where they are, how old they are, when they are
+     * online and what they tap on the profile.
+     *
+     * One endpoint for every platform, chosen with `platform`; a platform that
+     * cannot answer it returns `platform_not_supported` with the list of the
+     * ones that can. The window is clamped server-side to at most 60 days
+     * ending before today.
+     *
+     * @param options - Query options
+     */
+    getAudience(options: {
+      user: string;
+      platform: 'tiktok';
+      /** Window start, ISO `YYYY-MM-DD`. */
+      startDate?: string;
+      /** Window end, ISO `YYYY-MM-DD`. Always clamped to before today. */
+      endDate?: string;
+      /** Compare the account against this category's averages. */
+      benchmarkCategory?: string;
+    }): Promise<AudienceResponse>;
+
+    /**
+     * Get what to write about: the hashtags or the searches a platform
+     * suggests around a keyword.
+     *
+     * One endpoint for both questions, told apart by `type`, and one endpoint
+     * for every platform, chosen with `platform`.
+     *
+     * @param options - Query options
+     */
+    getSuggestions(options: {
+      user: string;
+      platform: 'tiktok';
+      type: SuggestionType;
+      /** Keyword to get suggestions around. */
+      q?: string;
+      countryCode?: string;
+      language?: string;
+    }): Promise<SuggestionsResponse>;
 
     /**
      * Get available metrics configuration for all supported platforms
@@ -1019,17 +1150,23 @@ declare module 'upload-post' {
      */
     testNotifications(): Promise<{ success: boolean; [key: string]: any }>;
 
-    // Instagram Comments
+    // Comments
 
     /**
-     * Get comments on a post
+     * Get comments on a post, or the replies hanging from one of them.
+     *
+     * Pass `commentId` to read that comment's replies instead of the post's
+     * top-level comments.
+     *
      * @param options - Query options
      */
     getPostComments(options: {
       user: string;
-      platform?: 'instagram' | 'facebook' | 'youtube' | 'linkedin';
+      platform?: 'instagram' | 'facebook' | 'youtube' | 'linkedin' | 'tiktok';
       postId?: string;
       postUrl?: string;
+      /** Read the replies to this comment instead of the post's top-level comments. */
+      commentId?: string;
       limit?: number;
       after?: string;
     }): Promise<{
@@ -1086,7 +1223,7 @@ declare module 'upload-post' {
      */
     createComment(options: {
       user: string;
-      platform: 'instagram' | 'facebook' | 'youtube' | 'linkedin';
+      platform: 'instagram' | 'facebook' | 'youtube' | 'linkedin' | 'tiktok';
       message: string;
       postId?: string;
       postUrl?: string;
@@ -1104,7 +1241,7 @@ declare module 'upload-post' {
      */
     deleteComment(options: {
       user: string;
-      platform: 'instagram' | 'facebook' | 'youtube' | 'linkedin';
+      platform: 'instagram' | 'facebook' | 'youtube' | 'linkedin' | 'tiktok';
       commentId: string;
       /** Post identifier (the post URN for LinkedIn) */
       postId?: string;
@@ -1113,6 +1250,24 @@ declare module 'upload-post' {
       message?: string;
       error?: string;
     }>;
+
+    /**
+     * Moderate a comment: hide, like or pin it — and undo any of the three.
+     *
+     * One method for every platform, chosen with `platform`. `postId` is
+     * required for hide/unhide and pin/unpin; like/unlike take the comment
+     * alone and never send it.
+     *
+     * @param options - Action options
+     */
+    commentAction(options: {
+      user: string;
+      platform: 'tiktok';
+      commentId: string;
+      action: CommentActionValue;
+      /** Required for hide/unhide and pin/unpin; never sent for like/unlike. */
+      postId?: string;
+    }): Promise<CommentActionResponse>;
 
     // Post Management
     /**
