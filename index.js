@@ -152,25 +152,54 @@ export class UploadPost {
    * @private
    */
   _addTiktokParams(form, options, isVideo = true) {
-    if (options.tiktokDisableComment !== undefined) form.append('disable_comment', String(options.tiktokDisableComment));
-    if (options.brandContentToggle !== undefined) form.append('brand_content_toggle', String(options.brandContentToggle));
-    if (options.brandOrganicToggle !== undefined) form.append('brand_organic_toggle', String(options.brandOrganicToggle));
+    // [form field, option key, "flag" when the value is a boolean/number sent as
+    // soon as it is defined, "text" when an empty value means "not set"].
+    //
+    // The shared block is shared on purpose: the backend reads privacy_level and
+    // post_mode on both /upload and /upload_photos, and TikTok's photo endpoint
+    // also accepts the music track id, the location pair and is_ai_generated.
+    // Gating them behind isVideo made photo carousels always publish as
+    // PUBLIC_TO_EVERYONE / DIRECT_POST and unable to carry music or a location.
+    //
+    // The music/location/cover/draft fields need the matching capability on the
+    // connection (see `capabilities` on the TikTok account returned by
+    // listUsers() / GET /api/uploadposts/users). Without it the field is ignored,
+    // the post still publishes, and the response carries a per-field `warnings`
+    // entry.
+    const shared = [
+      ['disable_comment', 'tiktokDisableComment', 'flag'],
+      ['brand_content_toggle', 'brandContentToggle', 'flag'],
+      ['brand_organic_toggle', 'brandOrganicToggle', 'flag'],
+      ['privacy_level', 'tiktokPrivacyLevel', 'text'],
+      ['post_mode', 'tiktokPostMode', 'text'],
+      ['tiktok_music_id', 'tiktokMusicId', 'text'],
+      ['tiktok_location_id', 'tiktokLocationId', 'text'],
+      ['tiktok_location_name', 'tiktokLocationName', 'text'],
+      ['tiktok_is_ai_generated', 'tiktokIsAiGenerated', 'flag'],
+    ];
+    // Video-only: TikTok's photo contract takes the track id alone, with no
+    // volume or trim, and has no custom cover or draft switch.
+    const videoOnly = [
+      ['disable_duet', 'tiktokDisableDuet', 'flag'],
+      ['disable_stitch', 'tiktokDisableStitch', 'flag'],
+      ['cover_timestamp', 'tiktokCoverTimestamp', 'flag'],
+      ['is_aigc', 'tiktokIsAigc', 'flag'],
+      ['tiktok_music_volume', 'tiktokMusicVolume', 'flag'],
+      ['tiktok_music_start', 'tiktokMusicStart', 'flag'],
+      ['tiktok_music_end', 'tiktokMusicEnd', 'flag'],
+      ['tiktok_original_sound_volume', 'tiktokOriginalSoundVolume', 'flag'],
+      ['tiktok_cover_image_url', 'tiktokCoverImageUrl', 'text'],
+      ['tiktok_upload_to_draft', 'tiktokUploadToDraft', 'flag'],
+    ];
+    const photoOnly = [
+      ['auto_add_music', 'tiktokAutoAddMusic', 'flag'],
+      ['photo_cover_index', 'tiktokPhotoCoverIndex', 'flag'],
+    ];
 
-    // Shared by TikTok video AND photo uploads: the backend reads privacy_level and
-    // post_mode for both /upload and /upload_photos. Gating them behind isVideo made
-    // photo carousels always publish as PUBLIC_TO_EVERYONE / DIRECT_POST.
-    if (options.tiktokPrivacyLevel) form.append('privacy_level', options.tiktokPrivacyLevel);
-    if (options.tiktokPostMode) form.append('post_mode', options.tiktokPostMode);
-
-    if (isVideo) {
-      if (options.tiktokDisableDuet !== undefined) form.append('disable_duet', String(options.tiktokDisableDuet));
-      if (options.tiktokDisableStitch !== undefined) form.append('disable_stitch', String(options.tiktokDisableStitch));
-      if (options.tiktokCoverTimestamp !== undefined) form.append('cover_timestamp', options.tiktokCoverTimestamp);
-      if (options.tiktokIsAigc !== undefined) form.append('is_aigc', String(options.tiktokIsAigc));
-    } else {
-      // Photo-specific
-      if (options.tiktokAutoAddMusic !== undefined) form.append('auto_add_music', String(options.tiktokAutoAddMusic));
-      if (options.tiktokPhotoCoverIndex !== undefined) form.append('photo_cover_index', options.tiktokPhotoCoverIndex);
+    for (const [field, key, kind] of shared.concat(isVideo ? videoOnly : photoOnly)) {
+      const value = options[key];
+      if (kind === 'flag' ? value === undefined : !value) continue;
+      form.append(field, String(value));
     }
   }
 
@@ -401,7 +430,7 @@ export class UploadPost {
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
    * 
    * TikTok options:
-   * @param {string} [options.tiktokPrivacyLevel] - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY
+   * @param {string} [options.tiktokPrivacyLevel] - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY. TikTok decides per account which of these are available (a private account has no PUBLIC_TO_EVERYONE); asking for another one fails with error_code tiktok_privacy_unavailable listing the allowed ones. Omit it to keep the account's own default.
    * @param {boolean} [options.tiktokDisableDuet] - Disable duet
    * @param {boolean} [options.tiktokDisableComment] - Disable comments
    * @param {boolean} [options.tiktokDisableStitch] - Disable stitch
@@ -410,7 +439,24 @@ export class UploadPost {
    * @param {string} [options.tiktokPostMode] - DIRECT_POST or MEDIA_UPLOAD
    * @param {boolean} [options.brandContentToggle] - Branded content toggle
    * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
-   * 
+   *
+   * TikTok music, location, cover and draft options. Available on connections that
+   * declare the matching `capabilities` (music, location, cover_image, draft) on the
+   * TikTok account returned by listUsers() / GET /api/uploadposts/users. If your
+   * connection does not have it, the field is ignored, the post still publishes, and
+   * the response includes a per-field `warnings` entry — reconnect the TikTok account
+   * to enable it.
+   * @param {string} [options.tiktokMusicId] - Commercial Music Library track id (see getTiktokTrendingMusic)
+   * @param {number} [options.tiktokMusicVolume] - Music volume 0-100 (defaults to 50 when music is set)
+   * @param {number} [options.tiktokMusicStart] - Music start offset in ms
+   * @param {number} [options.tiktokMusicEnd] - Music end offset in ms
+   * @param {number} [options.tiktokOriginalSoundVolume] - Original video audio volume 0-100 (defaults to 50 when music is set, so the original audio is not muted)
+   * @param {string} [options.tiktokLocationId] - Location id (see getTiktokLocations)
+   * @param {string} [options.tiktokLocationName] - Location name, required whenever tiktokLocationId is set
+   * @param {string} [options.tiktokCoverImageUrl] - Custom cover image URL
+   * @param {boolean} [options.tiktokIsAiGenerated] - AI-generated content disclosure
+   * @param {boolean} [options.tiktokUploadToDraft] - Publish to drafts. When true TikTok ignores the rest of the post settings
+   *
    * Instagram options:
    * @param {string} [options.instagramMediaType] - REELS or STORIES
    * @param {boolean} [options.instagramShareToFeed] - Share to feed
@@ -521,10 +567,22 @@ export class UploadPost {
    * TikTok options:
    * @param {boolean} [options.tiktokAutoAddMusic] - Auto add music
    * @param {boolean} [options.tiktokDisableComment] - Disable comments
-   * @param {number} [options.tiktokPhotoCoverIndex] - Index of photo for cover (0-based)
+   * @param {number} [options.tiktokPhotoCoverIndex] - Index of photo for cover (0-based). Sent as `photo_cover_index`
+   * @param {string} [options.tiktokPrivacyLevel] - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY. TikTok requires one on photo posts, so it defaults to PUBLIC_TO_EVERYONE; asking for one the account does not have fails with error_code tiktok_privacy_unavailable listing the allowed ones.
    * @param {boolean} [options.brandContentToggle] - Branded content toggle
    * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
-   * 
+   *
+   * TikTok music, location and AI disclosure on photo posts. TikTok's photo contract
+   * takes the track id alone — no volume/trim, no custom cover, no draft (those are
+   * video-only). Available on connections that declare the matching `capabilities`
+   * (music, location) on the TikTok account returned by listUsers(); otherwise the
+   * field is ignored, the post still publishes, and the response includes a
+   * per-field `warnings` entry.
+   * @param {string} [options.tiktokMusicId] - Commercial Music Library track id (see getTiktokTrendingMusic)
+   * @param {string} [options.tiktokLocationId] - Location id (see getTiktokLocations)
+   * @param {string} [options.tiktokLocationName] - Location name, required whenever tiktokLocationId is set
+   * @param {boolean} [options.tiktokIsAiGenerated] - AI-generated content disclosure
+   *
    * Instagram options:
    * @param {string} [options.instagramMediaType] - IMAGE or STORIES
    * @param {string} [options.instagramCollaborators] - Comma-separated collaborator usernames
@@ -1240,6 +1298,102 @@ export class UploadPost {
   async getPinterestBoards(profile) {
     const params = profile ? { profile } : {};
     return this._request('/uploadposts/pinterest/boards', 'GET', params);
+  }
+
+  /**
+   * Catalogue filters shared by the trending and search endpoints, so both
+   * address the same cached chart slice.
+   * @private
+   */
+  _tiktokMusicParams(profile, options = {}) {
+    const params = { profile };
+    if (options.genre) params.genre = options.genre;
+    if (options.countryCode) params.country_code = options.countryCode;
+    if (options.dateRange) params.date_range = options.dateRange;
+    return params;
+  }
+
+  /**
+   * Get trending tracks from the TikTok Commercial Music Library.
+   *
+   * Available on connections that declare the `music` capability (see
+   * `capabilities` on the TikTok account returned by listUsers() /
+   * GET /api/uploadposts/users). The returned `id` is what you pass as
+   * `tiktokMusicId` on an upload — not `commercial_music_id`, which TikTok
+   * rejects on public posts.
+   *
+   * @param {string} profile - Profile username
+   * @param {Object} [options] - Query options
+   * @param {string} [options.genre] - Genre filter (e.g. ALL, POP). Defaults to ALL upstream.
+   * @param {string} [options.countryCode] - ISO country code. Defaults to US upstream.
+   * @param {('1DAY'|'7DAY'|'30DAY'|'90DAY')} [options.dateRange] - Trending window. Defaults to 7DAY upstream.
+   * @returns {Promise<Object>} Trending tracks
+   */
+  async getTiktokTrendingMusic(profile, options = {}) {
+    return this._request('/uploadposts/tiktok/music/trending', 'GET',
+      this._tiktokMusicParams(profile, options));
+  }
+
+  /**
+   * Search the TikTok Commercial Music Library by song title or artist.
+   *
+   * TikTok itself has no music search endpoint — its only catalogue read is the
+   * trending chart for a genre/country/period. Upload-Post caches those charts
+   * and matches your text against them, so this searches the trending charts,
+   * not TikTok's whole catalogue. Matching is case- and accent-insensitive and
+   * every word must match.
+   *
+   * Returns the same track objects as getTiktokTrendingMusic(), so the `id` is
+   * again what you pass as `tiktokMusicId` on an upload.
+   *
+   * @param {string} profile - Profile username
+   * @param {Object} [options] - Query options
+   * @param {string} [options.q] - Text matched against titles and artists (max 80 chars). Omit for the chart in trending order.
+   * @param {string} [options.genre] - Genre filter (e.g. ALL, POP). Defaults to ALL upstream.
+   * @param {string} [options.countryCode] - ISO country code choosing which chart is searched. Defaults to US upstream.
+   * @param {('1DAY'|'7DAY'|'30DAY'|'90DAY')} [options.dateRange] - Chart window. Defaults to 7DAY upstream.
+   * @param {number} [options.limit] - Maximum tracks to return (capped at 100 upstream).
+   * @returns {Promise<Object>} Matching tracks plus a `catalog` block describing the corpus searched
+   */
+  async searchTiktokMusic(profile, options = {}) {
+    const params = this._tiktokMusicParams(profile, options);
+    if (options.q) params.q = options.q;
+    if (options.limit !== undefined && options.limit !== null) params.limit = options.limit;
+    return this._request('/uploadposts/tiktok/music/search', 'GET', params);
+  }
+
+  /**
+   * Search TikTok locations (places) to tag on a post.
+   *
+   * Available on connections that declare the `location` capability (see
+   * `capabilities` on the TikTok account returned by listUsers() /
+   * GET /api/uploadposts/users). Pass the returned `location_id` as
+   * `tiktokLocationId` and `location_name` as `tiktokLocationName` on an upload;
+   * TikTok requires both together.
+   *
+   * @param {string} profile - Profile username
+   * @param {string} query - Search query (max 100 characters)
+   * @returns {Promise<Object>} Matching locations (up to 20)
+   */
+  async getTiktokLocations(profile, query) {
+    return this._request('/uploadposts/tiktok/locations', 'GET', { profile, q: query });
+  }
+
+  /**
+   * Get what the connected TikTok account is allowed to publish.
+   *
+   * The point of this call is `privacy_level_options`: TikTok narrows the four
+   * privacy values per account (a private account has no `PUBLIC_TO_EVERYONE`),
+   * and sending one the account does not have fails the upload with
+   * `error_code: "tiktok_privacy_unavailable"`. Ask here to offer only the
+   * values that will work, instead of the full enum.
+   *
+   * @param {string} profile - Profile username
+   * @returns {Promise<Object>} privacy_level_options, max_video_post_duration_sec
+   *   and the account's comment/duet/stitch switches
+   */
+  async getTiktokPublishingSettings(profile) {
+    return this._request('/uploadposts/tiktok/settings', 'GET', { profile });
   }
 
   /**

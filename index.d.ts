@@ -114,7 +114,12 @@ declare module 'upload-post' {
   // ==================== TikTok Options ====================
 
   export interface TikTokVideoOptions {
-    /** Privacy setting */
+    /**
+     * Privacy setting. TikTok decides per account which levels are available (a
+     * private account has no `PUBLIC_TO_EVERYONE`); asking for another one fails
+     * with `error_code: "tiktok_privacy_unavailable"` listing the allowed ones.
+     * Omit it to keep the account's own default.
+     */
     tiktokPrivacyLevel?: TikTokPrivacyLevel;
     /** Disable duet */
     tiktokDisableDuet?: boolean;
@@ -132,6 +137,35 @@ declare module 'upload-post' {
     brandContentToggle?: boolean;
     /** Brand organic toggle */
     brandOrganicToggle?: boolean;
+
+    // ---- Music, location, cover and draft ----
+    // Available on connections that declare the matching capability (`music`,
+    // `location`, `cover_image`, `draft`) — see `capabilities` on the TikTok
+    // account returned by listUsers() / GET /api/uploadposts/users. If your
+    // connection does not have it, the field is ignored, the post still
+    // publishes, and the response includes a per-field `warnings` entry —
+    // reconnect the TikTok account to enable it.
+
+    /** Commercial Music Library track id (see getTiktokTrendingMusic) */
+    tiktokMusicId?: string;
+    /** Music volume, 0-100. Defaults to 50 when music is set */
+    tiktokMusicVolume?: number;
+    /** Music start offset in ms */
+    tiktokMusicStart?: number;
+    /** Music end offset in ms */
+    tiktokMusicEnd?: number;
+    /** Original video audio volume, 0-100. Defaults to 50 when music is set, so the original audio is not muted */
+    tiktokOriginalSoundVolume?: number;
+    /** Location id to tag (see getTiktokLocations) */
+    tiktokLocationId?: string;
+    /** Location name. Required whenever tiktokLocationId is set */
+    tiktokLocationName?: string;
+    /** Custom cover image URL */
+    tiktokCoverImageUrl?: string;
+    /** AI-generated content disclosure */
+    tiktokIsAiGenerated?: boolean;
+    /** Publish to drafts. When true TikTok ignores the rest of the post settings */
+    tiktokUploadToDraft?: boolean;
   }
 
   export interface TikTokPhotoOptions {
@@ -139,16 +173,39 @@ declare module 'upload-post' {
     tiktokAutoAddMusic?: boolean;
     /** Disable comments */
     tiktokDisableComment?: boolean;
-    /** Index of photo for cover (0-based) */
+    /** Index of photo for cover (0-based). Sent as `photo_cover_index` */
     tiktokPhotoCoverIndex?: number;
-    /** Privacy level, e.g. PUBLIC_TO_EVERYONE, SELF_ONLY, MUTUAL_FOLLOW_FRIENDS */
-    tiktokPrivacyLevel?: string;
+    /**
+     * Privacy setting. TikTok REQUIRES one on photo posts, so it defaults to
+     * `PUBLIC_TO_EVERYONE`. Which values the account may use is decided by TikTok
+     * (a private account has no `PUBLIC_TO_EVERYONE`); asking for another one
+     * fails with `error_code: "tiktok_privacy_unavailable"` listing the allowed
+     * ones.
+     */
+    tiktokPrivacyLevel?: TikTokPrivacyLevel;
     /** Post mode, e.g. DIRECT_POST or MEDIA_UPLOAD (inbox) */
     tiktokPostMode?: string;
     /** Branded content toggle */
     brandContentToggle?: boolean;
     /** Brand organic toggle */
     brandOrganicToggle?: boolean;
+
+    // ---- Music, location and AI disclosure ----
+    // Photo posts accept the track id, the location pair and the AI disclosure —
+    // not the volume/trim, cover-image or draft fields, which are video-only.
+    // Available on connections that declare the matching capability (`music`,
+    // `location`) — see `capabilities` on the TikTok account returned by
+    // listUsers(). Without it the field is ignored, the post still publishes, and
+    // the response includes a per-field `warnings` entry.
+
+    /** Commercial Music Library track id (see getTiktokTrendingMusic) */
+    tiktokMusicId?: string;
+    /** Location id to tag (see getTiktokLocations) */
+    tiktokLocationId?: string;
+    /** Location name. Required whenever tiktokLocationId is set */
+    tiktokLocationName?: string;
+    /** AI-generated content disclosure */
+    tiktokIsAiGenerated?: boolean;
   }
 
   // ==================== Instagram Options ====================
@@ -577,6 +634,80 @@ declare module 'upload-post' {
   export interface BoardsResponse {
     success: boolean;
     boards?: Array<{ id: string; name?: string }>;
+    [key: string]: any;
+  }
+
+  /** Trending window accepted by the TikTok Commercial Music Library. */
+  export type TikTokMusicDateRange = '1DAY' | '7DAY' | '30DAY' | '90DAY';
+
+  export interface TikTokMusicTrack {
+    /** Pass this as `tiktokMusicId` on an upload. */
+    id: string;
+    /**
+     * TikTok's catalogue id for the same track, returned for reference only.
+     * Do NOT send it as `tiktokMusicId`: TikTok rejects it on public posts.
+     */
+    commercial_music_id?: string;
+    title?: string;
+    artist?: string;
+    /** Track duration in seconds. */
+    duration?: number;
+    genres?: string[];
+    /** Artwork image URL. */
+    cover_url?: string;
+    /** Audio preview URL. */
+    preview_url?: string;
+    rank?: number;
+    [key: string]: any;
+  }
+
+  export interface TikTokTrendingMusicResponse {
+    success: boolean;
+    tracks?: TikTokMusicTrack[];
+    [key: string]: any;
+  }
+
+  export interface TikTokMusicSearchResponse {
+    success: boolean;
+    /** Matches, ranked by relevance; same shape as the trending endpoint. */
+    tracks?: TikTokMusicTrack[];
+    /** How many tracks matched before `limit` was applied. */
+    total?: number;
+    query?: string;
+    /** What the search actually ran against. */
+    catalog?: {
+      /** Number of tracks in the searched corpus. */
+      tracks_indexed?: number;
+      /** Genre charts currently loaded for this country and period. */
+      genres_indexed?: string[];
+      /** False when this request had to load a chart from TikTok. */
+      cached?: boolean;
+    };
+    [key: string]: any;
+  }
+
+  export interface TikTokLocation {
+    location_id: string;
+    location_name?: string;
+    location_address?: string;
+    [key: string]: any;
+  }
+
+  export interface TikTokLocationsResponse {
+    success: boolean;
+    locations?: TikTokLocation[];
+    [key: string]: any;
+  }
+
+  export interface TikTokPublishingSettingsResponse {
+    success: boolean;
+    /** The privacy levels THIS account may use — a subset of the four. */
+    privacy_level_options?: TikTokPrivacyLevel[];
+    /** Longest video the account can publish, in seconds. */
+    max_video_post_duration_sec?: number;
+    comment_disabled?: boolean;
+    duet_disabled?: boolean;
+    stitch_disabled?: boolean;
     [key: string]: any;
   }
 
@@ -1048,6 +1179,76 @@ declare module 'upload-post' {
      * @param profile - Profile username
      */
     getGoogleBusinessLocations(profile?: string): Promise<Record<string, unknown>>;
+
+    /**
+     * Get trending tracks from the TikTok Commercial Music Library.
+     *
+     * Available on connections that declare the `music` capability (see
+     * `capabilities` on the TikTok account returned by listUsers() /
+     * GET /api/uploadposts/users). Pass the returned `id` as `tiktokMusicId`
+     * on an upload (NOT `commercial_music_id` — TikTok rejects that one on
+     * public posts).
+     *
+     * @param profile - Profile username
+     * @param options - Query options
+     */
+    getTiktokTrendingMusic(
+      profile: string,
+      options?: {
+        genre?: string;
+        countryCode?: string;
+        dateRange?: TikTokMusicDateRange;
+      }
+    ): Promise<TikTokTrendingMusicResponse>;
+
+    /**
+     * Search the TikTok Commercial Music Library by song title or artist.
+     *
+     * TikTok has no music search endpoint, so this searches the trending charts
+     * Upload-Post caches (per genre / country / period), not TikTok's whole
+     * catalogue. Matching is case- and accent-insensitive and every word must
+     * match. Returns the same track objects as getTiktokTrendingMusic().
+     *
+     * @param profile - Profile username
+     * @param options - Query options
+     */
+    searchTiktokMusic(
+      profile: string,
+      options?: {
+        q?: string;
+        genre?: string;
+        countryCode?: string;
+        dateRange?: TikTokMusicDateRange;
+        limit?: number;
+      }
+    ): Promise<TikTokMusicSearchResponse>;
+
+    /**
+     * Search TikTok locations (places) to tag on a post.
+     *
+     * Available on connections that declare the `location` capability (see
+     * `capabilities` on the TikTok account returned by listUsers() /
+     * GET /api/uploadposts/users). TikTok requires both the id and the name, so
+     * pass `location_id` as `tiktokLocationId` and `location_name` as
+     * `tiktokLocationName`.
+     *
+     * @param profile - Profile username
+     * @param query - Search query (max 100 characters)
+     */
+    getTiktokLocations(profile: string, query: string): Promise<TikTokLocationsResponse>;
+
+    /**
+     * Get what the connected TikTok account is allowed to publish.
+     *
+     * The point of this call is `privacy_level_options`: TikTok narrows the four
+     * privacy values per account (a private account has no `PUBLIC_TO_EVERYONE`),
+     * and sending one the account does not have fails the upload with
+     * `error_code: "tiktok_privacy_unavailable"`. Ask here to offer only the
+     * values that will work, instead of the full enum.
+     *
+     * @param profile - Profile username
+     */
+    getTiktokPublishingSettings(profile: string): Promise<TikTokPublishingSettingsResponse>;
   }
 
   export default UploadPost;

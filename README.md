@@ -295,7 +295,79 @@ const liPages = await client.getLinkedinPages('my-profile');
 
 // Get Pinterest boards for a profile
 const boards = await client.getPinterestBoards('my-profile');
+
+// TikTok: trending Commercial Music Library tracks
+const music = await client.getTiktokTrendingMusic('my-profile', {
+  genre: 'POP',
+  countryCode: 'ES',
+  dateRange: '7DAY', // 1DAY, 7DAY, 30DAY, 90DAY
+});
+
+// TikTok: find a track by song or artist
+const found = await client.searchTiktokMusic('my-profile', {
+  q: 'bad bunny',
+  countryCode: 'ES',
+});
+
+// TikTok: search locations to tag
+const locations = await client.getTiktokLocations('my-profile', 'Madrid');
 ```
+
+## TikTok music, location, cover and drafts
+
+> **Capabilities.** These options are available on connections that declare the
+> matching capability — `music`, `location`, `cover_image`, `draft` — in the
+> `capabilities` array of the TikTok account returned by `listUsers()`
+> (other values you may see there: `cover_timestamp`, `photo_privacy`,
+> `video_privacy`, `inbox_fallback`, `profile_analytics`)
+> (`GET /api/uploadposts/users`). If your connection does not have it, the field
+> is ignored, the post still publishes, and the response includes a per-field
+> `warnings` entry — reconnect the TikTok account to enable it.
+
+```javascript
+// 1. Pick a track and a place
+const { tracks } = await client.getTiktokTrendingMusic('my-profile', { countryCode: 'ES' });
+// ...or find one by name. TikTok has no music search endpoint, so this searches
+// the trending charts Upload-Post caches, not TikTok's whole catalogue.
+// const { tracks } = await client.searchTiktokMusic('my-profile', { q: 'bossa', countryCode: 'ES' });
+const { locations } = await client.getTiktokLocations('my-profile', 'Madrid');
+
+// 2. Publish with them
+await client.upload('./video.mp4', {
+  title: 'Shot in Madrid',
+  user: 'my-profile',
+  platforms: ['tiktok'],
+
+  tiktokMusicId: tracks[0].id,
+  tiktokMusicVolume: 70,            // 0-100, defaults to 50 when music is set
+  tiktokMusicStart: 0,              // ms
+  tiktokMusicEnd: 15000,            // ms
+  tiktokOriginalSoundVolume: 30,    // 0-100, defaults to 50 so the original audio is not muted
+
+  tiktokLocationId: locations[0].location_id,
+  tiktokLocationName: locations[0].location_name, // required together with the id
+
+  tiktokCoverImageUrl: 'https://example.com/cover.jpg',
+  tiktokIsAiGenerated: false,
+  tiktokUploadToDraft: false,       // true sends it to drafts and ignores the rest
+});
+```
+
+### Options
+
+| Option | Type | Notes |
+| --- | --- | --- |
+| `tiktokMusicId` | string | The track `id` from `getTiktokTrendingMusic()` or `searchTiktokMusic()` (not `commercial_music_id`) |
+| `tiktokMusicVolume` | number | 0-100. Defaults to 50 when music is set |
+| `tiktokMusicStart` | number | Music start offset in ms |
+| `tiktokMusicEnd` | number | Music end offset in ms |
+| `tiktokOriginalSoundVolume` | number | 0-100. Defaults to 50 when music is set, so the original audio is not muted |
+| `tiktokLocationId` | string | `location_id` from `getTiktokLocations()` |
+| `tiktokLocationName` | string | Required whenever `tiktokLocationId` is set |
+| `tiktokCoverImageUrl` | string | Custom cover image URL |
+| `tiktokIsAiGenerated` | boolean | AI-generated content disclosure |
+| `tiktokUploadToDraft` | boolean | Publish to drafts; TikTok ignores the rest of the post settings |
+| `tiktokPhotoCoverIndex` | number | Cover photo index for photo posts (0-based) |
 
 ## Platform-Specific Options
 
@@ -310,10 +382,29 @@ const boards = await client.getPinterestBoards('my-profile');
 - `brandContentToggle` - Branded content toggle
 - `brandOrganicToggle` - Brand organic toggle
 
+> **Which privacy levels are available is decided by TikTok per account.** A
+> private account, for example, is offered `FOLLOWER_OF_CREATOR`,
+> `MUTUAL_FOLLOW_FRIENDS` and `SELF_ONLY` and has no `PUBLIC_TO_EVERYONE`.
+> Asking for one the account does not have fails with
+> `error_code: "tiktok_privacy_unavailable"` and an error listing the ones it
+> does have. Omit `tiktokPrivacyLevel` on video and TikTok keeps the account's
+> own default; on **photo** posts it defaults to `PUBLIC_TO_EVERYONE`.
+
+See [TikTok music, location, cover and drafts](#tiktok-music-location-cover-and-drafts)
+for those options.
+
 ### TikTok (Photos)
 - `tiktokAutoAddMusic` - Auto add music
 - `tiktokPhotoCoverIndex` - Index of photo for cover (0-based)
 - `tiktokDisableComment` - Disable comments
+- `tiktokPrivacyLevel` - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY (same field and same per-account limits as video)
+- `tiktokMusicId` - Commercial Music Library track id (see `getTiktokTrendingMusic`)
+- `tiktokLocationId` / `tiktokLocationName` - Location tag, both required together
+- `tiktokIsAiGenerated` - AI-generated content disclosure
+
+> TikTok's photo contract takes the music track id alone: `tiktokMusicVolume`,
+> `tiktokMusicStart`, `tiktokMusicEnd`, `tiktokOriginalSoundVolume`,
+> `tiktokCoverImageUrl` and `tiktokUploadToDraft` are video-only.
 
 ### Instagram
 - `instagramMediaType` - REELS, STORIES, IMAGE
