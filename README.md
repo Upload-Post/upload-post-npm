@@ -37,6 +37,8 @@ console.log(response);
 - ✅ **Posting Queue** - Add posts to your configured queue
 - ✅ **First Comments** - Auto-post first comment after publishing
 - ✅ **Analytics** - Get engagement metrics
+- ✅ **Audience** - Who follows a profile, per platform
+- ✅ **Suggestions** - Hashtags and searches to post about, per platform
 - ✅ **Full TypeScript Support**
 
 ## Using this from an AI agent? Use the MCP server instead
@@ -315,8 +317,9 @@ const locations = await client.getTiktokLocations('my-profile', 'Madrid');
 
 ### Comments
 
-The same three methods cover every platform that has comments — Instagram,
-Facebook, YouTube, LinkedIn and TikTok:
+The same methods cover every platform that has comments — Instagram, Facebook,
+YouTube, LinkedIn and TikTok. There is no per-network method: the endpoint
+answers one question and `platform` says who to ask.
 
 ```javascript
 // Read the comments on a post
@@ -325,6 +328,14 @@ const { comments } = await client.getPostComments({
   platform: 'tiktok',
   postId: '7412345678901234567', // TikTok has no post-URL lookup, pass the video id
   limit: 20,
+});
+
+// Read the replies hanging from one of them — same question, one more parameter
+const { comments: replies } = await client.getPostComments({
+  user: 'my-profile',
+  platform: 'tiktok',
+  postId: '7412345678901234567',
+  commentId: comments[0].id,
 });
 
 // Comment on the post, or reply to a comment
@@ -357,91 +368,118 @@ On TikTok all of this needs the `comments` capability, which the account grants
 when it connects — see
 [What a TikTok connection can do](#what-a-tiktok-connection-can-do-capabilities).
 
-#### TikTok replies, hide, like and pin
+#### Moderating a comment: hide, like, pin
 
-Replies live in their own call because no other platform models them as a
-separate resource:
-
-```javascript
-const replies = await client.getTiktokCommentReplies(
-  'my-profile', '7412345678901234567', '7412345678909999999', { limit: 20 }
-);
-console.log(replies.comments, replies.pagination.next_cursor);
-```
-
-Hiding, liking and pinning share one method. `postId` is required for `hide` and
-`pin`; `like` takes the comment alone:
+`commentAction()` does the three and undoes them, on any platform that supports
+it. Each action carries its own inverse, and `postId` is only sent when the
+platform needs it:
 
 ```javascript
-await client.tiktokCommentAction('my-profile', {
-  type: 'hide', action: 'HIDE',
+await client.commentAction({
+  user: 'my-profile',
+  platform: 'tiktok',
+  action: 'hide',
   commentId: '7412345678909999999',
   postId: '7412345678901234567',
 });
 
-await client.tiktokCommentAction('my-profile', {
-  type: 'like', action: 'LIKE',
+await client.commentAction({
+  user: 'my-profile',
+  platform: 'tiktok',
+  action: 'like',
   commentId: '7412345678909999999',
 });
 
-await client.tiktokCommentAction('my-profile', {
-  type: 'pin', action: 'UNPIN',
+await client.commentAction({
+  user: 'my-profile',
+  platform: 'tiktok',
+  action: 'unpin',
   commentId: '7412345678909999999',
   postId: '7412345678901234567',
 });
 ```
 
-| `type` | `action` | `postId` |
+| `action` | Undo | `postId` |
 | --- | --- | --- |
-| `hide` | `HIDE` / `UNHIDE` | required |
-| `like` | `LIKE` / `UNLIKE` | not sent |
-| `pin` | `PIN` / `UNPIN` | required |
+| `hide` | `unhide` | required |
+| `like` | `unlike` | not sent |
+| `pin` | `unpin` | required |
 
-### TikTok audience insights and discovery
+### Audience
 
-Where the analytics methods answer *how did my posts do*, these answer *who is
-my audience* and *what is worth posting about*. All four work on any recent
-TikTok connection — the ones that list the `profile_analytics` capability.
+Where the analytics methods answer *how did my posts do*, `getAudience()`
+answers *who is following me*. One endpoint, one `platform` parameter, like
+every other question in the API.
 
 ```javascript
-// Who follows the account, when they are online, what they tap on the profile
-const insights = await client.getTiktokInsights('my-profile', {
+const audience = await client.getAudience({
+  user: 'my-profile',
+  platform: 'tiktok',
   startDate: '2026-07-01',
   endDate: '2026-07-30',
 });
-console.log(insights.audience.countries, insights.audience.ages);
-console.log(insights.activity_by_hour, insights.followers_daily);
-console.log(insights.profile_actions); // bio link, address, email, phone, leads
 
-// Per-video breakdown: retention curve, impression sources, audience types,
-// followers gained and watch times
-const videos = await client.getTiktokVideoInsights('my-profile', { limit: 20 });
-console.log(videos.videos[0].video_view_retention);
-console.log(videos.videos[0].impression_sources);
+console.log(audience.range);              // the window actually used
+console.log(audience.audience.countries); // and .cities, .ages, .genders
+console.log(audience.activity_by_hour);   // [{ hour: '14', followers_online: 1494 }, ...]
+console.log(audience.followers_daily);    // [{ date, total, new, lost }, ...]
+console.log(audience.profile_actions);    // bio link, address, email, phone, leads
+console.log(audience.bio_description);
+```
 
-// Hashtags to pair with a keyword
-const { hashtags } = await client.getTiktokHashtags('my-profile', 'pilates', {
+The window is clamped on the server: at most 60 days, and `endDate` always
+before today. A wider window is trimmed to what the platform accepts instead of
+failing.
+
+Ask for a `benchmarkCategory` and the same call also returns how the account
+compares with the average of that category. The accepted categories come back in
+`benchmark_categories` on every response, so a picker needs no second call:
+
+```javascript
+const { benchmark_categories } = await client.getAudience({
+  user: 'my-profile', platform: 'tiktok',
+});
+
+const { benchmark } = await client.getAudience({
+  user: 'my-profile',
+  platform: 'tiktok',
+  benchmarkCategory: 'SOFTWARE_AND_APPS',
+});
+console.log(benchmark.average_engagement_rate, benchmark.average_video_views);
+```
+
+### Suggestions
+
+`getSuggestions()` answers *what is worth posting about*: the hashtags or the
+searches a platform suggests around a keyword. One endpoint for both, told apart
+by `type`.
+
+```javascript
+const { hashtags } = await client.getSuggestions({
+  user: 'my-profile',
+  platform: 'tiktok',
+  type: 'hashtags',
+  q: 'pilates',
   countryCode: 'ES',
   language: 'es',
 });
 console.log(hashtags); // [{ name, view_count }, ...]
 
-// The account against the average of its category
-const { categories } = await client.getTiktokBenchmark('my-profile');
-const { benchmark } = await client.getTiktokBenchmark('my-profile', 'SOFTWARE_AND_APPS');
+const { keywords } = await client.getSuggestions({
+  user: 'my-profile',
+  platform: 'tiktok',
+  type: 'keywords',
+  q: 'pilates',
+});
 ```
 
-The window for `getTiktokInsights()` is at most 60 days and has to end before
-today; it defaults to the 30 days ending yesterday. A wider window is trimmed to
-what TikTok accepts instead of failing.
+Per-post numbers stay in `getPostAnalytics()`. On TikTok that response carries
+more than the usual counters: `retention` (the curve, second by second),
+`impression_sources` (For You, search, profile...), `audience_types` (followers
+vs non-followers), `new_followers`, `reach` and the watch times.
 
-Searching what people look for on TikTok is a separate capability,
-`trend_search`, which also needs the account to have been reconnected:
-
-```javascript
-const { data } = await client.searchTiktokKeywords('my-profile', 'pilates');
-console.log(data.search_keywords);
-```
+Asking a platform a question it cannot answer fails with
+`platform_not_supported` and the list of the ones that can.
 
 ## What a TikTok connection can do (`capabilities`)
 
@@ -458,9 +496,9 @@ TikTok account; check it before offering a feature.
 | `draft` | `tiktokUploadToDraft` |
 | `video_privacy` | `tiktokPrivacyLevel` on video |
 | `photo_privacy` | `tiktokPrivacyLevel` on photo posts |
-| `profile_analytics` | `getTiktokInsights()`, `getTiktokVideoInsights()`, `getTiktokHashtags()`, `getTiktokBenchmark()` |
-| `comments` | Comments on TikTok: `getPostComments()`, `createComment()`, `deleteComment()`, `getTiktokCommentReplies()`, `tiktokCommentAction()` and `tiktokFirstComment` |
-| `trend_search` | `searchTiktokKeywords()` |
+| `profile_analytics` | `getAudience()` and `getSuggestions({ type: 'hashtags' })` with `platform: 'tiktok'` |
+| `comments` | Comments on TikTok: `getPostComments()` (top-level and replies), `createComment()`, `deleteComment()`, `commentAction()` and `tiktokFirstComment` |
+| `trend_search` | `getSuggestions({ type: 'keywords' })` with `platform: 'tiktok'` |
 
 > **`comments` and `trend_search` need the account to be reconnected.** TikTok
 > grants them at connect time, so an account linked before they existed keeps

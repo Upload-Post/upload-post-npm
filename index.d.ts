@@ -716,131 +716,79 @@ declare module 'upload-post' {
     [key: string]: any;
   }
 
-  /** Which toggle `tiktokCommentAction` flips. */
-  export type TikTokCommentActionType = 'hide' | 'like' | 'pin';
-
-  /** The value that toggle takes. Each type accepts only its own pair. */
-  export type TikTokCommentActionValue =
-    | 'HIDE' | 'UNHIDE'
-    | 'LIKE' | 'UNLIKE'
-    | 'PIN' | 'UNPIN';
-
-  /** TikTok's own cursor pagination: no cursor left means no next page. */
-  export interface TikTokCursorPagination {
-    next_cursor?: string | null;
-    has_next?: boolean;
-  }
-
-  export interface TikTokCommentRepliesResponse {
-    success: boolean;
-    comments?: Array<{
-      id?: string;
-      text?: string;
-      create_time?: number;
-      username?: string;
-      like_count?: number;
-      reply_count?: number;
-      [key: string]: any;
-    }>;
-    pagination?: TikTokCursorPagination;
-    [key: string]: any;
-  }
-
-  export interface TikTokCommentActionResponse {
-    success: boolean;
-    type?: TikTokCommentActionType;
-    action?: TikTokCommentActionValue;
-    comment_id?: string;
-    result?: Record<string, any>;
-    [key: string]: any;
-  }
-
-  export interface TikTokKeywordSearchResponse {
-    success: boolean;
-    query?: string | null;
-    data?: {
-      search_keywords?: Array<Record<string, any>>;
-      [key: string]: any;
-    };
-    [key: string]: any;
-  }
+  // ==================== Audience, Suggestions and Comment Actions ====================
 
   /** One row of an audience breakdown: a bucket and its share. */
-  export interface TikTokAudienceSlice {
+  export interface AudienceSlice {
     name?: string;
     value?: number;
     percentage?: number;
     [key: string]: any;
   }
 
-  export interface TikTokAccountInsightsResponse {
+  /** Category averages returned when `benchmarkCategory` is asked for. */
+  export interface AudienceBenchmark {
+    category?: string;
+    average_comments?: number;
+    average_engagement_rate?: number;
+    average_follower_count?: number;
+    average_follower_growth?: number;
+    average_likes?: number;
+    average_shares?: number;
+    average_video_count?: number;
+    average_video_views?: number;
+    [key: string]: any;
+  }
+
+  export interface AudienceResponse {
     success: boolean;
-    /** The window actually used after TikTok's 60-day / not-today clamps. */
+    platform?: string;
+    /** The window actually used after the 60-day / not-today clamps. */
     range?: { start_date?: string; end_date?: string };
     audience?: {
-      countries?: TikTokAudienceSlice[];
-      cities?: TikTokAudienceSlice[];
-      ages?: TikTokAudienceSlice[];
-      genders?: TikTokAudienceSlice[];
+      countries?: AudienceSlice[];
+      cities?: AudienceSlice[];
+      ages?: AudienceSlice[];
+      genders?: AudienceSlice[];
     };
-    /** Followers online per hour of the day. */
-    activity_by_hour?: Array<Record<string, any>>;
+    /** Followers online per hour of the day, e.g. `{ hour: '14', followers_online: 1494 }`. */
+    activity_by_hour?: Array<{ hour?: string; followers_online?: number; [key: string]: any }>;
     /** Follower count per day inside the window. */
-    followers_daily?: Array<Record<string, any>>;
+    followers_daily?: Array<{ date?: string; total?: number; new?: number; lost?: number; [key: string]: any }>;
     /** Taps on the profile: bio link, address, app download, email, phone, leads. */
     profile_actions?: Record<string, number>;
     bio_description?: string | null;
+    /** Every category `benchmarkCategory` accepts, so a picker needs no extra call. */
+    benchmark_categories?: string[];
+    /** Only when a `benchmarkCategory` was asked for. */
+    benchmark?: AudienceBenchmark;
     [key: string]: any;
   }
 
-  export interface TikTokVideoInsight {
-    item_id?: string;
-    create_time?: number;
-    caption?: string;
-    share_url?: string;
-    thumbnail_url?: string;
-    video_duration?: number;
-    video_views?: number;
-    likes?: number;
-    comments?: number;
-    shares?: number;
-    reach?: number;
-    favorites?: number;
-    new_followers?: number;
-    profile_views?: number;
-    full_video_watched_rate?: number;
-    average_time_watched?: number;
-    total_time_watched?: number;
-    /** Retention curve: how much of the audience was still watching, second by second. */
-    video_view_retention?: Array<Record<string, any>>;
-    /** Where the impressions came from (For You, search, profile...). */
-    impression_sources?: Array<Record<string, any>>;
-    /** Followers vs non-followers. */
-    audience_types?: Array<Record<string, any>>;
-    [key: string]: any;
-  }
+  /** Which kind of suggestion `getSuggestions` asks for. */
+  export type SuggestionType = 'hashtags' | 'keywords';
 
-  export interface TikTokVideoInsightsResponse {
+  export interface SuggestionsResponse {
     success: boolean;
-    videos?: TikTokVideoInsight[];
-    pagination?: TikTokCursorPagination;
-    [key: string]: any;
-  }
-
-  export interface TikTokHashtagSuggestionsResponse {
-    success: boolean;
-    query?: string;
+    platform?: string;
+    type?: SuggestionType;
+    query?: string | null;
+    /** With `type: 'hashtags'`. */
     hashtags?: Array<{ name?: string; view_count?: number; [key: string]: any }>;
+    /** With `type: 'keywords'`. */
+    keywords?: Array<Record<string, any>>;
     [key: string]: any;
   }
 
-  export interface TikTokBenchmarkResponse {
+  /** What `commentAction` does to a comment. Each action carries its own inverse. */
+  export type CommentActionValue = 'hide' | 'unhide' | 'like' | 'unlike' | 'pin' | 'unpin';
+
+  export interface CommentActionResponse {
     success: boolean;
-    /** Returned when no category was asked for. */
-    categories?: string[];
-    category?: string;
-    /** Category averages: likes, comments, shares, engagement rate, followers... */
-    benchmark?: Record<string, number>;
+    platform?: string;
+    action?: CommentActionValue;
+    comment_id?: string;
+    result?: Record<string, any>;
     [key: string]: any;
   }
 
@@ -939,7 +887,15 @@ declare module 'upload-post' {
     }>;
 
     /**
-     * Get analytics for a specific post across all platforms
+     * Get analytics for a specific post across all platforms.
+     *
+     * `post_metrics` carries whatever the platform reports, so it is not the
+     * same shape everywhere: TikTok adds `retention` (the curve, second by
+     * second), `impression_sources` (For You, search, profile...),
+     * `audience_types` (followers vs non-followers), `new_followers`, `reach`
+     * and the watch times (`average_time_watched`, `total_time_watched`,
+     * `full_video_watched_rate`) on top of the usual counters.
+     *
      * @param requestId - The request_id from the upload
      */
     getPostAnalytics(requestId: string): Promise<{
@@ -949,7 +905,8 @@ declare module 'upload-post' {
         success: boolean;
         platform_post_id?: string;
         post_url?: string;
-        post_metrics?: Record<string, number>;
+        /** Counters plus, on TikTok, retention / impression_sources / audience_types and watch times. */
+        post_metrics?: Record<string, any>;
         post_metrics_source?: string;
         post_metrics_error?: string;
         profile_snapshot_at_post_date?: Record<string, number>;
@@ -1000,6 +957,47 @@ declare module 'upload-post' {
       next_cursor: string | null;
       has_more: boolean;
     }>;
+
+    /**
+     * Get who the audience is: where they are, how old they are, when they are
+     * online and what they tap on the profile.
+     *
+     * One endpoint for every platform, chosen with `platform`; a platform that
+     * cannot answer it returns `platform_not_supported` with the list of the
+     * ones that can. The window is clamped server-side to at most 60 days
+     * ending before today.
+     *
+     * @param options - Query options
+     */
+    getAudience(options: {
+      user: string;
+      platform: 'tiktok';
+      /** Window start, ISO `YYYY-MM-DD`. */
+      startDate?: string;
+      /** Window end, ISO `YYYY-MM-DD`. Always clamped to before today. */
+      endDate?: string;
+      /** Compare the account against this category's averages. */
+      benchmarkCategory?: string;
+    }): Promise<AudienceResponse>;
+
+    /**
+     * Get what to write about: the hashtags or the searches a platform
+     * suggests around a keyword.
+     *
+     * One endpoint for both questions, told apart by `type`, and one endpoint
+     * for every platform, chosen with `platform`.
+     *
+     * @param options - Query options
+     */
+    getSuggestions(options: {
+      user: string;
+      platform: 'tiktok';
+      type: SuggestionType;
+      /** Keyword to get suggestions around. */
+      q?: string;
+      countryCode?: string;
+      language?: string;
+    }): Promise<SuggestionsResponse>;
 
     /**
      * Get available metrics configuration for all supported platforms
@@ -1152,10 +1150,14 @@ declare module 'upload-post' {
      */
     testNotifications(): Promise<{ success: boolean; [key: string]: any }>;
 
-    // Instagram Comments
+    // Comments
 
     /**
-     * Get comments on a post
+     * Get comments on a post, or the replies hanging from one of them.
+     *
+     * Pass `commentId` to read that comment's replies instead of the post's
+     * top-level comments.
+     *
      * @param options - Query options
      */
     getPostComments(options: {
@@ -1163,6 +1165,8 @@ declare module 'upload-post' {
       platform?: 'instagram' | 'facebook' | 'youtube' | 'linkedin' | 'tiktok';
       postId?: string;
       postUrl?: string;
+      /** Read the replies to this comment instead of the post's top-level comments. */
+      commentId?: string;
       limit?: number;
       after?: string;
     }): Promise<{
@@ -1246,6 +1250,24 @@ declare module 'upload-post' {
       message?: string;
       error?: string;
     }>;
+
+    /**
+     * Moderate a comment: hide, like or pin it — and undo any of the three.
+     *
+     * One method for every platform, chosen with `platform`. `postId` is
+     * required for hide/unhide and pin/unpin; like/unlike take the comment
+     * alone and never send it.
+     *
+     * @param options - Action options
+     */
+    commentAction(options: {
+      user: string;
+      platform: 'tiktok';
+      commentId: string;
+      action: CommentActionValue;
+      /** Required for hide/unhide and pin/unpin; never sent for like/unlike. */
+      postId?: string;
+    }): Promise<CommentActionResponse>;
 
     // Post Management
     /**
@@ -1382,125 +1404,6 @@ declare module 'upload-post' {
      * @param profile - Profile username
      */
     getTiktokPublishingSettings(profile: string): Promise<TikTokPublishingSettingsResponse>;
-
-    /**
-     * Get the replies hanging from one TikTok comment.
-     *
-     * Top-level comments go through the multi-platform methods
-     * (`getPostComments`, `createComment`, `deleteComment` with
-     * `platform: 'tiktok'`); replies have their own call because no other
-     * platform models them as a separate resource.
-     *
-     * Needs the `comments` capability on the connection (see `capabilities` on
-     * the TikTok account returned by listUsers()). TikTok grants it at connect
-     * time, so an account connected earlier has to be reconnected.
-     *
-     * @param profile - Profile username
-     * @param postId - Native TikTok video id the comment belongs to
-     * @param commentId - Comment whose replies you want
-     * @param options - Query options
-     */
-    getTiktokCommentReplies(
-      profile: string,
-      postId: string,
-      commentId: string,
-      options?: { limit?: number; cursor?: string }
-    ): Promise<TikTokCommentRepliesResponse>;
-
-    /**
-     * Hide, like or pin a TikTok comment — and undo any of the three.
-     *
-     * `postId` is required for `hide` and `pin`; `like` takes the comment alone
-     * and never sends it.
-     *
-     * Needs the `comments` capability on the connection (see `capabilities` on
-     * the TikTok account returned by listUsers()). TikTok grants it at connect
-     * time, so an account connected earlier has to be reconnected.
-     *
-     * @param profile - Profile username
-     * @param options - Action options
-     */
-    tiktokCommentAction(
-      profile: string,
-      options: {
-        type: TikTokCommentActionType;
-        commentId: string;
-        action: TikTokCommentActionValue;
-        postId?: string;
-      }
-    ): Promise<TikTokCommentActionResponse>;
-
-    /**
-     * Search what people look for on TikTok around a keyword.
-     *
-     * Needs the `trend_search` capability on the connection (see `capabilities`
-     * on the TikTok account returned by listUsers()). TikTok grants it at
-     * connect time, so an account connected earlier has to be reconnected.
-     *
-     * @param profile - Profile username
-     * @param query - Keyword to search around
-     */
-    searchTiktokKeywords(profile: string, query: string): Promise<TikTokKeywordSearchResponse>;
-
-    /**
-     * Get who follows the account, when they are online and what they tap.
-     *
-     * Available on any recent TikTok connection — the one that declares the
-     * `profile_analytics` capability. The window is at most 60 days, must end
-     * before today, and defaults to the last 30 days ending yesterday; a wider
-     * one is trimmed rather than rejected.
-     *
-     * @param profile - Profile username
-     * @param options - Window, as ISO `YYYY-MM-DD` dates
-     */
-    getTiktokInsights(
-      profile: string,
-      options?: { startDate?: string; endDate?: string }
-    ): Promise<TikTokAccountInsightsResponse>;
-
-    /**
-     * Get the per-video breakdown of the account's most recent posts: retention
-     * curve, impression sources, audience types, followers gained and watch times.
-     *
-     * Available on any recent TikTok connection — the one that declares the
-     * `profile_analytics` capability.
-     *
-     * @param profile - Profile username
-     * @param options - Query options. `limit` is capped at 20.
-     */
-    getTiktokVideoInsights(
-      profile: string,
-      options?: { limit?: number; cursor?: string }
-    ): Promise<TikTokVideoInsightsResponse>;
-
-    /**
-     * Get the hashtags TikTok suggests pairing with a keyword.
-     *
-     * Available on any recent TikTok connection — the one that declares the
-     * `profile_analytics` capability.
-     *
-     * @param profile - Profile username
-     * @param query - Keyword to get hashtags for
-     * @param options - Optional country and language bias
-     */
-    getTiktokHashtags(
-      profile: string,
-      query: string,
-      options?: { countryCode?: string; language?: string }
-    ): Promise<TikTokHashtagSuggestionsResponse>;
-
-    /**
-     * Compare the account against the average of its category. Called without a
-     * category it answers the list of categories alone, so a UI can render the
-     * picker without a second call.
-     *
-     * Available on any recent TikTok connection — the one that declares the
-     * `profile_analytics` capability.
-     *
-     * @param profile - Profile username
-     * @param category - Category to compare against (e.g. `SOFTWARE_AND_APPS`)
-     */
-    getTiktokBenchmark(profile: string, category?: string): Promise<TikTokBenchmarkResponse>;
   }
 
   export default UploadPost;

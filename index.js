@@ -859,6 +859,13 @@ export class UploadPost {
   /**
    * Get analytics for a specific post across all platforms it was published to
    *
+   * `post_metrics` carries whatever the platform reports, so it is not the same
+   * shape everywhere: on TikTok it also brings `retention` (the curve, second
+   * by second), `impression_sources` (For You, search, profile...),
+   * `audience_types` (followers vs non-followers), `new_followers`, `reach` and
+   * the watch times (`average_time_watched`, `total_time_watched`,
+   * `full_video_watched_rate`).
+   *
    * @param {string} requestId - The request_id from the upload
    * @returns {Promise<Object>} Post analytics with per-platform metrics
    */
@@ -907,6 +914,73 @@ export class UploadPost {
     if (options.since) params.since = options.since;
     if (options.until) params.until = options.until;
     return this._request('/uploadposts/post-analytics/cached', 'GET', params);
+  }
+
+  /**
+   * Get who the audience is: where they are, how old they are, when they are
+   * online and what they tap on the profile.
+   *
+   * Where the post-analytics methods answer *how did my posts do*, this one
+   * answers *who is following me*. It is one endpoint for every platform,
+   * chosen with `platform` — a platform that cannot answer it comes back with
+   * `platform_not_supported` and the list of the ones that can.
+   *
+   * The window is clamped server-side: at most 60 days, and `endDate` always
+   * before today. A wider window is trimmed rather than rejected.
+   *
+   * Pass `benchmarkCategory` to also get the averages of that category next to
+   * the account's own numbers; the accepted values come back in
+   * `benchmark_categories` on every response, so a picker needs no extra call.
+   *
+   * @param {Object} options - Query options
+   * @param {string} options.user - Profile username
+   * @param {string} options.platform - Platform to ask (tiktok)
+   * @param {string} [options.startDate] - Window start, ISO `YYYY-MM-DD`
+   * @param {string} [options.endDate] - Window end, ISO `YYYY-MM-DD`
+   * @param {string} [options.benchmarkCategory] - Category to compare the account
+   *   against, e.g. `SOFTWARE_AND_APPS`
+   * @returns {Promise<Object>} `range`, `audience` (countries, cities, ages, genders),
+   *   `activity_by_hour`, `followers_daily`, `profile_actions`, `bio_description`,
+   *   `benchmark_categories` and, with a category, `benchmark`
+   */
+  async getAudience(options = {}) {
+    const params = { user: options.user, platform: options.platform };
+    if (options.startDate) params.start_date = options.startDate;
+    if (options.endDate) params.end_date = options.endDate;
+    if (options.benchmarkCategory) params.benchmark_category = options.benchmarkCategory;
+    return this._request('/uploadposts/audience', 'GET', params);
+  }
+
+  /**
+   * Get what to write about: the hashtags or the searches a platform suggests
+   * around a keyword.
+   *
+   * One endpoint for both questions, told apart by `type`:
+   *
+   *   type        answers
+   *   hashtags    `{ hashtags: [{ name, view_count }] }`
+   *   keywords    `{ keywords: [...] }`
+   *
+   * Chosen with `platform`, like every other question in the API — a platform
+   * that cannot answer it comes back with `platform_not_supported` and the list
+   * of the ones that can.
+   *
+   * @param {Object} options - Query options
+   * @param {string} options.user - Profile username
+   * @param {string} options.platform - Platform to ask (tiktok)
+   * @param {('hashtags'|'keywords')} options.type - Which suggestions you want
+   * @param {string} [options.q] - Keyword to get suggestions around
+   * @param {string} [options.countryCode] - ISO country code to bias the suggestions
+   * @param {string} [options.language] - Language code to bias the suggestions
+   * @returns {Promise<Object>} `{ success, platform, type, hashtags }` or
+   *   `{ success, platform, type, keywords }`
+   */
+  async getSuggestions(options = {}) {
+    const params = { user: options.user, platform: options.platform, type: options.type };
+    if (options.q) params.q = options.q;
+    if (options.countryCode) params.country_code = options.countryCode;
+    if (options.language) params.language = options.language;
+    return this._request('/uploadposts/suggestions', 'GET', params);
   }
 
   /**
@@ -1121,7 +1195,12 @@ export class UploadPost {
   // ==================== Comments ====================
 
   /**
-   * Get comments on a post
+   * Get comments on a post, or the replies hanging from one of them
+   *
+   * Pass `commentId` to read the replies to that comment instead of the
+   * post's top-level comments. It is the same question — *what was said
+   * here* — so it is the same endpoint with one more parameter, not a
+   * separate method per platform.
    *
    * On TikTok this needs the `comments` capability on the connection (see
    * `capabilities` on the TikTok account returned by listUsers()). TikTok grants
@@ -1133,6 +1212,8 @@ export class UploadPost {
    * @param {string} [options.postId] - Native post/media ID (provide postId or postUrl).
    *   Required on TikTok, which has no post URL lookup.
    * @param {string} [options.postUrl] - Full post URL (provide postId or postUrl)
+   * @param {string} [options.commentId] - Read the replies to this comment instead
+   *   of the post's top-level comments
    * @param {number} [options.limit] - Max number of comments to return
    * @param {string} [options.after] - Pagination cursor for the next page
    * @returns {Promise<Object>} Comments data
@@ -1145,6 +1226,7 @@ export class UploadPost {
     const params = { platform: options.platform || 'instagram', user: options.user };
     if (options.postId) params.post_id = options.postId;
     if (options.postUrl) params.post_url = options.postUrl;
+    if (options.commentId) params.comment_id = options.commentId;
     if (options.limit !== undefined) params.limit = options.limit;
     if (options.after) params.after = options.after;
     return this._request('/uploadposts/comments', 'GET', params);
@@ -1243,6 +1325,43 @@ export class UploadPost {
     };
     if (options.postId) body.post_id = options.postId;
     return this._request('/uploadposts/comments/delete', 'DELETE', body);
+  }
+
+  /**
+   * Moderate a comment: hide, like or pin it — and undo any of the three
+   *
+   * One method for every platform, because it is one question: *do this to
+   * that comment*. Each action carries its own inverse:
+   *
+   *   action              post_id
+   *   hide / unhide       required
+   *   like / unlike       not sent (the platform likes the comment on its own)
+   *   pin / unpin         required
+   *
+   * On TikTok this needs the `comments` capability on the connection (see
+   * `capabilities` on the TikTok account returned by listUsers()). TikTok grants
+   * it at connect time, so an account connected earlier has to be reconnected.
+   *
+   * @param {Object} options - Action options
+   * @param {string} options.user - Profile username
+   * @param {string} options.platform - Platform (tiktok)
+   * @param {string} options.commentId - Comment to act on
+   * @param {('hide'|'unhide'|'like'|'unlike'|'pin'|'unpin')} options.action - What to do
+   * @param {string} [options.postId] - Native post ID. Required for hide/unhide and
+   *   pin/unpin; never sent for like/unlike.
+   * @returns {Promise<Object>} `{ success, platform, action, comment_id, result }`
+   */
+  async commentAction(options) {
+    const body = {
+      platform: options.platform,
+      user: options.user,
+      comment_id: options.commentId,
+      action: options.action
+    };
+    // Liking takes the comment alone; hiding and pinning need the post too.
+    const likes = options.action === 'like' || options.action === 'unlike';
+    if (!likes && options.postId) body.post_id = options.postId;
+    return this._request('/uploadposts/comments/action', 'POST', body);
   }
 
   // ==================== Post Management ====================
@@ -1411,165 +1530,6 @@ export class UploadPost {
    */
   async getTiktokPublishingSettings(profile) {
     return this._request('/uploadposts/tiktok/settings', 'GET', { profile });
-  }
-
-  /**
-   * Get the replies hanging from one TikTok comment.
-   *
-   * Top-level comments are listed and written with the multi-platform methods
-   * (`getPostComments`, `createComment`, `deleteComment` with
-   * `platform: 'tiktok'`). Replies have their own call because no other
-   * platform models them as a separate resource.
-   *
-   * Needs the `comments` capability on the connection (see `capabilities` on
-   * the TikTok account returned by listUsers()). TikTok grants it at connect
-   * time, so an account connected earlier has to be reconnected.
-   *
-   * @param {string} profile - Profile username
-   * @param {string} postId - Native TikTok video id the comment belongs to
-   * @param {string} commentId - Comment whose replies you want
-   * @param {Object} [options] - Query options
-   * @param {number} [options.limit] - Replies per page. Defaults to 20 upstream.
-   * @param {string} [options.cursor] - Cursor from a previous response's `pagination.next_cursor`
-   * @returns {Promise<Object>} `{ success, comments, pagination: { next_cursor, has_next } }`
-   */
-  async getTiktokCommentReplies(profile, postId, commentId, options = {}) {
-    const params = { profile, post_id: postId, comment_id: commentId };
-    if (options.limit !== undefined && options.limit !== null) params.limit = options.limit;
-    if (options.cursor) params.cursor = options.cursor;
-    return this._request('/uploadposts/tiktok/comments/replies', 'GET', params);
-  }
-
-  /**
-   * Hide, like or pin a TikTok comment — and undo any of the three.
-   *
-   * One method instead of three because the toggles differ only in the values
-   * they take:
-   *
-   *   type    action            postId
-   *   hide    HIDE / UNHIDE     required
-   *   like    LIKE / UNLIKE     not sent (TikTok likes the comment on its own)
-   *   pin     PIN / UNPIN       required
-   *
-   * Needs the `comments` capability on the connection (see `capabilities` on
-   * the TikTok account returned by listUsers()). TikTok grants it at connect
-   * time, so an account connected earlier has to be reconnected.
-   *
-   * @param {string} profile - Profile username
-   * @param {Object} options - Action options
-   * @param {('hide'|'like'|'pin')} options.type - Which toggle to flip
-   * @param {string} options.commentId - Comment to act on
-   * @param {('HIDE'|'UNHIDE'|'LIKE'|'UNLIKE'|'PIN'|'UNPIN')} options.action - Value for that toggle
-   * @param {string} [options.postId] - Native TikTok video id. Required for `hide` and `pin`.
-   * @returns {Promise<Object>} `{ success, type, action, comment_id, result }`
-   */
-  async tiktokCommentAction(profile, options) {
-    const body = {
-      profile,
-      type: options.type,
-      comment_id: options.commentId,
-      action: options.action
-    };
-    // Liking takes the comment alone; hiding and pinning need the video too.
-    if (options.type !== 'like' && options.postId) body.post_id = options.postId;
-    return this._request('/uploadposts/tiktok/comments/action', 'POST', body);
-  }
-
-  /**
-   * Search what people look for on TikTok around a keyword.
-   *
-   * Needs the `trend_search` capability on the connection (see `capabilities`
-   * on the TikTok account returned by listUsers()). TikTok grants it at connect
-   * time, so an account connected earlier has to be reconnected.
-   *
-   * @param {string} profile - Profile username
-   * @param {string} query - Keyword to search around
-   * @returns {Promise<Object>} `{ success, query, data: { search_keywords: [...] } }`
-   */
-  async searchTiktokKeywords(profile, query) {
-    return this._request('/uploadposts/tiktok/search/keywords', 'GET', { profile, q: query });
-  }
-
-  /**
-   * Get who follows the account, when they are online and what they tap.
-   *
-   * Complements the post analytics: those say how a post did, this says who the
-   * audience is. Available on any recent TikTok connection — the one that
-   * declares the `profile_analytics` capability (see `capabilities` on the
-   * TikTok account returned by listUsers()).
-   *
-   * @param {string} profile - Profile username
-   * @param {Object} [options] - Query options
-   * @param {string} [options.startDate] - Window start, ISO `YYYY-MM-DD`
-   * @param {string} [options.endDate] - Window end, ISO `YYYY-MM-DD`. TikTok refuses today or later.
-   *   The window is at most 60 days and defaults to the last 30 that ended yesterday;
-   *   a wider one is trimmed rather than rejected.
-   * @returns {Promise<Object>} `range`, `audience` (countries, cities, ages, genders),
-   *   `activity_by_hour`, `followers_daily`, `profile_actions` and `bio_description`
-   */
-  async getTiktokInsights(profile, options = {}) {
-    const params = { profile };
-    if (options.startDate) params.start_date = options.startDate;
-    if (options.endDate) params.end_date = options.endDate;
-    return this._request('/uploadposts/tiktok/insights', 'GET', params);
-  }
-
-  /**
-   * Get the per-video breakdown of the account's most recent posts.
-   *
-   * Retention curve, where the impressions came from, who watched, followers
-   * gained and watch times, one entry per video. Available on any recent TikTok
-   * connection — the one that declares the `profile_analytics` capability.
-   *
-   * @param {string} profile - Profile username
-   * @param {Object} [options] - Query options
-   * @param {number} [options.limit] - Videos per page, max 20. Defaults to 10 upstream.
-   * @param {string} [options.cursor] - Cursor from a previous response's `pagination.next_cursor`
-   * @returns {Promise<Object>} `{ success, videos, pagination: { next_cursor, has_next } }`
-   */
-  async getTiktokVideoInsights(profile, options = {}) {
-    const params = { profile };
-    if (options.limit !== undefined && options.limit !== null) params.limit = options.limit;
-    if (options.cursor) params.cursor = options.cursor;
-    return this._request('/uploadposts/tiktok/videos/insights', 'GET', params);
-  }
-
-  /**
-   * Get the hashtags TikTok suggests pairing with a keyword.
-   *
-   * Available on any recent TikTok connection — the one that declares the
-   * `profile_analytics` capability.
-   *
-   * @param {string} profile - Profile username
-   * @param {string} query - Keyword to get hashtags for
-   * @param {Object} [options] - Query options
-   * @param {string} [options.countryCode] - ISO country code to bias the suggestions
-   * @param {string} [options.language] - Language code to bias the suggestions
-   * @returns {Promise<Object>} `{ success, query, hashtags: [{ name, view_count }] }`
-   */
-  async getTiktokHashtags(profile, query, options = {}) {
-    const params = { profile, q: query };
-    if (options.countryCode) params.country_code = options.countryCode;
-    if (options.language) params.language = options.language;
-    return this._request('/uploadposts/tiktok/hashtags', 'GET', params);
-  }
-
-  /**
-   * Compare the account against the average of its category.
-   *
-   * Called without a category it answers the list of categories alone, so a UI
-   * can render the picker without a second call. Available on any recent TikTok
-   * connection — the one that declares the `profile_analytics` capability.
-   *
-   * @param {string} profile - Profile username
-   * @param {string} [category] - Category to compare against (e.g. `SOFTWARE_AND_APPS`)
-   * @returns {Promise<Object>} `{ success, categories }` without a category,
-   *   `{ success, category, benchmark }` with one
-   */
-  async getTiktokBenchmark(profile, category) {
-    const params = { profile };
-    if (category) params.category = category;
-    return this._request('/uploadposts/tiktok/benchmark', 'GET', params);
   }
 
   /**
