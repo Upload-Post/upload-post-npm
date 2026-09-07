@@ -82,6 +82,10 @@ export class UploadPost {
 
     // Optional common parameters
     if (options.firstComment) form.append('first_comment', options.firstComment);
+    // Reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). The
+    // API has always accepted `reply_to_id`; the SDK simply never mapped it.
+    const replyToId = options.replyToId || options.xReplyToId || options.blueskyReplyToId;
+    if (replyToId) form.append('reply_to_id', replyToId);
     if (options.altText) form.append('alt_text', options.altText);
     if (options.scheduledDate) form.append('scheduled_date', options.scheduledDate);
     if (options.timezone) form.append('timezone', options.timezone);

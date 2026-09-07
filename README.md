@@ -675,6 +675,7 @@ These options work across all upload methods:
 | `platforms` | Target platforms array (required) |
 | `firstComment` | First comment to post |
 | `tiktokFirstComment` | First comment for TikTok only (needs the `comments` capability) |
+| `replyToId` | Publish as a reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). Alias: `xReplyToId` |
 | `altText` | Alt text for accessibility |
 | `scheduledDate` | ISO date for scheduling |
 | `timezone` | Timezone for scheduled date |
