@@ -136,12 +136,23 @@ declare module 'upload-post' {
     tiktokCoverTimestamp?: number;
     /** AI-generated content flag */
     tiktokIsAigc?: boolean;
-    /** Post mode */
+    /**
+     * Post mode. `MEDIA_UPLOAD` is the same draft as {@link TikTokVideoOptions.tiktokUploadToDraft}.
+     * Alias: `postMode` / `post_mode`.
+     */
     tiktokPostMode?: TikTokPostMode;
+    /** Alias of {@link TikTokVideoOptions.tiktokPostMode}. */
+    postMode?: TikTokPostMode;
+    /** Alias of {@link TikTokVideoOptions.tiktokPostMode}. */
+    post_mode?: TikTokPostMode;
     /** Branded content toggle */
     brandContentToggle?: boolean;
     /** Brand organic toggle */
     brandOrganicToggle?: boolean;
+    /** Only show the video in ads */
+    tiktokIsAdsOnly?: boolean;
+    /** TikTok One invite link. Requires branded content. */
+    tiktokTtoInviteLink?: string;
 
     // ---- Music, location, cover and draft ----
     // Available on connections that declare the matching capability (`music`,
@@ -169,8 +180,18 @@ declare module 'upload-post' {
     tiktokCoverImageUrl?: string;
     /** AI-generated content disclosure */
     tiktokIsAiGenerated?: boolean;
-    /** Publish to drafts. When true TikTok ignores the rest of the post settings */
+    /**
+     * Publish to drafts. Same draft as `tiktokPostMode: 'MEDIA_UPLOAD'` /
+     * `postMode: 'MEDIA_UPLOAD'`. Aliases: `uploadToDraft`, `tiktok_upload_to_draft`,
+     * `upload_to_draft`. When true TikTok ignores the rest of the post settings.
+     */
     tiktokUploadToDraft?: boolean;
+    /** Alias of {@link TikTokVideoOptions.tiktokUploadToDraft}. */
+    uploadToDraft?: boolean;
+    /** Alias of {@link TikTokVideoOptions.tiktokUploadToDraft}. */
+    tiktok_upload_to_draft?: boolean;
+    /** Alias of {@link TikTokVideoOptions.tiktokUploadToDraft}. */
+    upload_to_draft?: boolean;
   }
 
   export interface TikTokPhotoOptions {
@@ -188,20 +209,27 @@ declare module 'upload-post' {
      * ones.
      */
     tiktokPrivacyLevel?: TikTokPrivacyLevel;
-    /** Post mode, e.g. DIRECT_POST or MEDIA_UPLOAD (inbox) */
-    tiktokPostMode?: string;
+    /**
+     * Post mode. `MEDIA_UPLOAD` is the same draft as {@link TikTokPhotoOptions.tiktokUploadToDraft}.
+     * Alias: `postMode` / `post_mode`.
+     */
+    tiktokPostMode?: TikTokPostMode;
+    /** Alias of {@link TikTokPhotoOptions.tiktokPostMode}. */
+    postMode?: TikTokPostMode;
+    /** Alias of {@link TikTokPhotoOptions.tiktokPostMode}. */
+    post_mode?: TikTokPostMode;
     /** Branded content toggle */
     brandContentToggle?: boolean;
     /** Brand organic toggle */
     brandOrganicToggle?: boolean;
 
-    // ---- Music, location and AI disclosure ----
-    // Photo posts accept the track id, the location pair and the AI disclosure —
-    // not the volume/trim, cover-image or draft fields, which are video-only.
-    // Available on connections that declare the matching capability (`music`,
-    // `location`) — see `capabilities` on the TikTok account returned by
-    // listUsers(). Without it the field is ignored, the post still publishes, and
-    // the response includes a per-field `warnings` entry.
+    // ---- Music, location, AI disclosure and draft ----
+    // Photo posts accept the track id, the location pair, the AI disclosure and
+    // the draft switch — not the volume/trim or cover-image fields, which are
+    // video-only. Available on connections that declare the matching capability
+    // (`music`, `location`, `draft`) — see `capabilities` on the TikTok account
+    // returned by listUsers(). Without it the field is ignored, the post still
+    // publishes, and the response includes a per-field `warnings` entry.
 
     /** Commercial Music Library track id (see getTiktokTrendingMusic) */
     tiktokMusicId?: string;
@@ -211,6 +239,18 @@ declare module 'upload-post' {
     tiktokLocationName?: string;
     /** AI-generated content disclosure */
     tiktokIsAiGenerated?: boolean;
+    /**
+     * Publish to drafts. Same draft as `tiktokPostMode: 'MEDIA_UPLOAD'` /
+     * `postMode: 'MEDIA_UPLOAD'`. Aliases: `uploadToDraft`, `tiktok_upload_to_draft`,
+     * `upload_to_draft`.
+     */
+    tiktokUploadToDraft?: boolean;
+    /** Alias of {@link TikTokPhotoOptions.tiktokUploadToDraft}. */
+    uploadToDraft?: boolean;
+    /** Alias of {@link TikTokPhotoOptions.tiktokUploadToDraft}. */
+    tiktok_upload_to_draft?: boolean;
+    /** Alias of {@link TikTokPhotoOptions.tiktokUploadToDraft}. */
+    upload_to_draft?: boolean;
   }
 
   // ==================== Instagram Options ====================
@@ -243,6 +283,8 @@ declare module 'upload-post' {
     instagramUserTags?: string;
     /** Location ID */
     instagramLocationId?: string;
+    /** Alt text: string (applied to every item) or list of strings, ≤1000 chars each */
+    instagramAltText?: string | string[];
   }
 
   // ==================== YouTube Options ====================
@@ -278,6 +320,10 @@ declare module 'upload-post' {
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
+    /** Notify subscribers. Default true; send false to suppress the notification */
+    youtubeNotifySubscribers?: boolean;
+    /** RFC3339 time. Uploads the video as private until this instant (Studio: Scheduled) */
+    youtubePublishAt?: string;
     /** Playlist ID(s) to add the uploaded video to — one ID, an array, or a comma-separated list */
     youtubePlaylistId?: string | string[];
     /** Subtitle/caption files to upload. Each entry needs a language code and either a file path or URL. */
@@ -300,6 +346,36 @@ declare module 'upload-post' {
     linkedinVisibility?: LinkedInVisibility;
     /** Page ID for organization posts */
     targetLinkedinPageId?: string;
+    /** Alt text per image (string, JSON list, or repeated). Default = title */
+    linkedinAltText?: string | string[];
+    /** Disable reshare by others */
+    linkedinDisableReshare?: boolean;
+    /** Override the scraped link-share title (< 400 chars) */
+    linkedinLinkTitle?: string;
+    /** Override the scraped link-share description (< 4086 chars) */
+    linkedinLinkDescription?: string;
+    /** Alt text for the link-share thumbnail */
+    linkedinThumbnailAltText?: string;
+    /** Organic Page targeting: geo locations (CSV, JSON list, URN or numeric id) */
+    linkedinTargetGeoLocations?: string | string[];
+    linkedinTargetIndustries?: string | string[];
+    linkedinTargetSeniorities?: string | string[];
+    linkedinTargetJobFunctions?: string | string[];
+    linkedinTargetStaffCountRanges?: string | string[];
+    linkedinTargetInterfaceLocales?: string | string[];
+    linkedinTargetDegrees?: string | string[];
+    linkedinTargetFieldsOfStudy?: string | string[];
+    linkedinTargetOrganizations?: string | string[];
+    /** Raw LinkedIn targetEntities facets JSON */
+    linkedinTargetEntities?: Record<string, unknown> | string;
+    /** Reject the post if LinkedIn reports audience < 300 */
+    linkedinTargetCheckAudience?: boolean;
+    /** English SRT captions: local path, stream, or file */
+    linkedinSubtitles?: string | Buffer | NodeJS.ReadableStream;
+    /** Public URL of an English SRT file */
+    linkedinSubtitlesUrl?: string;
+    /** Inline English SRT text */
+    linkedinSubtitlesText?: string;
   }
 
   // ==================== Facebook Options ====================
@@ -313,11 +389,35 @@ declare module 'upload-post' {
     facebookMediaType?: FacebookMediaType;
     /** Thumbnail URL for normal page videos (only when facebookMediaType is 'VIDEO') */
     thumbnailUrl?: string;
+    /** Facebook Place ID */
+    facebookPlaceId?: string;
+    /** Geographic/age/language targeting */
+    facebookTargeting?: Record<string, unknown> | string;
+    /** Feed targeting */
+    facebookFeedTargeting?: Record<string, unknown> | string;
+    /** AI-generated disclosure on Reels */
+    facebookIsAiGenerated?: boolean;
+    /** Unpublished type for page video: DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED. Do not send SCHEDULED — use scheduledDate. */
+    facebookUnpublishedContentType?: 'DRAFT' | 'INLINE_CREATED' | 'ADS_POST' | 'PUBLISHED' | string;
+    /** Hide the video from the Page story */
+    facebookNoStory?: boolean;
+    /** Secret/unpublished video */
+    facebookSecret?: boolean;
+    /** Page IDs to invite as Reel collaborators (max 10 / 24h) */
+    facebookCollaborators?: string | string[];
   }
 
   export interface FacebookPhotoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Alt text per photo */
+    facebookAltText?: string | string[];
+    /** Facebook Place ID */
+    facebookPlaceId?: string;
+    /** Geographic/age/language targeting */
+    facebookTargeting?: Record<string, unknown> | string;
+    /** Feed targeting */
+    facebookFeedTargeting?: Record<string, unknown> | string;
   }
 
   export interface FacebookTextOptions {
@@ -325,6 +425,18 @@ declare module 'upload-post' {
     facebookPageId?: string;
     /** URL to attach as link preview */
     facebookLinkUrl?: string;
+    /** Facebook Place ID */
+    facebookPlaceId?: string;
+    /** Geographic/age/language targeting */
+    facebookTargeting?: Record<string, unknown> | string;
+    /** Feed targeting */
+    facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Link-post CTA, e.g. { type: 'LEARN_MORE', link: 'https://…' } */
+    facebookCallToAction?: Record<string, unknown> | string;
+    /** Link carousel (2–5 objects with `link`) */
+    facebookChildAttachments?: Array<Record<string, unknown>> | string;
+    /** Show the multi-share end card (requires child attachments) */
+    facebookMultiShareEndCard?: boolean;
   }
 
   // ==================== Pinterest Options ====================
@@ -340,8 +452,12 @@ declare module 'upload-post' {
     pinterestCoverImageContentType?: string;
     /** Base64-encoded cover image data */
     pinterestCoverImageData?: string;
-    /** Key frame time in ms for cover */
+    /** Key frame time in seconds (values larger than the video duration are treated as milliseconds) */
     pinterestCoverImageKeyFrameTime?: number;
+    /** Board section ID */
+    pinterestBoardSectionId?: string;
+    /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
+    pinterestAiDisclosures?: string | string[];
   }
 
   export interface PinterestPhotoOptions {
@@ -351,6 +467,18 @@ declare module 'upload-post' {
     pinterestAltText?: string;
     /** Destination link */
     pinterestLink?: string;
+    /** Board section ID */
+    pinterestBoardSectionId?: string;
+    /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
+    pinterestAiDisclosures?: string | string[];
+    /** Per-slide titles on a 2–5 photo carousel */
+    pinterestCarouselTitles?: string | string[];
+    /** Per-slide descriptions on a 2–5 photo carousel */
+    pinterestCarouselDescriptions?: string | string[];
+    /** Per-slide links on a 2–5 photo carousel */
+    pinterestCarouselLinks?: string | string[];
+    /** 0-based cover index on a carousel */
+    pinterestCarouselIndex?: number;
   }
 
   // ==================== X (Twitter) Options ====================
@@ -372,6 +500,8 @@ declare module 'upload-post' {
     xDirectMessageDeepLink?: string;
     /** Post long text as single post */
     xLongTextAsPost?: boolean;
+    /** Paid partnership label on the first post */
+    xPaidPartnership?: boolean;
   }
 
   export interface XMediaOptions extends XBaseOptions {
@@ -381,12 +511,22 @@ declare module 'upload-post' {
     xPlaceId?: string;
     /** Comma-separated image layout for thread (e.g. "4,4" or "2,3,1"). Each value 1-4, total must equal image count. */
     xThreadImageLayout?: string;
+    /** Alt text (≤1000 chars). String for video; string, list or `x_alt_text[]` for photos */
+    xAltText?: string | string[];
+    /** Public URL of a .srt file (≤1 MB) */
+    xSubtitlesUrl?: string;
+    /** Inline SRT text, or a URL if the value starts with http(s) */
+    xSubtitles?: string;
+    /** 2-letter language code (default EN) */
+    xSubtitlesLanguage?: string;
+    /** Subtitle track name shown on X (≤150 chars) */
+    xSubtitlesName?: string;
   }
 
   export interface XTextOptions extends XBaseOptions {
     /** URL to attach */
     xPostUrl?: string;
-    /** Tweet ID to quote */
+    /** Tweet ID to quote. Quote posts require an X API Enterprise plan. */
     xQuoteTweetId?: string;
     /** Poll options (2-4 options) */
     xPollOptions?: string | string[];
@@ -396,6 +536,16 @@ declare module 'upload-post' {
     xPollReplySettings?: XReplySettings;
     /** Card URI for Twitter Cards */
     xCardUri?: string;
+    /** X Article title (≤100 chars, Premium) */
+    xArticleTitle?: string;
+    /** X Article body (plain text / light Markdown) */
+    xArticleBody?: string;
+    /** DraftJS content_state JSON */
+    xArticleContentState?: Record<string, unknown> | string;
+    /** Create the Article as a draft only */
+    xArticleDraft?: boolean;
+    /** Article cover: local file, public URL, or X media_id */
+    xArticleCoverMedia?: string | Buffer | NodeJS.ReadableStream;
   }
 
   // ==================== Threads Options ====================
@@ -403,19 +553,182 @@ declare module 'upload-post' {
   export interface ThreadsOptions {
     /** Post long text as single post (vs thread) */
     threadsLongTextAsPost?: boolean;
-    /** Comma-separated list of how many media items per Threads post (e.g. "5,5"). Each value 1-10, total must equal file count. */
+    /** Comma-separated list of how many media items per Threads post (e.g. "5,5"). Each value 1-20, total must equal file count. */
     threadsThreadMediaLayout?: string;
     /** Topic tag for the Threads post */
     threadsTopicTag?: string;
+    /** Who can reply: everyone, accounts_you_follow, mentioned_only, parent_post_author_only, followers_only */
+    threadsReplyControl?: 'everyone' | 'accounts_you_follow' | 'mentioned_only' | 'parent_post_author_only' | 'followers_only' | 'followers' | string;
+    /** Alt text per image/video (≤1000 chars) */
+    threadsAltText?: string | string[];
+    /** Publish as a reply to this Threads post id */
+    threadsReplyToId?: string;
+    /** Quote this Threads post id */
+    threadsQuotePostId?: string;
+    /** Force a link preview (text posts) */
+    threadsLinkAttachment?: string;
+    /** Poll options, 2–4 strings of 1–25 chars (text posts) */
+    threadsPollOptions?: string | string[];
+    /** Publish a text container without the second threads_publish call */
+    threadsAutoPublishText?: boolean;
   }
 
   // ==================== Reddit Options ====================
 
+  /**
+   * Reddit is currently unavailable. Uploads, OAuth and comments return HTTP 503
+   * with `error_code=reddit_unavailable`. Fields are still accepted and forwarded.
+   */
   export interface RedditOptions {
     /** Subreddit name (without r/) */
     redditSubreddit?: string;
     /** Flair template ID */
     redditFlairId?: string;
+    redditNsfw?: boolean;
+    redditSpoiler?: boolean;
+    redditResubmit?: boolean;
+    redditSendReplies?: boolean;
+    /** Custom text for editable flairs */
+    redditFlairText?: string;
+    /** Per-image captions (JSON array or `||`-separated) */
+    redditGalleryCaptions?: string | string[];
+    /** Per-image outbound URLs (JSON array or `||`-separated) */
+    redditGalleryUrls?: string | string[];
+  }
+
+  // ==================== Bluesky Options ====================
+
+  export interface BlueskyOptions {
+    /** Alt text per image/video (string, JSON array or `||`-separated) */
+    blueskyAltText?: string | string[];
+    /** Up to 3 BCP-47 language codes, comma-separated */
+    blueskyLangs?: string | string[];
+    /** Content labels: porn, sexual, nudity, graphic-media */
+    blueskyLabels?: string | string[];
+    /** Publish up to 20 images as a gallery (default: first 4) */
+    blueskyGallery?: boolean;
+    /** Who can reply: everyone, nobody, mention, following, followers, list:<at://uri> */
+    blueskyThreadgate?: string;
+    /** Alias of blueskyThreadgate */
+    blueskyReplySettings?: string;
+    /** `disable_quotes` or `true` to block quotes */
+    blueskyPostgate?: string | boolean;
+    /** Alias of blueskyPostgate */
+    blueskyQuoteSettings?: string | boolean;
+    /** Quote a post (bsky.app URL or at:// URI) */
+    blueskyQuoteUri?: string;
+    blueskyQuoteId?: string;
+    blueskyQuoteUrl?: string;
+  }
+
+  export interface DiscordOptions {
+    discordThreadId?: string;
+    discordThreadName?: string;
+    discordAppliedTags?: string | string[];
+    discordEmbeds?: Array<Record<string, unknown>> | string;
+    discordUsername?: string;
+    discordAvatarUrl?: string;
+    discordAllowedMentions?: Record<string, unknown> | string;
+    discordAltText?: string | string[];
+    discordFlags?: number;
+    discordTts?: boolean;
+    discordPoll?: Record<string, unknown> | string;
+    discordMaxFileMb?: number;
+  }
+
+  export interface TelegramOptions {
+    telegramParseMode?: 'MarkdownV2' | 'HTML' | string;
+    telegramMessageThreadId?: number | string;
+    telegramDisableNotification?: boolean;
+    telegramProtectContent?: boolean;
+    telegramHasSpoiler?: boolean;
+    telegramLinkPreview?: boolean;
+    telegramReplyMarkup?: Record<string, unknown> | string;
+    telegramCaptionOverflow?: 'truncate' | 'split';
+    telegramAsDocument?: boolean;
+    telegramMediaUrls?: string | string[];
+  }
+
+  export interface MastodonOptions {
+    mastodonVisibility?: 'public' | 'unlisted' | 'private' | 'direct';
+    mastodonSensitive?: boolean;
+    mastodonSpoilerText?: string;
+    mastodonLanguage?: string;
+    mastodonAltText?: string | string[];
+    mastodonPollOptions?: string | string[];
+    mastodonPollExpiresIn?: number;
+    mastodonPollMultiple?: boolean;
+    mastodonScheduledAt?: string;
+  }
+
+  export interface WordpressOptions {
+    wordpressStatus?: 'publish' | 'draft' | 'pending' | 'future';
+    wordpressDate?: string;
+    wordpressCategories?: string | string[];
+    wordpressTags?: string | string[];
+    wordpressExcerpt?: string;
+    wordpressSlug?: string;
+    wordpressAltText?: string;
+    wordpressMediaCaption?: string;
+    wordpressBlockFormat?: boolean;
+  }
+
+  export interface LemmyOptions {
+    lemmyUrl?: string;
+    lemmyCommunity?: string;
+    lemmyNsfw?: boolean;
+    lemmyLanguageId?: number | string;
+    lemmyAltText?: string;
+  }
+
+  export interface SlackOptions {
+    slackMarkdown?: boolean;
+    slackBlocks?: Array<Record<string, unknown>> | string;
+    slackMrkdwn?: boolean;
+    slackAltText?: string;
+    slackFirstCommentMode?: 'separate' | 'inline';
+  }
+
+  export interface NostrOptions {
+    nostrKind?: 1 | 20 | 22 | 34235 | 30023 | number;
+    nostrLongForm?: boolean;
+  }
+
+  export interface DevtoOptions {
+    devtoTags?: string | string[];
+    devtoCanonicalUrl?: string;
+    devtoDescription?: string;
+    devtoMainImage?: string;
+    devtoSeries?: string;
+    devtoPublished?: boolean;
+  }
+
+  export interface HashnodeOptions {
+    hashnodeTags?: string | string[];
+    hashnodeOriginalArticleUrl?: string;
+    hashnodeSubtitle?: string;
+    hashnodeCoverImageUrl?: string;
+    hashnodeDraft?: boolean;
+    hashnodeBody?: string;
+    /** Alias of hashnodeBody */
+    content?: string;
+  }
+
+  export interface WhopOptions {
+    whopBody?: string;
+    whopPinned?: boolean;
+    whopIsMention?: boolean;
+    whopPaywallAmount?: number;
+    whopPaywallCurrency?: string;
+    whopAttachmentIds?: string | string[];
+  }
+
+  export interface ListmonkOptions {
+    listmonkContentType?: 'richtext' | 'markdown' | 'html' | 'plain';
+    listmonkSendAt?: string;
+    listmonkLists?: string | string[];
+    listmonkTemplateId?: string | number;
+    listmonkMediaIds?: string | string[];
   }
 
   // ==================== Combined Upload Options ====================
@@ -468,6 +781,14 @@ declare module 'upload-post' {
     gbpOfferRedeemUrl?: string;
     /** Offer terms and conditions */
     gbpOfferTerms?: string;
+    /** BCP-47 language code. Default "en" */
+    gbpLanguageCode?: string;
+    /** Alias of gbpOfferCoupon */
+    gbpCouponCode?: string;
+    /** Alias of gbpOfferRedeemUrl */
+    gbpRedeemUrl?: string;
+    /** Alias of gbpOfferTerms */
+    gbpTerms?: string;
   }
 
   export interface UploadVideoOptions extends CommonUploadOptions,
@@ -480,7 +801,12 @@ declare module 'upload-post' {
     XMediaOptions,
     ThreadsOptions,
     RedditOptions,
-    GoogleBusinessOptions {
+    GoogleBusinessOptions,
+    BlueskyOptions,
+    DiscordOptions,
+    TelegramOptions,
+    MastodonOptions,
+    WordpressOptions {
     /** Target platforms */
     platforms: VideoPlatform[];
   }
@@ -494,7 +820,13 @@ declare module 'upload-post' {
     XMediaOptions,
     ThreadsOptions,
     RedditOptions,
-    GoogleBusinessOptions {
+    GoogleBusinessOptions,
+    BlueskyOptions,
+    DiscordOptions,
+    TelegramOptions,
+    MastodonOptions,
+    LemmyOptions,
+    WordpressOptions {
     /** Target platforms */
     platforms: PhotoPlatform[];
   }
@@ -515,7 +847,19 @@ declare module 'upload-post' {
     ThreadsOptions,
     RedditOptions,
     LinkPreviewOptions,
-    GoogleBusinessOptions {
+    GoogleBusinessOptions,
+    BlueskyOptions,
+    DiscordOptions,
+    TelegramOptions,
+    SlackOptions,
+    MastodonOptions,
+    NostrOptions,
+    LemmyOptions,
+    DevtoOptions,
+    HashnodeOptions,
+    WordpressOptions,
+    WhopOptions,
+    ListmonkOptions {
     /** Target platforms */
     platforms: TextPlatform[];
   }
@@ -531,6 +875,9 @@ declare module 'upload-post' {
     linkedinVisibility?: LinkedInVisibility;
     /** Page ID for organization posts */
     targetLinkedinPageId?: string;
+    linkedinAltText?: string | string[];
+    linkedinDisableReshare?: boolean;
+    linkedinTargetCheckAudience?: boolean;
     /** ISO date for scheduling */
     scheduledDate?: string;
     /** Timezone for scheduled date */
