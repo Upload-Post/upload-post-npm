@@ -69,6 +69,71 @@ export class UploadPost {
   }
 
   /**
+   * First defined alias. Upload option keys are camelCase; a few fields also
+   * accept the snake_case name the API uses.
+   * @private
+   */
+  _pick(options, ...keys) {
+    for (const key of keys) {
+      if (options[key] !== undefined) return options[key];
+    }
+  }
+
+  /**
+   * Append a whitelist field. Objects/arrays go as JSON; booleans and numbers
+   * as strings. Empty strings are omitted.
+   * @private
+   */
+  _appendField(form, field, value) {
+    if (value === undefined || value === null) return;
+    if (typeof value === 'boolean' || typeof value === 'number') {
+      form.append(field, String(value));
+      return;
+    }
+    if (Array.isArray(value)) {
+      form.append(field, JSON.stringify(value));
+      return;
+    }
+    if (typeof value === 'object' && typeof value.pipe !== 'function' && !Buffer.isBuffer(value)) {
+      form.append(field, JSON.stringify(value));
+      return;
+    }
+    if (value === '') return;
+    form.append(field, value);
+  }
+
+  /**
+   * Local path becomes a file stream; http(s) URLs and other values pass through.
+   * @private
+   */
+  _appendFileField(form, field, value) {
+    if (value === undefined || value === null || value === '') return;
+    if (typeof value === 'string') {
+      const lower = value.toLowerCase();
+      if (lower.startsWith('http://') || lower.startsWith('https://') || !fs.existsSync(value)) {
+        form.append(field, value);
+      } else {
+        form.append(field, createReadStream(value));
+      }
+      return;
+    }
+    form.append(field, value);
+  }
+
+  /**
+   * Repeat `field[]` once per item (carousel titles, alt-text lists, …).
+   * @private
+   */
+  _appendRepeated(form, field, value) {
+    if (value === undefined || value === null || value === '') return;
+    const items = Array.isArray(value) ? value : [value];
+    for (const item of items) {
+      if (item === undefined || item === null || item === '') continue;
+      form.append(field, typeof item === 'object' ? JSON.stringify(item) : String(item));
+    }
+  }
+
+  /**
    * Add common upload parameters to form
    * @private
    */
@@ -179,14 +244,13 @@ export class UploadPost {
       ['brand_content_toggle', 'brandContentToggle', 'flag'],
       ['brand_organic_toggle', 'brandOrganicToggle', 'flag'],
       ['privacy_level', 'tiktokPrivacyLevel', 'text'],
-      ['post_mode', 'tiktokPostMode', 'text'],
       ['tiktok_music_id', 'tiktokMusicId', 'text'],
       ['tiktok_location_id', 'tiktokLocationId', 'text'],
       ['tiktok_location_name', 'tiktokLocationName', 'text'],
       ['tiktok_is_ai_generated', 'tiktokIsAiGenerated', 'flag'],
     ];
     // Video-only: TikTok's photo contract takes the track id alone, with no
-    // volume or trim, and has no custom cover or draft switch.
+    // volume or trim, and has no custom cover.
     const videoOnly = [
       ['disable_duet', 'tiktokDisableDuet', 'flag'],
       ['disable_stitch', 'tiktokDisableStitch', 'flag'],
@@ -197,7 +261,6 @@ export class UploadPost {
       ['tiktok_music_end', 'tiktokMusicEnd', 'flag'],
       ['tiktok_original_sound_volume', 'tiktokOriginalSoundVolume', 'flag'],
       ['tiktok_cover_image_url', 'tiktokCoverImageUrl', 'text'],
-      ['tiktok_upload_to_draft', 'tiktokUploadToDraft', 'flag'],
     ];
     const photoOnly = [
       ['auto_add_music', 'tiktokAutoAddMusic', 'flag'],
@@ -208,6 +271,23 @@ export class UploadPost {
       const value = options[key];
       if (kind === 'flag' ? value === undefined : !value) continue;
       form.append(field, String(value));
+    }
+
+    // Draft: postMode MEDIA_UPLOAD and tiktokUploadToDraft are the same draft.
+    // Pass both through (camelCase and snake_case). Do not collapse them.
+    const postMode = this._pick(options, 'tiktokPostMode', 'postMode', 'post_mode');
+    if (postMode) form.append('post_mode', String(postMode));
+    const uploadToDraft = this._pick(
+      options,
+      'tiktokUploadToDraft', 'uploadToDraft', 'tiktok_upload_to_draft', 'upload_to_draft'
+    );
+    if (uploadToDraft !== undefined) form.append('tiktok_upload_to_draft', String(uploadToDraft));
+
+    if (isVideo) {
+      const adsOnly = this._pick(options, 'tiktokIsAdsOnly', 'isAdsOnly', 'tiktok_is_ads_only', 'is_ads_only');
+      if (adsOnly !== undefined) form.append('tiktok_is_ads_only', String(adsOnly));
+      const tto = this._pick(options, 'tiktokTtoInviteLink', 'ttoInviteLink', 'tiktok_tto_invite_link', 'tto_invite_link');
+      if (tto) form.append('tiktok_tto_invite_link', String(tto));
     }
   }
 
@@ -235,6 +315,8 @@ export class UploadPost {
       }
       if (options.instagramAudioName) form.append('audio_name', options.instagramAudioName);
       if (options.instagramThumbOffset) form.append('thumb_offset', options.instagramThumbOffset);
+    } else {
+      this._appendField(form, 'instagram_alt_text', this._pick(options, 'instagramAltText', 'instagram_alt_text'));
     }
   }
 
@@ -261,6 +343,8 @@ export class UploadPost {
     if (options.youtubeBlockedCountries) form.append('blockedCountries', options.youtubeBlockedCountries);
     if (options.youtubeHasPaidProductPlacement !== undefined) form.append('hasPaidProductPlacement', String(options.youtubeHasPaidProductPlacement));
     if (options.youtubeRecordingDate) form.append('recordingDate', options.youtubeRecordingDate);
+    if (options.youtubeNotifySubscribers !== undefined) form.append('youtube_notify_subscribers', String(options.youtubeNotifySubscribers));
+    if (options.youtubePublishAt) form.append('youtube_publish_at', options.youtubePublishAt);
     if (options.youtubePlaylistId) {
       const playlistIds = Array.isArray(options.youtubePlaylistId)
         ? options.youtubePlaylistId.join(',')
@@ -297,6 +381,25 @@ export class UploadPost {
     if (isText && (options.linkedinLinkUrl || options.linkUrl)) {
       form.append('linkedin_link_url', options.linkedinLinkUrl || options.linkUrl);
     }
+    this._appendField(form, 'linkedin_alt_text', this._pick(options, 'linkedinAltText', 'linkedin_alt_text'));
+    this._appendField(form, 'linkedin_disable_reshare', this._pick(options, 'linkedinDisableReshare', 'linkedin_disable_reshare'));
+    this._appendField(form, 'linkedin_link_title', this._pick(options, 'linkedinLinkTitle', 'linkedin_link_title'));
+    this._appendField(form, 'linkedin_link_description', this._pick(options, 'linkedinLinkDescription', 'linkedin_link_description'));
+    this._appendField(form, 'linkedin_thumbnail_alt_text', this._pick(options, 'linkedinThumbnailAltText', 'linkedin_thumbnail_alt_text'));
+    this._appendField(form, 'linkedin_target_geo_locations', this._pick(options, 'linkedinTargetGeoLocations', 'linkedin_target_geo_locations'));
+    this._appendField(form, 'linkedin_target_industries', this._pick(options, 'linkedinTargetIndustries', 'linkedin_target_industries'));
+    this._appendField(form, 'linkedin_target_seniorities', this._pick(options, 'linkedinTargetSeniorities', 'linkedin_target_seniorities'));
+    this._appendField(form, 'linkedin_target_job_functions', this._pick(options, 'linkedinTargetJobFunctions', 'linkedin_target_job_functions'));
+    this._appendField(form, 'linkedin_target_staff_count_ranges', this._pick(options, 'linkedinTargetStaffCountRanges', 'linkedin_target_staff_count_ranges'));
+    this._appendField(form, 'linkedin_target_interface_locales', this._pick(options, 'linkedinTargetInterfaceLocales', 'linkedin_target_interface_locales'));
+    this._appendField(form, 'linkedin_target_degrees', this._pick(options, 'linkedinTargetDegrees', 'linkedin_target_degrees'));
+    this._appendField(form, 'linkedin_target_fields_of_study', this._pick(options, 'linkedinTargetFieldsOfStudy', 'linkedin_target_fields_of_study'));
+    this._appendField(form, 'linkedin_target_organizations', this._pick(options, 'linkedinTargetOrganizations', 'linkedin_target_organizations'));
+    this._appendField(form, 'linkedin_target_entities', this._pick(options, 'linkedinTargetEntities', 'linkedin_target_entities'));
+    this._appendField(form, 'linkedin_target_check_audience', this._pick(options, 'linkedinTargetCheckAudience', 'linkedin_target_check_audience'));
+    this._appendFileField(form, 'linkedin_subtitles', this._pick(options, 'linkedinSubtitles', 'linkedin_subtitles'));
+    this._appendField(form, 'linkedin_subtitles_url', this._pick(options, 'linkedinSubtitlesUrl', 'linkedin_subtitles_url'));
+    this._appendField(form, 'linkedin_subtitles_text', this._pick(options, 'linkedinSubtitlesText', 'linkedin_subtitles_text'));
   }
 
   /**
@@ -305,15 +408,33 @@ export class UploadPost {
    */
   _addFacebookParams(form, options, isVideo = false, isText = false) {
     if (options.facebookPageId) form.append('facebook_page_id', options.facebookPageId);
-    
+
+    this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
+    this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
+    this._appendField(form, 'facebook_feed_targeting', this._pick(options, 'facebookFeedTargeting', 'facebook_feed_targeting'));
+
     if (isVideo) {
       if (options.facebookVideoState) form.append('video_state', options.facebookVideoState);
       if (options.facebookMediaType) form.append('facebook_media_type', options.facebookMediaType);
       if (options.thumbnailUrl) form.append('thumbnail_url', options.thumbnailUrl);
+      this._appendField(form, 'facebook_is_ai_generated', this._pick(options, 'facebookIsAiGenerated', 'facebook_is_ai_generated'));
+      this._appendField(form, 'facebook_unpublished_content_type', this._pick(options, 'facebookUnpublishedContentType', 'facebook_unpublished_content_type'));
+      this._appendField(form, 'facebook_no_story', this._pick(options, 'facebookNoStory', 'facebook_no_story'));
+      this._appendField(form, 'facebook_secret', this._pick(options, 'facebookSecret', 'facebook_secret'));
+      this._appendField(form, 'facebook_collaborators', this._pick(options, 'facebookCollaborators', 'facebook_collaborators'));
     }
-    
+
+    if (!isVideo && !isText) {
+      this._appendField(form, 'facebook_alt_text', this._pick(options, 'facebookAltText', 'facebook_alt_text'));
+    }
+
     if (isText && options.facebookLinkUrl) {
       form.append('facebook_link_url', options.facebookLinkUrl);
+    }
+    if (isText) {
+      this._appendField(form, 'facebook_call_to_action', this._pick(options, 'facebookCallToAction', 'facebook_call_to_action'));
+      this._appendField(form, 'facebook_child_attachments', this._pick(options, 'facebookChildAttachments', 'facebook_child_attachments'));
+      this._appendField(form, 'facebook_multi_share_end_card', this._pick(options, 'facebookMultiShareEndCard', 'facebook_multi_share_end_card'));
     }
   }
 
@@ -325,6 +446,15 @@ export class UploadPost {
     if (options.pinterestBoardId) form.append('pinterest_board_id', options.pinterestBoardId);
     if (options.pinterestAltText) form.append('pinterest_alt_text', options.pinterestAltText);
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
+    this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
+    this._appendField(form, 'pinterest_ai_disclosures', this._pick(options, 'pinterestAiDisclosures', 'pinterest_ai_disclosures'));
+
+    if (!isVideo) {
+      this._appendRepeated(form, 'pinterest_carousel_titles[]', this._pick(options, 'pinterestCarouselTitles', 'pinterest_carousel_titles'));
+      this._appendRepeated(form, 'pinterest_carousel_descriptions[]', this._pick(options, 'pinterestCarouselDescriptions', 'pinterest_carousel_descriptions'));
+      this._appendRepeated(form, 'pinterest_carousel_links[]', this._pick(options, 'pinterestCarouselLinks', 'pinterest_carousel_links'));
+      this._appendField(form, 'pinterest_carousel_index', this._pick(options, 'pinterestCarouselIndex', 'pinterest_carousel_index'));
+    }
 
     if (isVideo) {
       if (options.pinterestCoverImageUrl) form.append('pinterest_cover_image_url', options.pinterestCoverImageUrl);
@@ -348,6 +478,7 @@ export class UploadPost {
     if (options.xShareWithFollowers !== undefined) form.append('share_with_followers', String(options.xShareWithFollowers));
     if (options.xDirectMessageDeepLink) form.append('direct_message_deep_link', options.xDirectMessageDeepLink);
     if (options.xLongTextAsPost !== undefined) form.append('x_long_text_as_post', String(options.xLongTextAsPost));
+    this._appendField(form, 'x_paid_partnership', this._pick(options, 'xPaidPartnership', 'x_paid_partnership'));
 
     if (!isText) {
       if (options.xTaggedUserIds) {
@@ -356,10 +487,15 @@ export class UploadPost {
       }
       if (options.xPlaceId) form.append('place_id', options.xPlaceId);
       if (options.xThreadImageLayout) form.append('x_thread_image_layout', options.xThreadImageLayout);
+      this._appendField(form, 'x_alt_text', this._pick(options, 'xAltText', 'x_alt_text'));
+      this._appendField(form, 'x_subtitles_url', this._pick(options, 'xSubtitlesUrl', 'x_subtitles_url'));
+      this._appendField(form, 'x_subtitles', this._pick(options, 'xSubtitles', 'x_subtitles'));
+      this._appendField(form, 'x_subtitles_language', this._pick(options, 'xSubtitlesLanguage', 'x_subtitles_language'));
+      this._appendField(form, 'x_subtitles_name', this._pick(options, 'xSubtitlesName', 'x_subtitles_name'));
     } else {
       if (options.xPostUrl) form.append('post_url', options.xPostUrl);
       if (options.xCardUri) form.append('card_uri', options.xCardUri);
-      
+
       // Poll options
       if (options.xPollOptions) {
         const pollOpts = Array.isArray(options.xPollOptions) ? options.xPollOptions : options.xPollOptions.split(',').map(t => t.trim());
@@ -367,6 +503,11 @@ export class UploadPost {
         if (options.xPollDuration) form.append('poll_duration', options.xPollDuration);
         if (options.xPollReplySettings) form.append('poll_reply_settings', options.xPollReplySettings);
       }
+      this._appendField(form, 'x_article_title', this._pick(options, 'xArticleTitle', 'x_article_title'));
+      this._appendField(form, 'x_article_body', this._pick(options, 'xArticleBody', 'x_article_body'));
+      this._appendField(form, 'x_article_content_state', this._pick(options, 'xArticleContentState', 'x_article_content_state'));
+      this._appendField(form, 'x_article_draft', this._pick(options, 'xArticleDraft', 'x_article_draft'));
+      this._appendFileField(form, 'x_article_cover_media', this._pick(options, 'xArticleCoverMedia', 'x_article_cover_media'));
     }
   }
 
@@ -378,6 +519,13 @@ export class UploadPost {
     if (options.threadsLongTextAsPost !== undefined) form.append('threads_long_text_as_post', String(options.threadsLongTextAsPost));
     if (options.threadsThreadMediaLayout) form.append('threads_thread_media_layout', options.threadsThreadMediaLayout);
     if (options.threadsTopicTag) form.append('threads_topic_tag', options.threadsTopicTag);
+    this._appendField(form, 'threads_reply_control', this._pick(options, 'threadsReplyControl', 'threads_reply_control'));
+    this._appendField(form, 'threads_alt_text', this._pick(options, 'threadsAltText', 'threads_alt_text'));
+    this._appendField(form, 'threads_reply_to_id', this._pick(options, 'threadsReplyToId', 'threads_reply_to_id'));
+    this._appendField(form, 'threads_quote_post_id', this._pick(options, 'threadsQuotePostId', 'threads_quote_post_id'));
+    this._appendField(form, 'threads_link_attachment', this._pick(options, 'threadsLinkAttachment', 'threads_link_attachment'));
+    this._appendField(form, 'threads_poll_options', this._pick(options, 'threadsPollOptions', 'threads_poll_options'));
+    this._appendField(form, 'threads_auto_publish_text', this._pick(options, 'threadsAutoPublishText', 'threads_auto_publish_text'));
   }
 
   /**
@@ -408,6 +556,10 @@ export class UploadPost {
     if (options.gbpOfferCoupon) form.append('gbp_offer_coupon', options.gbpOfferCoupon);
     if (options.gbpOfferRedeemUrl) form.append('gbp_offer_redeem_url', options.gbpOfferRedeemUrl);
     if (options.gbpOfferTerms) form.append('gbp_offer_terms', options.gbpOfferTerms);
+    this._appendField(form, 'gbp_language_code', this._pick(options, 'gbpLanguageCode', 'gbp_language_code'));
+    this._appendField(form, 'gbp_coupon_code', this._pick(options, 'gbpCouponCode', 'gbp_coupon_code'));
+    this._appendField(form, 'gbp_redeem_url', this._pick(options, 'gbpRedeemUrl', 'gbp_redeem_url'));
+    this._appendField(form, 'gbp_terms', this._pick(options, 'gbpTerms', 'gbp_terms'));
   }
 
   /**
@@ -420,6 +572,200 @@ export class UploadPost {
     if (isText && (options.redditLinkUrl || options.linkUrl)) {
       form.append('reddit_link_url', options.redditLinkUrl || options.linkUrl);
     }
+    this._appendField(form, 'reddit_nsfw', this._pick(options, 'redditNsfw', 'reddit_nsfw'));
+    this._appendField(form, 'reddit_spoiler', this._pick(options, 'redditSpoiler', 'reddit_spoiler'));
+    this._appendField(form, 'reddit_resubmit', this._pick(options, 'redditResubmit', 'reddit_resubmit'));
+    this._appendField(form, 'reddit_send_replies', this._pick(options, 'redditSendReplies', 'reddit_send_replies'));
+    this._appendField(form, 'reddit_flair_text', this._pick(options, 'redditFlairText', 'reddit_flair_text'));
+    this._appendField(form, 'reddit_gallery_captions', this._pick(options, 'redditGalleryCaptions', 'reddit_gallery_captions'));
+    this._appendField(form, 'reddit_gallery_urls', this._pick(options, 'redditGalleryUrls', 'reddit_gallery_urls'));
+  }
+
+  /**
+   * Add Bluesky-specific parameters
+   * @private
+   */
+  _addBlueskyParams(form, options) {
+    this._appendField(form, 'bluesky_alt_text', this._pick(options, 'blueskyAltText', 'bluesky_alt_text'));
+    this._appendField(form, 'bluesky_langs', this._pick(options, 'blueskyLangs', 'bluesky_langs'));
+    this._appendField(form, 'bluesky_labels', this._pick(options, 'blueskyLabels', 'bluesky_labels'));
+    this._appendField(form, 'bluesky_gallery', this._pick(options, 'blueskyGallery', 'bluesky_gallery'));
+    this._appendField(form, 'bluesky_threadgate', this._pick(options, 'blueskyThreadgate', 'bluesky_threadgate', 'blueskyReplySettings', 'bluesky_reply_settings'));
+    this._appendField(form, 'bluesky_postgate', this._pick(options, 'blueskyPostgate', 'bluesky_postgate', 'blueskyQuoteSettings', 'bluesky_quote_settings'));
+    this._appendField(form, 'bluesky_quote_uri', this._pick(options, 'blueskyQuoteUri', 'bluesky_quote_uri', 'blueskyQuoteId', 'bluesky_quote_id', 'blueskyQuoteUrl', 'bluesky_quote_url'));
+  }
+
+  /**
+   * Add Discord-specific parameters
+   * @private
+   */
+  _addDiscordParams(form, options) {
+    this._appendField(form, 'discord_thread_id', this._pick(options, 'discordThreadId', 'discord_thread_id'));
+    this._appendField(form, 'discord_thread_name', this._pick(options, 'discordThreadName', 'discord_thread_name'));
+    this._appendField(form, 'discord_applied_tags', this._pick(options, 'discordAppliedTags', 'discord_applied_tags'));
+    this._appendField(form, 'discord_embeds', this._pick(options, 'discordEmbeds', 'discord_embeds'));
+    this._appendField(form, 'discord_username', this._pick(options, 'discordUsername', 'discord_username'));
+    this._appendField(form, 'discord_avatar_url', this._pick(options, 'discordAvatarUrl', 'discord_avatar_url'));
+    this._appendField(form, 'discord_allowed_mentions', this._pick(options, 'discordAllowedMentions', 'discord_allowed_mentions'));
+    this._appendField(form, 'discord_alt_text', this._pick(options, 'discordAltText', 'discord_alt_text'));
+    this._appendField(form, 'discord_flags', this._pick(options, 'discordFlags', 'discord_flags'));
+    this._appendField(form, 'discord_tts', this._pick(options, 'discordTts', 'discord_tts'));
+    this._appendField(form, 'discord_poll', this._pick(options, 'discordPoll', 'discord_poll'));
+    this._appendField(form, 'discord_max_file_mb', this._pick(options, 'discordMaxFileMb', 'discord_max_file_mb'));
+  }
+
+  /**
+   * Add Telegram-specific parameters
+   * @private
+   */
+  _addTelegramParams(form, options) {
+    this._appendField(form, 'telegram_parse_mode', this._pick(options, 'telegramParseMode', 'telegram_parse_mode'));
+    this._appendField(form, 'telegram_message_thread_id', this._pick(options, 'telegramMessageThreadId', 'telegram_message_thread_id'));
+    this._appendField(form, 'telegram_disable_notification', this._pick(options, 'telegramDisableNotification', 'telegram_disable_notification'));
+    this._appendField(form, 'telegram_protect_content', this._pick(options, 'telegramProtectContent', 'telegram_protect_content'));
+    this._appendField(form, 'telegram_has_spoiler', this._pick(options, 'telegramHasSpoiler', 'telegram_has_spoiler'));
+    this._appendField(form, 'telegram_link_preview', this._pick(options, 'telegramLinkPreview', 'telegram_link_preview'));
+    this._appendField(form, 'telegram_reply_markup', this._pick(options, 'telegramReplyMarkup', 'telegram_reply_markup'));
+    this._appendField(form, 'telegram_caption_overflow', this._pick(options, 'telegramCaptionOverflow', 'telegram_caption_overflow'));
+    this._appendField(form, 'telegram_as_document', this._pick(options, 'telegramAsDocument', 'telegram_as_document'));
+    this._appendField(form, 'telegram_media_urls', this._pick(options, 'telegramMediaUrls', 'telegram_media_urls'));
+  }
+
+  /**
+   * Add Mastodon-specific parameters
+   * @private
+   */
+  _addMastodonParams(form, options) {
+    this._appendField(form, 'mastodon_visibility', this._pick(options, 'mastodonVisibility', 'mastodon_visibility'));
+    this._appendField(form, 'mastodon_sensitive', this._pick(options, 'mastodonSensitive', 'mastodon_sensitive'));
+    this._appendField(form, 'mastodon_spoiler_text', this._pick(options, 'mastodonSpoilerText', 'mastodon_spoiler_text'));
+    this._appendField(form, 'mastodon_language', this._pick(options, 'mastodonLanguage', 'mastodon_language'));
+    this._appendField(form, 'mastodon_alt_text', this._pick(options, 'mastodonAltText', 'mastodon_alt_text'));
+    this._appendField(form, 'mastodon_poll_options', this._pick(options, 'mastodonPollOptions', 'mastodon_poll_options'));
+    this._appendField(form, 'mastodon_poll_expires_in', this._pick(options, 'mastodonPollExpiresIn', 'mastodon_poll_expires_in'));
+    this._appendField(form, 'mastodon_poll_multiple', this._pick(options, 'mastodonPollMultiple', 'mastodon_poll_multiple'));
+    this._appendField(form, 'mastodon_scheduled_at', this._pick(options, 'mastodonScheduledAt', 'mastodon_scheduled_at'));
+  }
+
+  /**
+   * Add WordPress-specific parameters
+   * @private
+   */
+  _addWordpressParams(form, options) {
+    this._appendField(form, 'wordpress_status', this._pick(options, 'wordpressStatus', 'wordpress_status'));
+    this._appendField(form, 'wordpress_date', this._pick(options, 'wordpressDate', 'wordpress_date'));
+    this._appendField(form, 'wordpress_categories', this._pick(options, 'wordpressCategories', 'wordpress_categories'));
+    this._appendField(form, 'wordpress_tags', this._pick(options, 'wordpressTags', 'wordpress_tags'));
+    this._appendField(form, 'wordpress_excerpt', this._pick(options, 'wordpressExcerpt', 'wordpress_excerpt'));
+    this._appendField(form, 'wordpress_slug', this._pick(options, 'wordpressSlug', 'wordpress_slug'));
+    this._appendField(form, 'wordpress_alt_text', this._pick(options, 'wordpressAltText', 'wordpress_alt_text'));
+    this._appendField(form, 'wordpress_media_caption', this._pick(options, 'wordpressMediaCaption', 'wordpress_media_caption'));
+    this._appendField(form, 'wordpress_block_format', this._pick(options, 'wordpressBlockFormat', 'wordpress_block_format'));
+  }
+
+  /**
+   * Add Lemmy-specific parameters
+   * @private
+   */
+  _addLemmyParams(form, options) {
+    this._appendField(form, 'lemmy_url', this._pick(options, 'lemmyUrl', 'lemmy_url'));
+    this._appendField(form, 'lemmy_community', this._pick(options, 'lemmyCommunity', 'lemmy_community'));
+    this._appendField(form, 'lemmy_nsfw', this._pick(options, 'lemmyNsfw', 'lemmy_nsfw'));
+    this._appendField(form, 'lemmy_language_id', this._pick(options, 'lemmyLanguageId', 'lemmy_language_id'));
+    this._appendField(form, 'lemmy_alt_text', this._pick(options, 'lemmyAltText', 'lemmy_alt_text'));
+  }
+
+  /**
+   * Add Slack-specific parameters
+   * @private
+   */
+  _addSlackParams(form, options) {
+    this._appendField(form, 'slack_markdown', this._pick(options, 'slackMarkdown', 'slack_markdown'));
+    this._appendField(form, 'slack_blocks', this._pick(options, 'slackBlocks', 'slack_blocks'));
+    this._appendField(form, 'slack_mrkdwn', this._pick(options, 'slackMrkdwn', 'slack_mrkdwn'));
+    this._appendField(form, 'slack_alt_text', this._pick(options, 'slackAltText', 'slack_alt_text'));
+    this._appendField(form, 'slack_first_comment_mode', this._pick(options, 'slackFirstCommentMode', 'slack_first_comment_mode'));
+  }
+
+  /**
+   * Add Nostr-specific parameters
+   * @private
+   */
+  _addNostrParams(form, options) {
+    this._appendField(form, 'nostr_kind', this._pick(options, 'nostrKind', 'nostr_kind'));
+    this._appendField(form, 'nostr_long_form', this._pick(options, 'nostrLongForm', 'nostr_long_form'));
+  }
+
+  /**
+   * Add Dev.to-specific parameters
+   * @private
+   */
+  _addDevtoParams(form, options) {
+    this._appendField(form, 'devto_tags', this._pick(options, 'devtoTags', 'devto_tags'));
+    this._appendField(form, 'devto_canonical_url', this._pick(options, 'devtoCanonicalUrl', 'devto_canonical_url'));
+    this._appendField(form, 'devto_description', this._pick(options, 'devtoDescription', 'devto_description'));
+    this._appendField(form, 'devto_main_image', this._pick(options, 'devtoMainImage', 'devto_main_image'));
+    this._appendField(form, 'devto_series', this._pick(options, 'devtoSeries', 'devto_series'));
+    this._appendField(form, 'devto_published', this._pick(options, 'devtoPublished', 'devto_published'));
+  }
+
+  /**
+   * Add Hashnode-specific parameters
+   * @private
+   */
+  _addHashnodeParams(form, options) {
+    this._appendField(form, 'hashnode_tags', this._pick(options, 'hashnodeTags', 'hashnode_tags'));
+    this._appendField(form, 'hashnode_original_article_url', this._pick(options, 'hashnodeOriginalArticleUrl', 'hashnode_original_article_url'));
+    this._appendField(form, 'hashnode_subtitle', this._pick(options, 'hashnodeSubtitle', 'hashnode_subtitle'));
+    this._appendField(form, 'hashnode_cover_image_url', this._pick(options, 'hashnodeCoverImageUrl', 'hashnode_cover_image_url'));
+    this._appendField(form, 'hashnode_draft', this._pick(options, 'hashnodeDraft', 'hashnode_draft'));
+    this._appendField(form, 'hashnode_body', this._pick(options, 'hashnodeBody', 'hashnode_body', 'content'));
+  }
+
+  /**
+   * Add Whop-specific parameters
+   * @private
+   */
+  _addWhopParams(form, options) {
+    this._appendField(form, 'whop_body', this._pick(options, 'whopBody', 'whop_body'));
+    this._appendField(form, 'whop_pinned', this._pick(options, 'whopPinned', 'whop_pinned'));
+    this._appendField(form, 'whop_is_mention', this._pick(options, 'whopIsMention', 'whop_is_mention'));
+    this._appendField(form, 'whop_paywall_amount', this._pick(options, 'whopPaywallAmount', 'whop_paywall_amount'));
+    this._appendField(form, 'whop_paywall_currency', this._pick(options, 'whopPaywallCurrency', 'whop_paywall_currency'));
+    this._appendField(form, 'whop_attachment_ids', this._pick(options, 'whopAttachmentIds', 'whop_attachment_ids'));
+  }
+
+  /**
+   * Add Listmonk-specific parameters
+   * @private
+   */
+  _addListmonkParams(form, options) {
+    this._appendField(form, 'listmonk_content_type', this._pick(options, 'listmonkContentType', 'listmonk_content_type'));
+    this._appendField(form, 'listmonk_send_at', this._pick(options, 'listmonkSendAt', 'listmonk_send_at'));
+    this._appendField(form, 'listmonk_lists', this._pick(options, 'listmonkLists', 'listmonk_lists'));
+    this._appendField(form, 'listmonk_template_id', this._pick(options, 'listmonkTemplateId', 'listmonk_template_id'));
+    this._appendField(form, 'listmonk_media_ids', this._pick(options, 'listmonkMediaIds', 'listmonk_media_ids'));
+  }
+
+  /**
+   * Credential-channel and Bluesky helpers. Called from every upload verb so
+   * unlisted fields are not dropped when those platforms are in `platforms`.
+   * @private
+   */
+  _addCredentialPlatformParams(form, options) {
+    const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
+    if (platforms.includes('bluesky')) this._addBlueskyParams(form, options);
+    if (platforms.includes('discord')) this._addDiscordParams(form, options);
+    if (platforms.includes('telegram')) this._addTelegramParams(form, options);
+    if (platforms.includes('mastodon')) this._addMastodonParams(form, options);
+    if (platforms.includes('wordpress')) this._addWordpressParams(form, options);
+    if (platforms.includes('lemmy')) this._addLemmyParams(form, options);
+    if (platforms.includes('slack')) this._addSlackParams(form, options);
+    if (platforms.includes('nostr')) this._addNostrParams(form, options);
+    if (platforms.includes('devto')) this._addDevtoParams(form, options);
+    if (platforms.includes('hashnode')) this._addHashnodeParams(form, options);
+    if (platforms.includes('whop')) this._addWhopParams(form, options);
+    if (platforms.includes('listmonk')) this._addListmonkParams(form, options);
   }
 
   /**
@@ -444,9 +790,11 @@ export class UploadPost {
    * @param {boolean} [options.tiktokDisableStitch] - Disable stitch
    * @param {number} [options.tiktokCoverTimestamp] - Timestamp in ms for video cover
    * @param {boolean} [options.tiktokIsAigc] - AI-generated content flag
-   * @param {string} [options.tiktokPostMode] - DIRECT_POST or MEDIA_UPLOAD
+   * @param {string} [options.tiktokPostMode] - DIRECT_POST or MEDIA_UPLOAD. MEDIA_UPLOAD is the same draft as tiktokUploadToDraft
    * @param {boolean} [options.brandContentToggle] - Branded content toggle
    * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
+   * @param {boolean} [options.tiktokIsAdsOnly] - Only show the video in ads
+   * @param {string} [options.tiktokTtoInviteLink] - TikTok One invite link (requires branded content)
    *
    * TikTok music, location, cover and draft options. Available on connections that
    * declare the matching `capabilities` (music, location, cover_image, draft) on the
@@ -463,7 +811,7 @@ export class UploadPost {
    * @param {string} [options.tiktokLocationName] - Location name, required whenever tiktokLocationId is set
    * @param {string} [options.tiktokCoverImageUrl] - Custom cover image URL
    * @param {boolean} [options.tiktokIsAiGenerated] - AI-generated content disclosure
-   * @param {boolean} [options.tiktokUploadToDraft] - Publish to drafts. When true TikTok ignores the rest of the post settings
+   * @param {boolean} [options.tiktokUploadToDraft] - Publish to drafts (same as postMode MEDIA_UPLOAD). When true TikTok ignores the rest of the post settings
    *
    * Instagram options:
    * @param {string} [options.instagramMediaType] - REELS or STORIES
@@ -552,6 +900,7 @@ export class UploadPost {
     if (platforms.includes('threads')) this._addThreadsParams(form, options);
     if (platforms.includes('reddit')) this._addRedditParams(form, options);
     if (platforms.includes('google_business')) this._addGoogleBusinessParams(form, options);
+    this._addCredentialPlatformParams(form, options);
 
     return this._request('/upload', 'POST', form, true, this._idempotencyHeaders(options));
   }
@@ -580,16 +929,20 @@ export class UploadPost {
    * @param {boolean} [options.brandContentToggle] - Branded content toggle
    * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
    *
-   * TikTok music, location and AI disclosure on photo posts. TikTok's photo contract
-   * takes the track id alone — no volume/trim, no custom cover, no draft (those are
-   * video-only). Available on connections that declare the matching `capabilities`
-   * (music, location) on the TikTok account returned by listUsers(); otherwise the
-   * field is ignored, the post still publishes, and the response includes a
-   * per-field `warnings` entry.
+   * TikTok music, location, AI disclosure and draft on photo posts. TikTok's
+   * photo contract takes the track id alone — no volume/trim, no custom cover
+   * (those are video-only). `tiktokUploadToDraft` and `postMode: 'MEDIA_UPLOAD'`
+   * are the same draft; both are passed through. Available on connections that
+   * declare the matching `capabilities` (music, location, draft) on the TikTok
+   * account returned by listUsers(); otherwise the field is ignored, the post
+   * still publishes, and the response includes a per-field `warnings` entry.
    * @param {string} [options.tiktokMusicId] - Commercial Music Library track id (see getTiktokTrendingMusic)
    * @param {string} [options.tiktokLocationId] - Location id (see getTiktokLocations)
    * @param {string} [options.tiktokLocationName] - Location name, required whenever tiktokLocationId is set
    * @param {boolean} [options.tiktokIsAiGenerated] - AI-generated content disclosure
+   * @param {string} [options.tiktokPostMode] - DIRECT_POST or MEDIA_UPLOAD. MEDIA_UPLOAD is the same draft as tiktokUploadToDraft
+   * @param {boolean} [options.tiktokUploadToDraft] - Publish to drafts. Same draft as postMode MEDIA_UPLOAD
+   * @param {string} [options.instagramAltText] - Alt text for photos (string or list, ≤1000 chars each)
    *
    * Instagram options:
    * @param {string} [options.instagramMediaType] - IMAGE or STORIES
@@ -620,7 +973,7 @@ export class UploadPost {
    * @param {string} [options.threadsThreadMediaLayout] - Comma-separated list of how many media items per Threads post (e.g. "5,5")
    * @param {string} [options.threadsTopicTag] - Topic tag for the Threads post (1-50 chars, no periods or ampersands)
    *
-   * Reddit options:
+   * Reddit options (currently unavailable: HTTP 503, error_code=reddit_unavailable):
    * @param {string} [options.redditSubreddit] - Subreddit name (without r/)
    * @param {string} [options.redditFlairId] - Flair template ID
    *
@@ -653,6 +1006,7 @@ export class UploadPost {
     if (platforms.includes('threads')) this._addThreadsParams(form, options);
     if (platforms.includes('reddit')) this._addRedditParams(form, options);
     if (platforms.includes('google_business')) this._addGoogleBusinessParams(form, options);
+    this._addCredentialPlatformParams(form, options);
 
     return this._request('/upload_photos', 'POST', form, true, this._idempotencyHeaders(options));
   }
@@ -697,7 +1051,7 @@ export class UploadPost {
    * @param {string} [options.threadsThreadMediaLayout] - Comma-separated list of how many media items per Threads post (e.g. "5,5")
    * @param {string} [options.threadsTopicTag] - Topic tag for the Threads post (1-50 chars, no periods or ampersands)
    *
-   * Reddit options:
+   * Reddit options (currently unavailable: HTTP 503, error_code=reddit_unavailable):
    * @param {string} [options.redditSubreddit] - Subreddit name (without r/)
    * @param {string} [options.redditFlairId] - Flair template ID
    *
@@ -721,6 +1075,7 @@ export class UploadPost {
       form.append('bluesky_link_url', options.blueskyLinkUrl || options.linkUrl);
     }
     if (platforms.includes('google_business')) this._addGoogleBusinessParams(form, options);
+    this._addCredentialPlatformParams(form, options);
 
     return this._request('/upload_text', 'POST', form, true, this._idempotencyHeaders(options));
   }
