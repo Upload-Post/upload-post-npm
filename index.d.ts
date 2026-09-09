@@ -56,6 +56,8 @@ declare module 'upload-post' {
     user: string;
     /** First comment to post after publishing */
     firstComment?: string;
+    /** Reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). */
+    replyToId?: string;
     /** Alt text for accessibility */
     altText?: string;
     /** ISO date for scheduling (e.g., "2024-12-25T10:00:00Z") */
@@ -502,6 +504,8 @@ declare module 'upload-post' {
     xLongTextAsPost?: boolean;
     /** Paid partnership label on the first post */
     xPaidPartnership?: boolean;
+    /** ID of the tweet to reply to (alias of the generic replyToId). */
+    xReplyToId?: string;
   }
 
   export interface XMediaOptions extends XBaseOptions {
