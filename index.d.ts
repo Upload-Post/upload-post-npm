@@ -1406,7 +1406,18 @@ declare module 'upload-post' {
      * @param jobId - Scheduled job ID
      * @param options - Edit options
      */
-    editScheduled(jobId: string, options: { scheduledDate?: string; timezone?: string }): Promise<{ success: boolean }>;
+    editScheduled(jobId: string, options: {
+        scheduledDate?: string;
+        timezone?: string;
+        /** New title for every platform */
+        title?: string;
+        /** New caption/description for every platform */
+        caption?: string;
+        /** Alias of caption */
+        description?: string;
+        /** Per-platform text; only the platforms listed are touched */
+        platformContent?: Record<string, { title?: string; caption?: string }>;
+    }): Promise<{ success: boolean }>;
 
     // User Management
     /**

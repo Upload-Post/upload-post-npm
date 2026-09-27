@@ -183,6 +183,14 @@ await client.editScheduled('job-id', {
   timezone: 'America/New_York',
 });
 
+// Fix the text of a pending post in place (only the platforms listed change)
+await client.editScheduled('job-id', {
+  platformContent: {
+    instagram: { caption: 'New Instagram caption' },
+    tiktok: { caption: 'New TikTok caption' },
+  },
+});
+
 // Cancel a scheduled post
 await client.cancelScheduled('job-id');
 ```

@@ -1409,12 +1409,22 @@ export class UploadPost {
    * @param {Object} options - Edit options
    * @param {string} [options.scheduledDate] - New scheduled date (ISO 8601)
    * @param {string} [options.timezone] - New timezone
+   * @param {string} [options.title] - New title for every platform
+   * @param {string} [options.caption] - New caption/description for every platform
+   * @param {string} [options.description] - Alias of caption
+   * @param {Object} [options.platformContent] - Per-platform text, e.g.
+   *   { instagram: { caption: '...' }, tiktok: { caption: '...' }, youtube: { title: '...' } }.
+   *   Only the platforms listed are touched.
    * @returns {Promise<Object>} Edit result
    */
   async editScheduled(jobId, options) {
     const body = {};
     if (options.scheduledDate) body.scheduled_date = options.scheduledDate;
     if (options.timezone) body.timezone = options.timezone;
+    if (options.title !== undefined) body.title = options.title;
+    if (options.caption !== undefined) body.caption = options.caption;
+    else if (options.description !== undefined) body.description = options.description;
+    if (options.platformContent) body.platform_content = options.platformContent;
     return this._request(`/uploadposts/schedule/${jobId}`, 'PATCH', body);
   }
 
