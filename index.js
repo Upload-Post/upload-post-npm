@@ -492,6 +492,8 @@ export class UploadPost {
       this._appendField(form, 'x_subtitles', this._pick(options, 'xSubtitles', 'x_subtitles'));
       this._appendField(form, 'x_subtitles_language', this._pick(options, 'xSubtitlesLanguage', 'x_subtitles_language'));
       this._appendField(form, 'x_subtitles_name', this._pick(options, 'xSubtitlesName', 'x_subtitles_name'));
+      // AI-media disclosure (X "made_with_ai"); is_ai_generated is the cross-platform alias.
+      this._appendField(form, 'made_with_ai', this._pick(options, 'xMadeWithAi', 'madeWithAi', 'made_with_ai', 'isAiGenerated', 'is_ai_generated'));
     } else {
       if (options.xPostUrl) form.append('post_url', options.xPostUrl);
       if (options.xCardUri) form.append('card_uri', options.xCardUri);
@@ -901,6 +903,14 @@ export class UploadPost {
     if (platforms.includes('reddit')) this._addRedditParams(form, options);
     if (platforms.includes('google_business')) this._addGoogleBusinessParams(form, options);
     this._addCredentialPlatformParams(form, options);
+
+    // thumbnail_url is one generic API field, read by X, YouTube, LinkedIn and Facebook.
+    // The Facebook and YouTube helpers already send it for their platform; send it once
+    // here for the rest (X since 2.15.0) without duplicating the field.
+    const cover = this._pick(options, 'thumbnailUrl', 'thumbnail_url');
+    const coverAlreadySent = (platforms.includes('facebook') && cover)
+      || (platforms.includes('youtube') && options.youtubeThumbnailUrl);
+    if (cover && !coverAlreadySent) form.append('thumbnail_url', cover);
 
     return this._request('/upload', 'POST', form, true, this._idempotencyHeaders(options));
   }

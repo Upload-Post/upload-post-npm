@@ -656,7 +656,7 @@ for those options.
 - `facebookPageId` - Facebook Page ID (required)
 - `facebookVideoState` - PUBLISHED, DRAFT
 - `facebookMediaType` - REELS, STORIES, VIDEO (VIDEO for normal page videos with no 9:16 restriction)
-- `thumbnailUrl` - URL for custom video thumbnail (only when facebookMediaType is VIDEO)
+- `thumbnailUrl` - URL for custom video cover (generic field, also read by X, YouTube and LinkedIn; on Facebook only when facebookMediaType is VIDEO)
 - `facebookLinkUrl` - URL for text posts
 - `facebookAltText` - Alt text per photo
 - `facebookPlaceId` - Place ID
@@ -694,6 +694,8 @@ for those options.
 - `xAltText` - Alt text (≤1000 chars)
 - `xSubtitles` / `xSubtitlesUrl` / `xSubtitlesLanguage` / `xSubtitlesName` - Video captions
 - `xPaidPartnership` - Paid partnership label
+- `madeWithAi` - Disclose AI-generated media on X (`made_with_ai`; alias `isAiGenerated`)
+- `thumbnailUrl` - Custom video cover (generic field; applied by X as the post's preview image)
 - `xArticleTitle` / `xArticleBody` / `xArticleContentState` / `xArticleDraft` / `xArticleCoverMedia` - X Articles (Premium)
 
 ### Threads

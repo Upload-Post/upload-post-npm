@@ -150,3 +150,62 @@ describe('new whitelist fields', () => {
     assert.equal(fields.notARealField, undefined);
   });
 });
+
+// Ticket #5385: the SDK never forwarded thumbnail_url or made_with_ai for X, so
+// customers had to drop to raw REST to use either.
+describe('X cover and AI disclosure', () => {
+  function countField(form, name) {
+    const body = form.getBuffer().toString('utf8');
+    return body.split(`name="${name}"`).length - 1;
+  }
+  function captured() {
+    const c = client();
+    c._request = async (_path, _method, form) => form;
+    return c;
+  }
+
+  test('madeWithAi and its aliases go as made_with_ai on media posts only', () => {
+    const media = new FormData();
+    client()._addXParams(media, { madeWithAi: true }, false);
+    assert.equal(formFields(media).made_with_ai, 'true');
+
+    const alias = new FormData();
+    client()._addXParams(alias, { isAiGenerated: true }, false);
+    assert.equal(formFields(alias).made_with_ai, 'true');
+
+    const text = new FormData();
+    client()._addXParams(text, { madeWithAi: true }, true);
+    assert.equal(formFields(text).made_with_ai, undefined);
+  });
+
+  test('upload() sends thumbnail_url for X', async () => {
+    const form = await captured().upload('https://cdn.example.com/v.mp4', {
+      user: 'p', title: 't', platforms: ['x'],
+      thumbnailUrl: 'https://cdn.example.com/cover.jpg', madeWithAi: true,
+    });
+    const fields = formFields(form);
+    assert.equal(fields.thumbnail_url, 'https://cdn.example.com/cover.jpg');
+    assert.equal(fields.made_with_ai, 'true');
+    assert.equal(countField(form, 'thumbnail_url'), 1);
+  });
+
+  test('upload() never duplicates thumbnail_url when Facebook or YouTube also send it', async () => {
+    const fb = await captured().upload('https://cdn.example.com/v.mp4', {
+      user: 'p', title: 't', platforms: ['x', 'facebook'],
+      thumbnailUrl: 'https://cdn.example.com/cover.jpg',
+    });
+    assert.equal(countField(fb, 'thumbnail_url'), 1);
+
+    const yt = await captured().upload('https://cdn.example.com/v.mp4', {
+      user: 'p', title: 't', platforms: ['x', 'youtube'],
+      youtubeThumbnailUrl: 'https://cdn.example.com/cover.jpg',
+    });
+    assert.equal(countField(yt, 'thumbnail_url'), 1);
+    assert.equal(formFields(yt).thumbnail_url, 'https://cdn.example.com/cover.jpg');
+
+    const none = await captured().upload('https://cdn.example.com/v.mp4', {
+      user: 'p', title: 't', platforms: ['x'],
+    });
+    assert.equal(countField(none, 'thumbnail_url'), 0);
+  });
+});

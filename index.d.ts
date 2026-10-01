@@ -389,7 +389,7 @@ declare module 'upload-post' {
     facebookVideoState?: FacebookVideoState;
     /** Media type */
     facebookMediaType?: FacebookMediaType;
-    /** Thumbnail URL for normal page videos (only when facebookMediaType is 'VIDEO') */
+    /** Custom video cover URL. Generic API field: X, YouTube, LinkedIn and Facebook (only when facebookMediaType is 'VIDEO') read it */
     thumbnailUrl?: string;
     /** Facebook Place ID */
     facebookPlaceId?: string;
@@ -517,6 +517,12 @@ declare module 'upload-post' {
     xThreadImageLayout?: string;
     /** Alt text (≤1000 chars). String for video; string, list or `x_alt_text[]` for photos */
     xAltText?: string | string[];
+    /** Disclose that the post contains AI-generated media (X `made_with_ai`). Alias: isAiGenerated */
+    madeWithAi?: boolean;
+    /** Same as madeWithAi */
+    xMadeWithAi?: boolean;
+    /** Cross-platform alias of madeWithAi (API `is_ai_generated`) */
+    isAiGenerated?: boolean;
     /** Public URL of a .srt file (≤1 MB) */
     xSubtitlesUrl?: string;
     /** Inline SRT text, or a URL if the value starts with http(s) */
