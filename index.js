@@ -1425,7 +1425,12 @@ export class UploadPost {
    * @param {Object} [options.platformContent] - Per-platform text, e.g.
    *   { instagram: { caption: '...' }, tiktok: { caption: '...' }, youtube: { title: '...' } }.
    *   Only the platforms listed are touched.
-   * @returns {Promise<Object>} Edit result
+   * @param {Object} [options.fields] - Any other upload option by its API form name, e.g.
+   *   { cover_timestamp: 4200, is_aigc: true, thumb_offset: '4200', youtube_title: '...' }.
+   *   `null` removes an option. Sent as given: the backend owns the list of editable keys.
+   *   The media, profile and platforms of a scheduled post cannot be changed.
+   * @returns {Promise<Object>} Edit result. A post that is publishing (or due within
+   *   60 s) is rejected with HTTP 409, error_code `scheduled_post_in_progress`.
    */
   async editScheduled(jobId, options) {
     const body = {};
@@ -1435,7 +1440,30 @@ export class UploadPost {
     if (options.caption !== undefined) body.caption = options.caption;
     else if (options.description !== undefined) body.description = options.description;
     if (options.platformContent) body.platform_content = options.platformContent;
+    if (options.fields) body.fields = options.fields;
     return this._request(`/uploadposts/schedule/${jobId}`, 'PATCH', body);
+  }
+
+  /**
+   * Get one scheduled post: its options (as editScheduled `fields` takes them),
+   * signed media URLs and whether it can still be edited.
+   *
+   * @param {string} jobId - Scheduled job ID
+   * @returns {Promise<Object>} Scheduled post detail
+   */
+  async getScheduled(jobId) {
+    return this._request(`/uploadposts/schedule/${jobId}`, 'GET');
+  }
+
+  /**
+   * Get the thumbnail of a scheduled post (built once if it has none yet).
+   * HTTP 202/429 carry `retry_after` seconds.
+   *
+   * @param {string} jobId - Scheduled job ID
+   * @returns {Promise<Object>} { job_id, thumbnail_url }
+   */
+  async getScheduledThumbnail(jobId) {
+    return this._request(`/uploadposts/schedule/${jobId}/thumbnail`, 'GET');
   }
 
   // ==================== User Management ====================

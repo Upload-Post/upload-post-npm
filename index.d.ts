@@ -1423,7 +1423,35 @@ declare module 'upload-post' {
         description?: string;
         /** Per-platform text; only the platforms listed are touched */
         platformContent?: Record<string, { title?: string; caption?: string }>;
+        /** Any other upload option by its API form name (e.g. cover_timestamp, is_aigc,
+         *  thumb_offset, youtube_title). `null` removes it. Media, profile and platforms
+         *  cannot be changed. */
+        fields?: Record<string, string | number | boolean | string[] | null>;
     }): Promise<{ success: boolean }>;
+
+    /**
+     * Get one scheduled post: options as `editScheduled` fields takes them,
+     * signed media URLs and whether it can still be edited.
+     */
+    getScheduled(jobId: string): Promise<{
+        success: boolean;
+        job_id: string;
+        post_type: 'video' | 'photo' | 'text' | 'document' | 'unknown';
+        profile_username: string;
+        platforms: string[];
+        scheduled_date: string | null;
+        original_timezone: string | null;
+        form: Record<string, unknown>;
+        media_urls: string[];
+        thumbnail_url: string | null;
+        cover_preview_url: string | null;
+        kept_files: string[];
+        editable: boolean;
+        not_editable_reason: string | null;
+    }>;
+
+    /** Thumbnail of a scheduled post, built once if missing. */
+    getScheduledThumbnail(jobId: string): Promise<{ job_id: string; thumbnail_url: string | null; retry_after?: number }>;
 
     // User Management
     /**

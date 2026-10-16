@@ -191,6 +191,15 @@ await client.editScheduled('job-id', {
   },
 });
 
+// Change any other option without uploading the video again
+// (cover frame, AI labels, YouTube title...). null removes an option.
+await client.editScheduled('job-id', {
+  fields: { cover_timestamp: 4200, is_aigc: true, youtube_title: 'New title' },
+});
+
+// What a scheduled post was scheduled with, and whether it is still editable
+const post = await client.getScheduled('job-id');
+
 // Cancel a scheduled post
 await client.cancelScheduled('job-id');
 ```

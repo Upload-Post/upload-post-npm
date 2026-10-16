@@ -41,3 +41,17 @@ test('description is an alias of caption, caption wins', async () => {
   await new UploadPost('k').editScheduled('job1', { caption: 'C', description: 'D' });
   assert.deepEqual(body(), { caption: 'C' });
 });
+
+test('forwards fields as given, null included', async () => {
+  const fields = { cover_timestamp: 4200, is_aigc: true, description: null };
+  await new UploadPost('k').editScheduled('job1', { fields });
+  assert.deepEqual(body(), { fields });
+});
+
+test('getScheduled and getScheduledThumbnail read the job', async () => {
+  await new UploadPost('k').getScheduled('job1');
+  assert.equal(sent[0].method.toUpperCase(), 'GET');
+  assert.match(sent[0].url, /\/uploadposts\/schedule\/job1$/);
+  await new UploadPost('k').getScheduledThumbnail('job1');
+  assert.match(sent[1].url, /\/uploadposts\/schedule\/job1\/thumbnail$/);
+});
