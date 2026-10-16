@@ -1452,11 +1452,31 @@ export class UploadPost {
   /**
    * Create a new user/profile
    * 
-   * @param {string} username - Profile name to create
+   * @param {string} username - Profile name to create. This is the `user` value of every API call and cannot be changed later.
+   * @param {Object} [options]
+   * @param {string} [options.displayName] - Optional label shown in the dashboard instead of the username (max 100 chars)
    * @returns {Promise<Object>} Created user
    */
-  async createUser(username) {
-    return this._request('/uploadposts/users', 'POST', { username });
+  async createUser(username, options = {}) {
+    const body = { username };
+    if (options.displayName !== undefined) body.display_name = options.displayName;
+    return this._request('/uploadposts/users', 'POST', body);
+  }
+
+  /**
+   * Rename a user/profile by setting its display name.
+   *
+   * Only the label shown in the dashboard changes: the username stays the
+   * `user` value of every API call, so existing integrations keep working.
+   *
+   * @param {string} username - Profile username (unchanged)
+   * @param {string|null} displayName - New label (max 100 chars). Empty string or null clears it and the dashboard shows the username again.
+   * @returns {Promise<Object>} `{ success, profile: { username, display_name } }`
+   */
+  async renameUser(username, displayName) {
+    return this._request(`/uploadposts/users/${encodeURIComponent(username)}`, 'PATCH', {
+      display_name: displayName ?? null,
+    });
   }
 
   /**

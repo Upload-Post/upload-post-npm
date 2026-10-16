@@ -201,8 +201,14 @@ await client.cancelScheduled('job-id');
 // List all profiles
 const users = await client.listUsers();
 
-// Create a new profile
+// Create a new profile (the username is the `user` value of every API call)
 await client.createUser('new-profile');
+await client.createUser('client-acme', { displayName: 'Acme Corp' });
+
+// Rename a profile: only the label shown in the dashboard changes,
+// the username stays the same so existing integrations keep working
+await client.renameUser('client-acme', 'Acme Corporation');
+await client.renameUser('client-acme', null); // back to showing the username
 
 // Delete a profile
 await client.deleteUser('old-profile');

@@ -969,7 +969,10 @@ declare module 'upload-post' {
   }
 
   export interface UserProfile {
+    /** The `user` value of every API call. Never changes. */
     username: string;
+    /** Label shown in the dashboard instead of the username; null when unset. Set it with renameUser(). */
+    display_name?: string | null;
     social_accounts?: Record<string, any>;
     created_at?: string;
   }
@@ -1433,9 +1436,18 @@ declare module 'upload-post' {
 
     /**
      * Create a new user/profile
-     * @param username - Profile name to create
+     * @param username - Profile name to create. It is the `user` value of every API call and cannot be changed later.
+     * @param options.displayName - Optional label shown in the dashboard instead of the username (max 100 chars)
      */
-    createUser(username: string): Promise<{ success: boolean; username?: string }>;
+    createUser(username: string, options?: { displayName?: string }): Promise<{ success: boolean; profile?: UserProfile; [key: string]: any }>;
+
+    /**
+     * Rename a user/profile by setting its display name. The username (the API `user` value) does not change,
+     * so existing integrations keep working.
+     * @param username - Profile username (unchanged)
+     * @param displayName - New label, max 100 chars. Empty string or null clears it.
+     */
+    renameUser(username: string, displayName: string | null): Promise<{ success: boolean; profile?: { username: string; display_name: string | null }; [key: string]: any }>;
 
     /**
      * Delete a user/profile
