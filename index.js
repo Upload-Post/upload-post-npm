@@ -1425,9 +1425,20 @@ export class UploadPost {
    * @param {Object} [options.platformContent] - Per-platform text, e.g.
    *   { instagram: { caption: '...' }, tiktok: { caption: '...' }, youtube: { title: '...' } }.
    *   Only the platforms listed are touched.
+   * @param {Object} [options.fields] - Any other editable upload option, keyed by the
+   *   API form name (e.g. { privacyStatus: 'unlisted', tags: '["a","b"]', disable_comment: true,
+   *   instagram_first_comment: '...' }). `null` removes an option. Unknown or internal keys
+   *   are ignored by the API.
+   * @param {string|null} [options.youtubePublishAt] - Native YouTube scheduling (RFC3339),
+   *   sent as fields.youtube_publish_at; `null` removes it. Wins over the same key in `fields`.
+   * @param {string} [options.coverImageBase64] - New cover image (Instagram / Facebook Reels),
+   *   base64 or a data URL
+   * @param {string} [options.coverFilename] - File name of the new cover (default cover.jpg)
+   * @param {string} [options.coverContentType] - MIME type of the new cover (default image/jpeg)
+   * @param {boolean} [options.removeCover] - Remove the custom cover
    * @returns {Promise<Object>} Edit result
    */
-  async editScheduled(jobId, options) {
+  async editScheduled(jobId, options = {}) {
     const body = {};
     if (options.scheduledDate) body.scheduled_date = options.scheduledDate;
     if (options.timezone) body.timezone = options.timezone;
@@ -1435,6 +1446,15 @@ export class UploadPost {
     if (options.caption !== undefined) body.caption = options.caption;
     else if (options.description !== undefined) body.description = options.description;
     if (options.platformContent) body.platform_content = options.platformContent;
+    const fields = { ...(options.fields || {}) };
+    if (options.youtubePublishAt !== undefined) fields.youtube_publish_at = options.youtubePublishAt;
+    if (Object.keys(fields).length) body.fields = fields;
+    if (options.removeCover === true) body.remove_cover = true;
+    else if (options.coverImageBase64) {
+      body.cover_image_base64 = options.coverImageBase64;
+      if (options.coverFilename) body.cover_filename = options.coverFilename;
+      if (options.coverContentType) body.cover_content_type = options.coverContentType;
+    }
     return this._request(`/uploadposts/schedule/${jobId}`, 'PATCH', body);
   }
 

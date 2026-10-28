@@ -41,3 +41,39 @@ test('description is an alias of caption, caption wins', async () => {
   await new UploadPost('k').editScheduled('job1', { caption: 'C', description: 'D' });
   assert.deepEqual(body(), { caption: 'C' });
 });
+
+test('forwards per-platform options as fields, youtubePublishAt included', async () => {
+  await new UploadPost('k').editScheduled('job1', {
+    fields: { privacyStatus: 'unlisted', disable_comment: true, cover_url: null },
+    youtubePublishAt: '2026-11-01T09:00:00Z',
+  });
+  assert.deepEqual(body(), {
+    fields: {
+      privacyStatus: 'unlisted', disable_comment: true, cover_url: null,
+      youtube_publish_at: '2026-11-01T09:00:00Z',
+    },
+  });
+});
+
+test('youtubePublishAt wins over fields and null removes it', async () => {
+  await new UploadPost('k').editScheduled('job1', {
+    fields: { youtube_publish_at: 'old' }, youtubePublishAt: null,
+  });
+  assert.deepEqual(body(), { fields: { youtube_publish_at: null } });
+});
+
+test('forwards a new cover, or its removal', async () => {
+  await new UploadPost('k').editScheduled('job1', {
+    coverImageBase64: 'data:image/png;base64,AAAA', coverFilename: 'c.png', coverContentType: 'image/png',
+  });
+  assert.deepEqual(body(), {
+    cover_image_base64: 'data:image/png;base64,AAAA', cover_filename: 'c.png', cover_content_type: 'image/png',
+  });
+  await new UploadPost('k').editScheduled('job1', { removeCover: true, coverImageBase64: 'AAAA' });
+  assert.deepEqual(body(), { remove_cover: true });
+});
+
+test('sends no fields key when nothing per-platform is edited', async () => {
+  await new UploadPost('k').editScheduled('job1', { scheduledDate: '2026-11-01T09:00:00Z', fields: {} });
+  assert.deepEqual(body(), { scheduled_date: '2026-11-01T09:00:00Z' });
+});

@@ -191,6 +191,14 @@ await client.editScheduled('job-id', {
   },
 });
 
+// Change any other option by its API form name (null removes it), schedule the
+// video natively on YouTube, or replace the Reels cover
+await client.editScheduled('job-id', {
+  fields: { privacyStatus: 'unlisted', disable_comment: true, instagram_first_comment: 'Link in bio' },
+  youtubePublishAt: '2026-11-01T09:00:00Z',
+  coverImageBase64: 'data:image/jpeg;base64,...', // or removeCover: true
+});
+
 // Cancel a scheduled post
 await client.cancelScheduled('job-id');
 ```

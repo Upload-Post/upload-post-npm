@@ -968,6 +968,50 @@ declare module 'upload-post' {
     [key: string]: any;
   }
 
+  /** Body of PATCH /api/uploadposts/schedule/<job_id>. Every key is optional. */
+  export interface EditScheduledOptions {
+    /** New publish date (ISO 8601); must be in the future and within 1 year */
+    scheduledDate?: string;
+    /** IANA timezone `scheduledDate` is read in (default UTC) */
+    timezone?: string;
+    /** New title for every platform */
+    title?: string;
+    /** New caption/description for every platform */
+    caption?: string;
+    /** Alias of caption */
+    description?: string;
+    /** Per-platform text; only the platforms listed are touched */
+    platformContent?: Record<string, { title?: string; caption?: string }>;
+    /**
+     * Any other editable upload option, keyed by its API form name
+     * (e.g. `privacyStatus`, `tags`, `disable_comment`, `instagram_first_comment`,
+     * `gbp_cta_url`). `null` removes the option; unknown or internal keys are ignored.
+     */
+    fields?: Record<string, string | number | boolean | string[] | null>;
+    /** Native YouTube scheduling (RFC3339), sent as `fields.youtube_publish_at`; `null` removes it */
+    youtubePublishAt?: string | null;
+    /** New cover image (Instagram / Facebook Reels) as base64 or a data URL */
+    coverImageBase64?: string;
+    /** File name of the new cover (default `cover.jpg`) */
+    coverFilename?: string;
+    /** MIME type of the new cover (default `image/jpeg`) */
+    coverContentType?: string;
+    /** Remove the custom cover */
+    removeCover?: boolean;
+  }
+
+  export interface EditScheduledResponse {
+    success: boolean;
+    job_id?: string;
+    scheduled_date?: string;
+    title?: string;
+    caption?: string;
+    platform_content?: Record<string, { title: string; caption: string }>;
+    error?: string;
+    error_code?: string;
+    [key: string]: any;
+  }
+
   export interface UserProfile {
     username: string;
     social_accounts?: Record<string, any>;
@@ -1412,18 +1456,7 @@ declare module 'upload-post' {
      * @param jobId - Scheduled job ID
      * @param options - Edit options
      */
-    editScheduled(jobId: string, options: {
-        scheduledDate?: string;
-        timezone?: string;
-        /** New title for every platform */
-        title?: string;
-        /** New caption/description for every platform */
-        caption?: string;
-        /** Alias of caption */
-        description?: string;
-        /** Per-platform text; only the platforms listed are touched */
-        platformContent?: Record<string, { title?: string; caption?: string }>;
-    }): Promise<{ success: boolean }>;
+    editScheduled(jobId: string, options?: EditScheduledOptions): Promise<EditScheduledResponse>;
 
     // User Management
     /**
