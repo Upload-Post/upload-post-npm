@@ -630,6 +630,8 @@ for those options.
 - `instagramLocationId` - Location ID
 - `instagramThumbOffset` - Thumbnail offset
 - `instagramAltText` - Alt text on photos (string or list, ≤1000 chars each)
+- `instagramShareMode` - Trial Reels: `TRIAL_REELS_SHARE_TO_FOLLOWERS_IF_LIKED` or `TRIAL_REELS_DONT_SHARE_TO_FOLLOWERS` (videos only)
+- `instagramIsAiGenerated` - AI-generated content label (sent as the generic `is_ai_generated`, which other platforms in the same post also read)
 
 ### YouTube
 - `youtubeTags` - Array or comma-separated tags
@@ -667,6 +669,7 @@ for those options.
 - `thumbnailUrl` - URL for custom video cover (generic field, also read by X, YouTube and LinkedIn; on Facebook only when facebookMediaType is VIDEO)
 - `facebookLinkUrl` - URL for text posts
 - `facebookAltText` - Alt text per photo
+- `facebookMediaType` on photos - POSTS (feed, default) or STORIES (Page photo story)
 - `facebookPlaceId` - Place ID
 - `facebookTargeting` / `facebookFeedTargeting` - Audience JSON
 - `facebookCallToAction` / `facebookChildAttachments` / `facebookMultiShareEndCard` - Link posts

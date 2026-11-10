@@ -209,3 +209,37 @@ describe('X cover and AI disclosure', () => {
     assert.equal(countField(none, 'thumbnail_url'), 0);
   });
 });
+
+describe('fields agents reported as dropped (2.17.0)', () => {
+  test('Instagram trial Reels share_mode on videos only', () => {
+    const video = new FormData();
+    client()._addInstagramParams(video, { instagramShareMode: 'TRIAL_REELS_DONT_SHARE_TO_FOLLOWERS' }, true);
+    assert.equal(formFields(video).share_mode, 'TRIAL_REELS_DONT_SHARE_TO_FOLLOWERS');
+
+    const snake = new FormData();
+    client()._addInstagramParams(snake, { share_mode: 'TRIAL_REELS_SHARE_TO_FOLLOWERS_IF_LIKED' }, true);
+    assert.equal(formFields(snake).share_mode, 'TRIAL_REELS_SHARE_TO_FOLLOWERS_IF_LIKED');
+
+    const photo = new FormData();
+    client()._addInstagramParams(photo, { instagramShareMode: 'TRIAL_REELS_DONT_SHARE_TO_FOLLOWERS' }, false);
+    assert.equal(formFields(photo).share_mode, undefined);
+  });
+
+  test('Instagram AI label goes as is_ai_generated on videos and photos', () => {
+    for (const isVideo of [true, false]) {
+      const form = new FormData();
+      client()._addInstagramParams(form, { instagramIsAiGenerated: true }, isVideo);
+      assert.equal(formFields(form).is_ai_generated, 'true');
+    }
+  });
+
+  test('Facebook photo stories send facebook_media_type', () => {
+    const form = new FormData();
+    client()._addFacebookParams(form, { facebookMediaType: 'STORIES' }, false, false);
+    assert.equal(formFields(form).facebook_media_type, 'STORIES');
+
+    const text = new FormData();
+    client()._addFacebookParams(text, { facebookMediaType: 'STORIES' }, false, true);
+    assert.equal(formFields(text).facebook_media_type, undefined);
+  });
+});

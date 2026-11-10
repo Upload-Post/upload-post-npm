@@ -36,6 +36,8 @@ declare module 'upload-post' {
 
   /** Facebook media type */
   export type FacebookMediaType = 'REELS' | 'STORIES' | 'VIDEO';
+  export type FacebookPhotoMediaType = 'POSTS' | 'STORIES';
+  export type InstagramShareMode = 'TRIAL_REELS_SHARE_TO_FOLLOWERS_IF_LIKED' | 'TRIAL_REELS_DONT_SHARE_TO_FOLLOWERS';
 
   /** X (Twitter) reply settings */
   export type XReplySettings = 'everyone' | 'following' | 'mentionedUsers' | 'subscribers' | 'verified';
@@ -274,6 +276,10 @@ declare module 'upload-post' {
     instagramLocationId?: string;
     /** Thumbnail offset */
     instagramThumbOffset?: string;
+    /** Trial Reel: shown to non-followers first. Sent as share_mode */
+    instagramShareMode?: InstagramShareMode;
+    /** AI-generated content label. Sent as the generic is_ai_generated field */
+    instagramIsAiGenerated?: boolean;
   }
 
   export interface InstagramPhotoOptions {
@@ -287,6 +293,8 @@ declare module 'upload-post' {
     instagramLocationId?: string;
     /** Alt text: string (applied to every item) or list of strings, ≤1000 chars each */
     instagramAltText?: string | string[];
+    /** AI-generated content label. Sent as the generic is_ai_generated field */
+    instagramIsAiGenerated?: boolean;
   }
 
   // ==================== YouTube Options ====================
@@ -414,6 +422,8 @@ declare module 'upload-post' {
     facebookPageId?: string;
     /** Alt text per photo */
     facebookAltText?: string | string[];
+    /** POSTS (default) publishes to the feed, STORIES as a Page story */
+    facebookMediaType?: FacebookPhotoMediaType;
     /** Facebook Place ID */
     facebookPlaceId?: string;
     /** Geographic/age/language targeting */

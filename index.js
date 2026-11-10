@@ -300,9 +300,14 @@ export class UploadPost {
     if (options.instagramCollaborators) form.append('collaborators', options.instagramCollaborators);
     if (options.instagramUserTags) form.append('user_tags', options.instagramUserTags);
     if (options.instagramLocationId) form.append('location_id', options.instagramLocationId);
+    // AI-content label. The API field is the generic is_ai_generated, which other
+    // platforms in the same post also read (it is the same media).
+    this._appendField(form, 'is_ai_generated', this._pick(options, 'instagramIsAiGenerated', 'isAiGenerated', 'is_ai_generated'));
 
     if (isVideo) {
       if (options.instagramShareToFeed !== undefined) form.append('share_to_feed', String(options.instagramShareToFeed));
+      // Trial Reels: TRIAL_REELS_SHARE_TO_FOLLOWERS_IF_LIKED or TRIAL_REELS_DONT_SHARE_TO_FOLLOWERS.
+      this._appendField(form, 'share_mode', this._pick(options, 'instagramShareMode', 'share_mode'));
       if (options.instagramCoverUrl) {
         const coverVal = options.instagramCoverUrl;
         if (typeof coverVal === 'string' && (coverVal.toLowerCase().startsWith('http://') || coverVal.toLowerCase().startsWith('https://'))) {
@@ -426,6 +431,8 @@ export class UploadPost {
 
     if (!isVideo && !isText) {
       this._appendField(form, 'facebook_alt_text', this._pick(options, 'facebookAltText', 'facebook_alt_text'));
+      // POSTS (default) or STORIES for a Page photo story.
+      this._appendField(form, 'facebook_media_type', this._pick(options, 'facebookMediaType', 'facebook_media_type'));
     }
 
     if (isText && options.facebookLinkUrl) {
