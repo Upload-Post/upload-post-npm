@@ -1111,6 +1111,8 @@ export class UploadPost {
    * @param {string} [options.timezone] - Timezone for scheduled date
    * @param {boolean} [options.addToQueue] - Add to posting queue
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
+   * @param {string} [options.firstComment] - Comment posted under the document right after publishing
+   * @param {string} [options.linkedinFirstComment] - Same, LinkedIn-specific name (used when firstComment is not set)
    * 
    * @returns {Promise<Object>} API response
    */
@@ -1138,6 +1140,10 @@ export class UploadPost {
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
     if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
+    // First comment under the document post. This method does not go through
+    // _addCommonParams, so without these two lines the option was dropped.
+    if (options.firstComment) form.append('first_comment', options.firstComment);
+    if (options.linkedinFirstComment) form.append('linkedin_first_comment', options.linkedinFirstComment);
     // AI auto-generation of native per-platform copy from the media (fills blank fields)
 
     this._addLinkedinParams(form, options);

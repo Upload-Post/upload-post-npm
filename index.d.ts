@@ -895,6 +895,10 @@ declare module 'upload-post' {
     linkedinVisibility?: LinkedInVisibility;
     /** Page ID for organization posts */
     targetLinkedinPageId?: string;
+    /** Comment posted under the document right after publishing */
+    firstComment?: string;
+    /** Same as firstComment, LinkedIn-specific name */
+    linkedinFirstComment?: string;
     linkedinAltText?: string | string[];
     linkedinDisableReshare?: boolean;
     linkedinTargetCheckAudience?: boolean;
