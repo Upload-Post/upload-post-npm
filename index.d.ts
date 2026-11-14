@@ -58,6 +58,16 @@ declare module 'upload-post' {
     user: string;
     /** First comment to post after publishing */
     firstComment?: string;
+    /**
+     * Native paid-partnership / branded-content label on every network that has one:
+     * TikTok (`brand_content_toggle`), YouTube (`hasPaidProductPlacement`) and X (`x_paid_partnership`).
+     * A platform-specific option wins over this switch. Networks without a native label
+     * (Instagram, LinkedIn, Threads...) publish normally and add a `warnings` entry.
+     * TikTok rejects it with `privacy_level=SELF_ONLY` (400 `commercial_disclosure_privacy_conflict`).
+     */
+    paidPartnership?: boolean;
+    /** snake_case alias of {@link CommonUploadOptions.paidPartnership}. */
+    paid_partnership?: boolean;
     /** Reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). */
     replyToId?: string;
     /** Alt text for accessibility */
@@ -415,6 +425,8 @@ declare module 'upload-post' {
     facebookSecret?: boolean;
     /** Page IDs to invite as Reel collaborators (max 10 / 24h) */
     facebookCollaborators?: string | string[];
+    /** Sponsor's Page ID (digits) for Meta's branded content tag. Only with `facebookMediaType: 'VIDEO'`: Reels and Stories have no sponsor field. */
+    facebookSponsorId?: string | number;
   }
 
   export interface FacebookPhotoOptions {
@@ -430,6 +442,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Sponsor's Page ID (digits) for Meta's branded content tag. */
+    facebookSponsorId?: string | number;
   }
 
   export interface FacebookTextOptions {
@@ -449,6 +463,8 @@ declare module 'upload-post' {
     facebookChildAttachments?: Array<Record<string, unknown>> | string;
     /** Show the multi-share end card (requires child attachments) */
     facebookMultiShareEndCard?: boolean;
+    /** Sponsor's Page ID (digits) for Meta's branded content tag. */
+    facebookSponsorId?: string | number;
   }
 
   // ==================== Pinterest Options ====================
@@ -470,6 +486,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Sponsor's account ID (digits) for Pinterest's paid partnership (closed beta). */
+    pinterestSponsorId?: string | number;
   }
 
   export interface PinterestPhotoOptions {
@@ -483,6 +501,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Sponsor's account ID (digits) for Pinterest's paid partnership (closed beta). */
+    pinterestSponsorId?: string | number;
     /** Per-slide titles on a 2–5 photo carousel */
     pinterestCarouselTitles?: string | string[];
     /** Per-slide descriptions on a 2–5 photo carousel */

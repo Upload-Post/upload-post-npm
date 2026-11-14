@@ -243,3 +243,63 @@ describe('fields agents reported as dropped (2.17.0)', () => {
     assert.equal(formFields(text).facebook_media_type, undefined);
   });
 });
+
+describe('Paid partnership / branded content (commercial disclosure)', () => {
+  test('paidPartnership goes out as the cross-platform paid_partnership field', () => {
+    const form = new FormData();
+    client()._addCommonParams(form, { user: 'u', platforms: ['tiktok', 'youtube', 'x'], paidPartnership: true });
+    assert.equal(formFields(form).paid_partnership, 'true');
+  });
+
+  test('paid_partnership (snake_case) is accepted and false is sent, not dropped', () => {
+    const form = new FormData();
+    client()._addCommonParams(form, { user: 'u', platforms: ['tiktok'], paid_partnership: false });
+    assert.equal(formFields(form).paid_partnership, 'false');
+  });
+
+  test('without the option no paid_partnership field is sent', () => {
+    const form = new FormData();
+    client()._addCommonParams(form, { user: 'u', platforms: ['tiktok'] });
+    assert.equal('paid_partnership' in formFields(form), false);
+  });
+
+  test('facebookSponsorId is sent on video, photo and text posts', () => {
+    for (const [isVideo, isText] of [[true, false], [false, false], [false, true]]) {
+      const form = new FormData();
+      client()._addFacebookParams(form, { facebookPageId: '1', facebookSponsorId: '1234567890' }, isVideo, isText);
+      assert.equal(formFields(form).facebook_sponsor_id, '1234567890');
+    }
+  });
+
+  test('a numeric facebookSponsorId and the snake_case name both work', () => {
+    const a = new FormData();
+    client()._addFacebookParams(a, { facebookSponsorId: 42 }, false, false);
+    assert.equal(formFields(a).facebook_sponsor_id, '42');
+    const b = new FormData();
+    client()._addFacebookParams(b, { facebook_sponsor_id: '77' }, false, false);
+    assert.equal(formFields(b).facebook_sponsor_id, '77');
+  });
+
+  test('no facebook_sponsor_id without the option', () => {
+    const form = new FormData();
+    client()._addFacebookParams(form, { facebookPageId: '1' }, true, false);
+    assert.equal('facebook_sponsor_id' in formFields(form), false);
+  });
+
+  test('pinterestSponsorId is sent on pins', () => {
+    for (const isVideo of [true, false]) {
+      const form = new FormData();
+      client()._addPinterestParams(form, { pinterestBoardId: 'b', pinterestSponsorId: '555' }, isVideo);
+      assert.equal(formFields(form).pinterest_sponsor_id, '555');
+    }
+  });
+
+  test('the alias and the platform field go out side by side; the API lets the platform field win', () => {
+    const form = new FormData();
+    client()._addCommonParams(form, { user: 'u', platforms: ['x'], paidPartnership: true, title: 't' });
+    client()._addXParams(form, { xPaidPartnership: false }, true);
+    const fields = formFields(form);
+    assert.equal(fields.paid_partnership, 'true');
+    assert.equal(fields.x_paid_partnership, 'false');
+  });
+});
