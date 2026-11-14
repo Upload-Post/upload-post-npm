@@ -72,6 +72,14 @@ declare module 'upload-post' {
     maxPostsPerSlot?: number;
     /** Process upload asynchronously (default: true) */
     asyncUpload?: boolean;
+    /**
+     * Mark the post as paid or sponsored. TikTok (brandContentToggle), YouTube (youtubeHasPaidProductPlacement) and X
+     * (xPaidPartnership) map it to their native label; a network-specific option sent too wins. Facebook needs
+     * facebookSponsorId, Pinterest pinterestSponsorId. Instagram and the other networks cannot set a label through
+     * Upload-Post: the response carries a `warnings` entry. TikTok direct posts only, and not with SELF_ONLY privacy
+     * (400 `commercial_disclosure_privacy_conflict`).
+     */
+    paidPartnership?: boolean;
     /** If true, AI generates native per-platform title/description from the media and fills any field left empty */
     /** Generate only the title with AI */
     /** Generate only the description with AI */
@@ -393,6 +401,8 @@ declare module 'upload-post' {
   export interface FacebookVideoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Numeric Page ID of the sponsor: tags the post as branded content (Page photos, Page videos with facebookMediaType VIDEO, and text posts; not Reels or Stories). The Page needs access to Meta's branded content tool. */
+    facebookSponsorId?: string;
     /** Video state */
     facebookVideoState?: FacebookVideoState;
     /** Media type */
@@ -420,6 +430,8 @@ declare module 'upload-post' {
   export interface FacebookPhotoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Numeric Page ID of the sponsor: tags the post as branded content (Page photos, Page videos with facebookMediaType VIDEO, and text posts; not Reels or Stories). The Page needs access to Meta's branded content tool. */
+    facebookSponsorId?: string;
     /** Alt text per photo */
     facebookAltText?: string | string[];
     /** POSTS (default) publishes to the feed, STORIES as a Page story */
@@ -435,6 +447,8 @@ declare module 'upload-post' {
   export interface FacebookTextOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Numeric Page ID of the sponsor: tags the post as branded content (Page photos, Page videos with facebookMediaType VIDEO, and text posts; not Reels or Stories). The Page needs access to Meta's branded content tool. */
+    facebookSponsorId?: string;
     /** URL to attach as link preview */
     facebookLinkUrl?: string;
     /** Facebook Place ID */
@@ -456,6 +470,8 @@ declare module 'upload-post' {
   export interface PinterestVideoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Numeric account ID of the sponsor (paid partnership). Pinterest only enables it for accounts in its closed beta. */
+    pinterestSponsorId?: string;
     /** Destination link */
     pinterestLink?: string;
     /** Cover image URL */
@@ -475,6 +491,8 @@ declare module 'upload-post' {
   export interface PinterestPhotoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Numeric account ID of the sponsor (paid partnership). Pinterest only enables it for accounts in its closed beta. */
+    pinterestSponsorId?: string;
     /** Alt text */
     pinterestAltText?: string;
     /** Destination link */
@@ -512,7 +530,7 @@ declare module 'upload-post' {
     xDirectMessageDeepLink?: string;
     /** Post long text as single post */
     xLongTextAsPost?: boolean;
-    /** Paid partnership label on the first post */
+    /** Paid partnership label on the first post (alias: paidPartnership) */
     xPaidPartnership?: boolean;
     /** ID of the tweet to reply to (alias of the generic replyToId). */
     xReplyToId?: string;
