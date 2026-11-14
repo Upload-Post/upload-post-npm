@@ -72,6 +72,8 @@ declare module 'upload-post' {
     maxPostsPerSlot?: number;
     /** Process upload asynchronously (default: true) */
     asyncUpload?: boolean;
+    /** Mark the post as paid/sponsored on the networks with a native label (TikTok branded content, YouTube paid promotion, X paid partnership). Ignored where the network-specific field is sent; other networks return a warning. */
+    paidPartnership?: boolean;
     /** If true, AI generates native per-platform title/description from the media and fills any field left empty */
     /** Generate only the title with AI */
     /** Generate only the description with AI */
@@ -326,7 +328,7 @@ declare module 'upload-post' {
     youtubeAllowedCountries?: string;
     /** Comma-separated blocked country codes */
     youtubeBlockedCountries?: string;
-    /** Paid product placement flag */
+    /** Paid product placement flag. YouTube's API reference does not list it among the settable properties, so YouTube may ignore it: check `results.youtube.warnings`. */
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
@@ -393,6 +395,8 @@ declare module 'upload-post' {
   export interface FacebookVideoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Sponsor's Facebook Page ID for the branded content tag. Pass it as a string. Page videos, photos and text/link posts only (Reels and Stories have no sponsor field). */
+    facebookSponsorId?: string;
     /** Video state */
     facebookVideoState?: FacebookVideoState;
     /** Media type */
@@ -420,6 +424,8 @@ declare module 'upload-post' {
   export interface FacebookPhotoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Sponsor's Facebook Page ID for the branded content tag. Pass it as a string. Page videos, photos and text/link posts only (Reels and Stories have no sponsor field). */
+    facebookSponsorId?: string;
     /** Alt text per photo */
     facebookAltText?: string | string[];
     /** POSTS (default) publishes to the feed, STORIES as a Page story */
@@ -435,6 +441,8 @@ declare module 'upload-post' {
   export interface FacebookTextOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Sponsor's Facebook Page ID for the branded content tag. Pass it as a string. Page videos, photos and text/link posts only (Reels and Stories have no sponsor field). */
+    facebookSponsorId?: string;
     /** URL to attach as link preview */
     facebookLinkUrl?: string;
     /** Facebook Place ID */
@@ -456,6 +464,8 @@ declare module 'upload-post' {
   export interface PinterestVideoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Sponsor's Pinterest account ID for a paid partnership Pin (Pinterest closed beta). */
+    pinterestSponsorId?: string;
     /** Destination link */
     pinterestLink?: string;
     /** Cover image URL */
@@ -475,6 +485,8 @@ declare module 'upload-post' {
   export interface PinterestPhotoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Sponsor's Pinterest account ID for a paid partnership Pin (Pinterest closed beta). */
+    pinterestSponsorId?: string;
     /** Alt text */
     pinterestAltText?: string;
     /** Destination link */
