@@ -58,6 +58,15 @@ declare module 'upload-post' {
     user: string;
     /** First comment to post after publishing */
     firstComment?: string;
+    /**
+     * Mark the post as paid or sponsored with each network's native label: TikTok branded content
+     * (`brandContentToggle`), YouTube paid promotion (`youtubeHasPaidProductPlacement`) and X
+     * (`xPaidPartnership`). A network-specific option you also send wins. Facebook and Pinterest need
+     * the sponsor too (`facebookSponsorId`, `pinterestSponsorId`); Instagram, LinkedIn, Threads and the
+     * rest have no API label, so the response carries a `warnings` entry and the upload goes on.
+     * TikTok with `tiktokPrivacyLevel: 'SELF_ONLY'` is refused with `commercial_disclosure_privacy_conflict`.
+     */
+    paidPartnership?: boolean;
     /** Reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). */
     replyToId?: string;
     /** Alt text for accessibility */
@@ -326,7 +335,11 @@ declare module 'upload-post' {
     youtubeAllowedCountries?: string;
     /** Comma-separated blocked country codes */
     youtubeBlockedCountries?: string;
-    /** Paid product placement flag */
+    /**
+     * Paid product placement flag (the "Paid promotion" box in YouTube Studio). YouTube does not document
+     * this property as writable and can ignore it: when its reply shows the flag off, the result carries a
+     * `warnings` entry. Alias: `paidPartnership`.
+     */
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
@@ -393,6 +406,8 @@ declare module 'upload-post' {
   export interface FacebookVideoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Branded content: the sponsor's Page ID (digits only). Needs Meta's branded content tool on the Page. Page videos (`facebookMediaType: 'VIDEO'`) only: Reels and Stories have no sponsor field. */
+    facebookSponsorId?: string;
     /** Video state */
     facebookVideoState?: FacebookVideoState;
     /** Media type */
@@ -420,6 +435,8 @@ declare module 'upload-post' {
   export interface FacebookPhotoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Branded content: the sponsor's Page ID (digits only). Needs Meta's branded content tool on the Page. Photo posts only: Stories have no sponsor field. */
+    facebookSponsorId?: string;
     /** Alt text per photo */
     facebookAltText?: string | string[];
     /** POSTS (default) publishes to the feed, STORIES as a Page story */
@@ -435,6 +452,8 @@ declare module 'upload-post' {
   export interface FacebookTextOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Branded content: the sponsor's Page ID (digits only). Needs Meta's branded content tool on the Page. */
+    facebookSponsorId?: string;
     /** URL to attach as link preview */
     facebookLinkUrl?: string;
     /** Facebook Place ID */
@@ -456,6 +475,8 @@ declare module 'upload-post' {
   export interface PinterestVideoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Paid partnership: the sponsor's account ID (digits only). Pinterest only opens this to accounts in its closed beta. */
+    pinterestSponsorId?: string;
     /** Destination link */
     pinterestLink?: string;
     /** Cover image URL */
@@ -475,6 +496,8 @@ declare module 'upload-post' {
   export interface PinterestPhotoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Paid partnership: the sponsor's account ID (digits only). Pinterest only opens this to accounts in its closed beta. */
+    pinterestSponsorId?: string;
     /** Alt text */
     pinterestAltText?: string;
     /** Destination link */
