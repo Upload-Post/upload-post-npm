@@ -179,6 +179,12 @@ export class UploadPost {
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
     if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
+    // Cross-network paid partnership / branded content. The API maps it to the
+    // native label of each network that has one (TikTok, YouTube, X; Facebook and
+    // Pinterest also need their sponsor id) and answers with a `warnings` entry for
+    // the rest. A network-specific field (brandContentToggle,
+    // youtubeHasPaidProductPlacement, xPaidPartnership) always wins over it.
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
     // AI auto-generation of native per-platform copy from the media (fills blank fields)
 
     // Platform-specific title overrides
@@ -437,6 +443,9 @@ export class UploadPost {
     if (options.facebookPageId) form.append('facebook_page_id', options.facebookPageId);
 
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
+    // Branded content tag: the sponsor's Page id. Page photos, videos and text
+    // posts only; the API ignores it (with a warning) for Reels and Stories.
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
     this._appendField(form, 'facebook_feed_targeting', this._pick(options, 'facebookFeedTargeting', 'facebook_feed_targeting'));
 
@@ -477,6 +486,8 @@ export class UploadPost {
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
     this._appendField(form, 'pinterest_ai_disclosures', this._pick(options, 'pinterestAiDisclosures', 'pinterest_ai_disclosures'));
+    // Paid partnership: the sponsor's account id (Pinterest closed beta).
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
 
     if (!isVideo) {
       this._appendRepeated(form, 'pinterest_carousel_titles[]', this._pick(options, 'pinterestCarouselTitles', 'pinterest_carousel_titles'));
@@ -2310,6 +2321,40 @@ export class UploadPost {
       user: options.user,
       post_id: options.postId
     });
+  }
+
+  /**
+   * Edit a published post (POST /api/uploadposts/posts/edit)
+   *
+   * Supported on Facebook, LinkedIn, X, YouTube and Google Business; the
+   * accepted fields depend on the platform (see the Edit post docs). Pass them
+   * in `fields` under the names the API uses (`message`, `text`, `commentary`,
+   * `title`, `description`, `tags`, `privacyStatus`, ...).
+   *
+   * To declare or remove YouTube's "Includes paid promotion" on a video that is
+   * already published, send `hasPaidProductPlacement` (or the cross-network
+   * `paidPartnership`). The result carries
+   * `paidProductPlacementDetails.hasPaidProductPlacement` as YouTube answered:
+   * anything other than `true` means YouTube did not accept it through the API.
+   * Costs 50 YouTube quota units.
+   *
+   * @param {Object} options - Edit options
+   * @param {string} options.user - Profile username
+   * @param {string} options.platform - facebook, linkedin, x, youtube, google_business
+   * @param {string} options.postId - Native post ID (YouTube: the video ID)
+   * @param {boolean} [options.hasPaidProductPlacement] - YouTube paid promotion declaration
+   * @param {boolean} [options.paidPartnership] - Cross-network alias of hasPaidProductPlacement (YouTube)
+   * @param {Object} [options.fields] - Other fields to change, with the API's names
+   * @returns {Promise<Object>} Edit result
+   */
+  async editPost(options) {
+    const body = { ...(options.fields || {}) };
+    body.platform = options.platform;
+    body.user = options.user;
+    body.post_id = options.postId;
+    if (options.hasPaidProductPlacement !== undefined) body.hasPaidProductPlacement = options.hasPaidProductPlacement;
+    if (options.paidPartnership !== undefined) body.paid_partnership = options.paidPartnership;
+    return this._request('/uploadposts/posts/edit', 'POST', body);
   }
 
   // ==================== Helper Endpoints ====================

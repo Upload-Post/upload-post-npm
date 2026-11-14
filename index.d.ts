@@ -72,6 +72,17 @@ declare module 'upload-post' {
     maxPostsPerSlot?: number;
     /** Process upload asynchronously (default: true) */
     asyncUpload?: boolean;
+    /**
+     * Mark the post as a paid partnership / branded content on every target
+     * network with a native label: TikTok (`brandContentToggle`), YouTube
+     * (`youtubeHasPaidProductPlacement`) and X (`xPaidPartnership`). Facebook and
+     * Pinterest also need `facebookSponsorId` / `pinterestSponsorId`. Networks
+     * without a native field (Instagram, LinkedIn, Threads...) still publish and the
+     * response carries a `warnings` entry. A network-specific option always wins.
+     * TikTok: direct posts only; `privacy_level` SELF_ONLY is a 400
+     * `commercial_disclosure_privacy_conflict`.
+     */
+    paidPartnership?: boolean;
     /** If true, AI generates native per-platform title/description from the media and fills any field left empty */
     /** Generate only the title with AI */
     /** Generate only the description with AI */
@@ -149,9 +160,12 @@ declare module 'upload-post' {
     postMode?: TikTokPostMode;
     /** Alias of {@link TikTokVideoOptions.tiktokPostMode}. */
     post_mode?: TikTokPostMode;
-    /** Branded content toggle */
+    /**
+     * Paid partnership with a third-party brand (TikTok's "Paid partnership" label).
+     * Direct Post only; not with `SELF_ONLY`. Overrides `paidPartnership`.
+     */
     brandContentToggle?: boolean;
-    /** Brand organic toggle */
+    /** Promoting your own business (TikTok's "Promotional content" label) */
     brandOrganicToggle?: boolean;
     /** Only show the video in ads */
     tiktokIsAdsOnly?: boolean;
@@ -413,6 +427,11 @@ declare module 'upload-post' {
     facebookNoStory?: boolean;
     /** Secret/unpublished video */
     facebookSecret?: boolean;
+    /**
+     * Sponsor's numeric Page id (branded content tag). Page videos only
+     * (`facebookMediaType: 'VIDEO'`): Reels and Stories cannot carry it.
+     */
+    facebookSponsorId?: string;
     /** Page IDs to invite as Reel collaborators (max 10 / 24h) */
     facebookCollaborators?: string | string[];
   }
@@ -424,6 +443,8 @@ declare module 'upload-post' {
     facebookAltText?: string | string[];
     /** POSTS (default) publishes to the feed, STORIES as a Page story */
     facebookMediaType?: FacebookPhotoMediaType;
+    /** Sponsor's numeric Page id (branded content tag). Not available for Stories. */
+    facebookSponsorId?: string;
     /** Facebook Place ID */
     facebookPlaceId?: string;
     /** Geographic/age/language targeting */
@@ -437,6 +458,8 @@ declare module 'upload-post' {
     facebookPageId?: string;
     /** URL to attach as link preview */
     facebookLinkUrl?: string;
+    /** Sponsor's numeric Page id (branded content tag) */
+    facebookSponsorId?: string;
     /** Facebook Place ID */
     facebookPlaceId?: string;
     /** Geographic/age/language targeting */
@@ -470,6 +493,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Sponsor's numeric account id (paid partnership). Pinterest closed beta. */
+    pinterestSponsorId?: string;
   }
 
   export interface PinterestPhotoOptions {
@@ -483,6 +508,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Sponsor's numeric account id (paid partnership). Pinterest closed beta. */
+    pinterestSponsorId?: string;
     /** Per-slide titles on a 2–5 photo carousel */
     pinterestCarouselTitles?: string | string[];
     /** Per-slide descriptions on a 2–5 photo carousel */
@@ -2177,6 +2204,38 @@ declare module 'upload-post' {
       success: boolean;
       message?: string;
       error?: string;
+    }>;
+
+    /**
+     * Edit a published post. Facebook, LinkedIn, X, YouTube and Google Business;
+     * the accepted fields depend on the platform.
+     *
+     * For YouTube, `hasPaidProductPlacement` declares or removes "Includes paid
+     * promotion" (50 quota units). The result carries what YouTube answered in
+     * `paidProductPlacementDetails.hasPaidProductPlacement`; anything other than
+     * `true` means YouTube did not accept it through the API.
+     */
+    editPost(options: {
+      user: string;
+      platform: 'facebook' | 'linkedin' | 'x' | 'youtube' | 'google_business' | string;
+      /** Native post ID (YouTube: the video ID) */
+      postId: string;
+      /** YouTube: declare (`true`) or remove (`false`) the paid promotion disclosure */
+      hasPaidProductPlacement?: boolean;
+      /** Cross-network alias of `hasPaidProductPlacement` (YouTube) */
+      paidPartnership?: boolean;
+      /** Other fields to change, with the names the API uses (`title`, `message`, `tags`...) */
+      fields?: Record<string, unknown>;
+    }): Promise<{
+      success: boolean;
+      platform?: string;
+      post_id?: string;
+      updated_fields?: string[];
+      paidProductPlacementDetails?: { hasPaidProductPlacement: boolean | null };
+      warnings?: string[];
+      message?: string;
+      error?: string;
+      error_code?: string;
     }>;
 
     // Helper Endpoints
