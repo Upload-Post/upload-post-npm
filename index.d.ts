@@ -72,6 +72,13 @@ declare module 'upload-post' {
     maxPostsPerSlot?: number;
     /** Process upload asynchronously (default: true) */
     asyncUpload?: boolean;
+    /**
+     * Mark the post as paid / sponsored on every network that has a native label: TikTok (brand content
+     * toggle, direct posts only, not with SELF_ONLY), YouTube (paid promotion) and X. Used only where the
+     * network-specific field (brandContentToggle, youtubeHasPaidProductPlacement, xPaidPartnership) was not
+     * sent; other networks get a `warnings` entry. Sent as paid_partnership; not sent unless set.
+     */
+    paidPartnership?: boolean;
     /** If true, AI generates native per-platform title/description from the media and fills any field left empty */
     /** Generate only the title with AI */
     /** Generate only the description with AI */
@@ -405,6 +412,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Facebook Page id (digits) of the sponsor, for a branded Page video. Applies with facebookMediaType 'VIDEO' only (Reels and Stories get a `warnings` entry). The Page needs access to Meta's branded content tool */
+    facebookSponsorId?: string;
     /** AI-generated disclosure on Reels */
     facebookIsAiGenerated?: boolean;
     /** Unpublished type for page video: DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED. Do not send SCHEDULED — use scheduledDate. */
@@ -430,6 +439,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Facebook Page id (digits) of the sponsor, for a branded Page photo. Not applied to photo Stories (`warnings` entry). The Page needs access to Meta's branded content tool */
+    facebookSponsorId?: string;
   }
 
   export interface FacebookTextOptions {
@@ -443,6 +454,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Facebook Page id (digits) of the sponsor, for a branded feed post. The Page needs access to Meta's branded content tool */
+    facebookSponsorId?: string;
     /** Link-post CTA, e.g. { type: 'LEARN_MORE', link: 'https://…' } */
     facebookCallToAction?: Record<string, unknown> | string;
     /** Link carousel (2–5 objects with `link`) */
@@ -470,6 +483,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Pinterest account id (digits) of the sponsor, sent as sponsor_id on the Pin. Pinterest keeps this to a closed beta */
+    pinterestSponsorId?: string;
   }
 
   export interface PinterestPhotoOptions {
@@ -483,6 +498,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Pinterest account id (digits) of the sponsor, sent as sponsor_id on the Pin. Pinterest keeps this to a closed beta */
+    pinterestSponsorId?: string;
     /** Per-slide titles on a 2–5 photo carousel */
     pinterestCarouselTitles?: string | string[];
     /** Per-slide descriptions on a 2–5 photo carousel */

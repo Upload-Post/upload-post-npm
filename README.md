@@ -846,6 +846,7 @@ gets per-post analytics; after 30 days without a post, use
 - `tiktokPostMode` / `postMode` - DIRECT_POST or MEDIA_UPLOAD. `MEDIA_UPLOAD` is the same draft as `tiktokUploadToDraft`
 - `brandContentToggle` - Branded content toggle
 - `brandOrganicToggle` - Brand organic toggle
+- `paidPartnership` - Cross-network paid / sponsored switch (see [Common Options](#common-options)); becomes `brand_content_toggle` when `brandContentToggle` is not set
 - `tiktokIsAdsOnly` - Only show the video in ads
 - `tiktokTtoInviteLink` - TikTok One invite link (requires branded content)
 
@@ -902,7 +903,7 @@ for those options.
 - `youtubeDefaultLanguage` - Title/description language (BCP-47)
 - `youtubeDefaultAudioLanguage` - Audio language (BCP-47)
 - `youtubeAllowedCountries` / `youtubeBlockedCountries` - Country restrictions
-- `youtubeHasPaidProductPlacement` - Paid placement flag
+- `youtubeHasPaidProductPlacement` - Paid placement flag (the generic `paidPartnership` sets it when this is not sent)
 - `youtubeRecordingDate` - Recording date (ISO 8601)
 - `youtubeNotifySubscribers` - Notify subscribers (default true)
 - `youtubePublishAt` - RFC3339 time; video stays private until then
@@ -927,6 +928,7 @@ for those options.
 - `facebookAltText` - Alt text per photo
 - `facebookMediaType` on photos - POSTS (feed, default) or STORIES (Page photo story)
 - `facebookPlaceId` - Place ID
+- `facebookSponsorId` - Sponsor's Facebook Page id (digits), sent as `sponsor_id` on Page photos, Page videos (`facebookMediaType: 'VIDEO'`) and feed posts. Not applied to Reels or Stories (the response carries a `warnings` entry). The Page needs access to Meta's branded content tool
 - `facebookTargeting` / `facebookFeedTargeting` - Audience JSON
 - `facebookCallToAction` / `facebookChildAttachments` / `facebookMultiShareEndCard` - Link posts
 - `facebookIsAiGenerated` - AI disclosure on Reels
@@ -942,6 +944,7 @@ for those options.
 - `pinterestCoverImageKeyFrameTime` - Key frame time in seconds (values larger than the video duration are treated as milliseconds)
 - `pinterestBoardSectionId` - Board section ID
 - `pinterestAiDisclosures` - `AI_MODIFIED` and/or `SYNTHETIC_PERFORMER`
+- `pinterestSponsorId` - Sponsor's Pinterest account id (digits), sent as `sponsor_id` on the Pin. Pinterest keeps this to a closed beta
 - `pinterestCarouselTitles` / `pinterestCarouselDescriptions` / `pinterestCarouselLinks` / `pinterestCarouselIndex` - 2–5 photo carousel
 
 ### X (Twitter)
@@ -960,7 +963,7 @@ for those options.
 - `xThreadImageLayout` - Comma-separated image layout for thread (e.g. "4,4" or "2,3,1")
 - `xAltText` - Alt text (≤1000 chars)
 - `xSubtitles` / `xSubtitlesUrl` / `xSubtitlesLanguage` / `xSubtitlesName` - Video captions
-- `xPaidPartnership` - Paid partnership label
+- `xPaidPartnership` - Paid partnership label (the generic `paidPartnership` sets it when this is not sent)
 - `madeWithAi` - Disclose AI-generated media on X (`made_with_ai`; alias `isAiGenerated`)
 - `thumbnailUrl` - Custom video cover (generic field; applied by X as the post's preview image)
 - `xArticleTitle` / `xArticleBody` / `xArticleContentState` / `xArticleDraft` / `xArticleCoverMedia` - X Articles (Premium). Articles have two heading levels: `###` and `header-three` become `header-two`
@@ -1061,6 +1064,7 @@ These options work across all upload methods:
 | `maxPostsPerSlot` | Max posts per queue slot (overrides profile setting) |
 | `asyncUpload` | Process asynchronously (default: true) |
 | `idempotencyKey` | Collapses duplicate uploads within 24h. Reuse the same value when retrying. Alias: `requestId` |
+| `paidPartnership` | Cross-network "this post is paid / sponsored" switch (alias `paid_partnership`). Mapped to TikTok `brandContentToggle` (direct posts only, not with `SELF_ONLY`), YouTube `youtubeHasPaidProductPlacement` and X `xPaidPartnership`, only where that network-specific option was not sent (it always wins, even `false`). Other networks get a `warnings` entry. Not sent unless set |
 
 ## Google Business Profile
 

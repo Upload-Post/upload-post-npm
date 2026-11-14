@@ -243,3 +243,93 @@ describe('fields agents reported as dropped (2.17.0)', () => {
     assert.equal(formFields(text).facebook_media_type, undefined);
   });
 });
+
+describe('commercial disclosure fields (2.20.0)', () => {
+  function countField(form, name) {
+    const body = form.getBuffer().toString('utf8');
+    return body.split(`name="${name}"`).length - 1;
+  }
+  function captured() {
+    const c = client();
+    c._request = async (_path, _method, form) => form;
+    return c;
+  }
+  const video = (options) => captured().upload('https://cdn.example.com/v.mp4', { user: 'p', title: 't', ...options });
+  const photos = (options) => captured().uploadPhotos(['https://cdn.example.com/a.jpg'], { user: 'p', title: 't', ...options });
+  const text = (options) => captured().uploadText({ user: 'p', title: 't', ...options });
+
+  test('paidPartnership goes as paid_partnership, once, on video, photos and text', async () => {
+    for (const send of [video, photos, text]) {
+      const form = await send({ platforms: ['x', 'youtube', 'tiktok'], paidPartnership: true });
+      assert.equal(formFields(form).paid_partnership, 'true');
+      assert.equal(countField(form, 'paid_partnership'), 1);
+    }
+  });
+
+  test('paidPartnership false is sent as "false" (the API gives the network-specific field priority)', async () => {
+    const form = await video({ platforms: ['tiktok'], paidPartnership: false });
+    assert.equal(formFields(form).paid_partnership, 'false');
+  });
+
+  test('snake_case paid_partnership is accepted', async () => {
+    const form = await video({ platforms: ['youtube'], paid_partnership: true });
+    assert.equal(formFields(form).paid_partnership, 'true');
+    assert.equal(countField(form, 'paid_partnership'), 1);
+  });
+
+  test('paid_partnership is not sent when unset, and does not replace the network-specific fields', async () => {
+    for (const send of [video, photos, text]) {
+      const form = await send({ platforms: ['x', 'youtube', 'tiktok'] });
+      assert.equal(countField(form, 'paid_partnership'), 0);
+    }
+    const both = await video({
+      platforms: ['x', 'youtube', 'tiktok'],
+      paidPartnership: true,
+      xPaidPartnership: false,
+      youtubeHasPaidProductPlacement: false,
+      brandContentToggle: false,
+    });
+    const fields = formFields(both);
+    assert.equal(fields.paid_partnership, 'true');
+    assert.equal(fields.x_paid_partnership, 'false');
+    assert.equal(fields.hasPaidProductPlacement, 'false');
+    assert.equal(fields.brand_content_toggle, 'false');
+  });
+
+  test('facebookSponsorId goes as facebook_sponsor_id on video, photos and text', async () => {
+    for (const send of [video, photos, text]) {
+      const form = await send({ platforms: ['facebook'], facebookSponsorId: '1234567890' });
+      assert.equal(formFields(form).facebook_sponsor_id, '1234567890');
+      assert.equal(countField(form, 'facebook_sponsor_id'), 1);
+    }
+    const snake = new FormData();
+    client()._addFacebookParams(snake, { facebook_sponsor_id: '42' }, false, false);
+    assert.equal(formFields(snake).facebook_sponsor_id, '42');
+  });
+
+  test('pinterestSponsorId goes as pinterest_sponsor_id on video and photos', async () => {
+    for (const send of [video, photos]) {
+      const form = await send({ platforms: ['pinterest'], pinterestSponsorId: '987654321' });
+      assert.equal(formFields(form).pinterest_sponsor_id, '987654321');
+      assert.equal(countField(form, 'pinterest_sponsor_id'), 1);
+    }
+    const snake = new FormData();
+    client()._addPinterestParams(snake, { pinterest_sponsor_id: '42' }, false);
+    assert.equal(formFields(snake).pinterest_sponsor_id, '42');
+  });
+
+  test('sponsor ids are not sent when unset or empty, nor for other platforms', async () => {
+    const unset = await video({ platforms: ['facebook', 'pinterest'] });
+    assert.equal(countField(unset, 'facebook_sponsor_id'), 0);
+    assert.equal(countField(unset, 'pinterest_sponsor_id'), 0);
+
+    const empty = await video({ platforms: ['facebook', 'pinterest'], facebookSponsorId: '', pinterestSponsorId: '' });
+    assert.equal(countField(empty, 'facebook_sponsor_id'), 0);
+    assert.equal(countField(empty, 'pinterest_sponsor_id'), 0);
+
+    // Each id belongs to its own platform's params.
+    const other = await video({ platforms: ['x'], facebookSponsorId: '1', pinterestSponsorId: '2' });
+    assert.equal(countField(other, 'facebook_sponsor_id'), 0);
+    assert.equal(countField(other, 'pinterest_sponsor_id'), 0);
+  });
+});
