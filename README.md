@@ -834,6 +834,44 @@ gets per-post analytics; after 30 days without a post, use
 | `tiktokIsAdsOnly` | boolean | Only show the video in ads |
 | `tiktokTtoInviteLink` | string | TikTok One invite link (requires branded content) |
 
+## Paid partnerships and branded content
+
+`paidPartnership: true` marks a post as a paid partnership on every target network that has a native field for it. A network-specific option you also send wins.
+
+```javascript
+await client.upload('clip.mp4', {
+  user: 'my-profile',
+  title: 'Launch day',
+  platforms: ['tiktok', 'youtube', 'x'],
+  paidPartnership: true,
+});
+```
+
+| Network | What is sent |
+|---------|--------------|
+| TikTok | `brand_content_toggle` (direct posts only; not with `privacy_level: 'SELF_ONLY'`, which is a 400 `commercial_disclosure_privacy_conflict`; drafts take no label) |
+| YouTube | `hasPaidProductPlacement`. YouTube does not document it as writable and may leave it off: the response has a `warnings` entry when it did |
+| X | `x_paid_partnership` on the first post |
+| Facebook | needs the sponsor's Page id: `facebookSponsorId` (Page photos, videos with `facebookMediaType: 'VIDEO'`, text posts; not Reels or Stories) |
+| Pinterest | needs `pinterestSponsorId` (closed beta) |
+| Instagram, LinkedIn, Threads, Reddit, Bluesky, Google Business | no native label through the API: the upload goes on with a `warnings` entry. Instagram's "Paid partnership" label has to be turned on in the Instagram app |
+
+A `paidPartnership` that is not a boolean, or a sponsor id that is not numeric, is refused with 400 `commercial_disclosure_invalid_value` before anything is published.
+
+Set or check the YouTube declaration after publishing (50 YouTube quota units). The response returns the value YouTube stored:
+
+```javascript
+const result = await client.editPost({
+  user: 'my-profile',
+  platform: 'youtube',
+  postId: 'VIDEO_ID',
+  hasPaidProductPlacement: true,
+});
+result.paidProductPlacementDetails.hasPaidProductPlacement; // true = kept
+```
+
+TikTok's Music Usage Confirmation is a consent line that publishing apps show to the user, not an API field: there is nothing to send. See the [Paid Partnerships guide](https://docs.upload-post.com/guides/paid-partnerships).
+
 ## Platform-Specific Options
 
 ### TikTok (Video)
@@ -902,7 +940,7 @@ for those options.
 - `youtubeDefaultLanguage` - Title/description language (BCP-47)
 - `youtubeDefaultAudioLanguage` - Audio language (BCP-47)
 - `youtubeAllowedCountries` / `youtubeBlockedCountries` - Country restrictions
-- `youtubeHasPaidProductPlacement` - Paid placement flag
+- `youtubeHasPaidProductPlacement` - Paid placement flag (cross-network alias: `paidPartnership`). YouTube may not keep it; check `warnings`, or set it later with `editPost`
 - `youtubeRecordingDate` - Recording date (ISO 8601)
 - `youtubeNotifySubscribers` - Notify subscribers (default true)
 - `youtubePublishAt` - RFC3339 time; video stays private until then
@@ -933,6 +971,7 @@ for those options.
 - `facebookUnpublishedContentType` - DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED (do not send SCHEDULED; use `scheduledDate`)
 - `facebookNoStory` / `facebookSecret` - Page video flags
 - `facebookCollaborators` - Page IDs to invite on Reels
+- `facebookSponsorId` - Numeric Page id of the sponsor (branded content; Page photos/videos/text, not Reels or Stories)
 
 ### Pinterest
 - `pinterestBoardId` - Board ID
@@ -941,6 +980,7 @@ for those options.
 - `pinterestCoverImageUrl` - Cover image URL (video)
 - `pinterestCoverImageKeyFrameTime` - Key frame time in seconds (values larger than the video duration are treated as milliseconds)
 - `pinterestBoardSectionId` - Board section ID
+- `pinterestSponsorId` - Numeric id of the sponsor's account (paid partnership; closed beta)
 - `pinterestAiDisclosures` - `AI_MODIFIED` and/or `SYNTHETIC_PERFORMER`
 - `pinterestCarouselTitles` / `pinterestCarouselDescriptions` / `pinterestCarouselLinks` / `pinterestCarouselIndex` - 2–5 photo carousel
 
@@ -1052,6 +1092,7 @@ These options work across all upload methods:
 | `user` | Profile name (required) |
 | `platforms` | Target platforms array (required) |
 | `firstComment` | First comment to post |
+| `paidPartnership` | Paid partnership / sponsored content on TikTok, YouTube and X (see above) |
 | `tiktokFirstComment` | First comment for TikTok only (needs the `comments` capability) |
 | `replyToId` | Publish as a reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). Alias: `xReplyToId` |
 | `altText` | Alt text for accessibility |

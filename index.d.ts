@@ -58,6 +58,14 @@ declare module 'upload-post' {
     user: string;
     /** First comment to post after publishing */
     firstComment?: string;
+    /**
+     * Mark the post as a paid partnership. Mapped to each network's native field: TikTok
+     * `brand_content_toggle`, YouTube `hasPaidProductPlacement`, X `x_paid_partnership` (a
+     * network-specific option you also send wins). Networks without a native label add a
+     * `warnings` entry and the upload goes on. TikTok: not with `privacy_level` SELF_ONLY
+     * (400 `commercial_disclosure_privacy_conflict`). Facebook and Pinterest need a sponsor id.
+     */
+    paidPartnership?: boolean;
     /** Reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). */
     replyToId?: string;
     /** Alt text for accessibility */
@@ -326,7 +334,11 @@ declare module 'upload-post' {
     youtubeAllowedCountries?: string;
     /** Comma-separated blocked country codes */
     youtubeBlockedCountries?: string;
-    /** Paid product placement flag */
+    /**
+     * Paid product placement flag. YouTube does not document the field as writable and may
+     * leave it off: the response has a `warnings` entry when it did. Set or check it afterwards
+     * with `editPost`.
+     */
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
@@ -393,6 +405,11 @@ declare module 'upload-post' {
   export interface FacebookVideoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Numeric Page id of the sponsor (branded content, sent to Meta as `sponsor_id`). Only for Page videos (`facebookMediaType: 'VIDEO'`); Reels and Stories have no sponsor field.
+     * The Page needs access to Meta's branded content tools.
+     */
+    facebookSponsorId?: string | number;
     /** Video state */
     facebookVideoState?: FacebookVideoState;
     /** Media type */
@@ -420,6 +437,11 @@ declare module 'upload-post' {
   export interface FacebookPhotoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Numeric Page id of the sponsor (branded content, sent to Meta as `sponsor_id`). Photo posts only; ignored for Stories.
+     * The Page needs access to Meta's branded content tools.
+     */
+    facebookSponsorId?: string | number;
     /** Alt text per photo */
     facebookAltText?: string | string[];
     /** POSTS (default) publishes to the feed, STORIES as a Page story */
@@ -435,6 +457,11 @@ declare module 'upload-post' {
   export interface FacebookTextOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Numeric Page id of the sponsor (branded content, sent to Meta as `sponsor_id`).
+     * The Page needs access to Meta's branded content tools.
+     */
+    facebookSponsorId?: string | number;
     /** URL to attach as link preview */
     facebookLinkUrl?: string;
     /** Facebook Place ID */
@@ -456,6 +483,8 @@ declare module 'upload-post' {
   export interface PinterestVideoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Numeric id of the sponsor's Pinterest account (paid partnership; Pinterest closed beta) */
+    pinterestSponsorId?: string | number;
     /** Destination link */
     pinterestLink?: string;
     /** Cover image URL */
@@ -475,6 +504,8 @@ declare module 'upload-post' {
   export interface PinterestPhotoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Numeric id of the sponsor's Pinterest account (paid partnership; Pinterest closed beta) */
+    pinterestSponsorId?: string | number;
     /** Alt text */
     pinterestAltText?: string;
     /** Destination link */
@@ -2162,6 +2193,56 @@ declare module 'upload-post' {
       job_id?: string;
       message?: string;
       error?: string;
+    }>;
+
+    /**
+     * Edit a published post. Fields you omit are left unchanged. Facebook, LinkedIn, X, YouTube
+     * and Google Business only; Instagram, TikTok and Threads have no edit API.
+     *
+     * YouTube can set or clear the paid-promotion declaration (`hasPaidProductPlacement`, alias
+     * `paidPartnership`). The call is a `videos.update` (50 YouTube quota units) and the response
+     * returns the value YouTube stored in `paidProductPlacementDetails.hasPaidProductPlacement`.
+     */
+    editPost(options: {
+      user: string;
+      platform: 'facebook' | 'linkedin' | 'x' | 'youtube' | 'google_business' | (string & {});
+      /** Native post id (YouTube: the video id) */
+      postId: string;
+      /** Facebook caption */
+      message?: string;
+      /** X text */
+      text?: string;
+      /** LinkedIn text */
+      commentary?: string;
+      /** Facebook: pin or unpin */
+      isPinned?: boolean;
+      /** Facebook: Unix seconds */
+      scheduledPublishTime?: string | number;
+      facebookPageId?: string;
+      /** YouTube */
+      title?: string;
+      description?: string;
+      tags?: string | string[];
+      privacyStatus?: 'public' | 'unlisted' | 'private';
+      categoryId?: string;
+      /** RFC 3339 */
+      publishAt?: string;
+      /** YouTube paid promotion declaration */
+      hasPaidProductPlacement?: boolean;
+      /** Same as `hasPaidProductPlacement` on YouTube */
+      youtubeHasPaidProductPlacement?: boolean;
+      /** Cross-network alias of `hasPaidProductPlacement` */
+      paidPartnership?: boolean;
+    }): Promise<{
+      success: boolean;
+      platform?: string;
+      post_id?: string;
+      updated_fields?: string[];
+      /** YouTube: what YouTube stored. `true` = kept; `false` or `null` = not applied. */
+      paidProductPlacementDetails?: { hasPaidProductPlacement: boolean | null };
+      message?: string;
+      error?: string;
+      error_code?: string;
     }>;
 
     /**
