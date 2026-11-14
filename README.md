@@ -844,8 +844,8 @@ gets per-post analytics; after 30 days without a post, use
 - `tiktokCoverTimestamp` - Timestamp in ms for cover
 - `tiktokIsAigc` - AI-generated content flag
 - `tiktokPostMode` / `postMode` - DIRECT_POST or MEDIA_UPLOAD. `MEDIA_UPLOAD` is the same draft as `tiktokUploadToDraft`
-- `brandContentToggle` - Branded content toggle
-- `brandOrganicToggle` - Brand organic toggle
+- `brandContentToggle` - Branded content toggle (sent to TikTok as `is_branded_content`; direct posts only, not with `tiktokPrivacyLevel: 'SELF_ONLY'`)
+- `brandOrganicToggle` - Brand organic toggle (promoting your own business)
 - `tiktokIsAdsOnly` - Only show the video in ads
 - `tiktokTtoInviteLink` - TikTok One invite link (requires branded content)
 
@@ -902,7 +902,7 @@ for those options.
 - `youtubeDefaultLanguage` - Title/description language (BCP-47)
 - `youtubeDefaultAudioLanguage` - Audio language (BCP-47)
 - `youtubeAllowedCountries` / `youtubeBlockedCountries` - Country restrictions
-- `youtubeHasPaidProductPlacement` - Paid placement flag
+- `youtubeHasPaidProductPlacement` - Paid placement flag. YouTube may not keep it: the result carries a `warnings` entry when it visibly did not, see [Commercial disclosure](#commercial-disclosure-paid-partnership--branded-content)
 - `youtubeRecordingDate` - Recording date (ISO 8601)
 - `youtubeNotifySubscribers` - Notify subscribers (default true)
 - `youtubePublishAt` - RFC3339 time; video stays private until then
@@ -932,7 +932,8 @@ for those options.
 - `facebookIsAiGenerated` - AI disclosure on Reels
 - `facebookUnpublishedContentType` - DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED (do not send SCHEDULED; use `scheduledDate`)
 - `facebookNoStory` / `facebookSecret` - Page video flags
-- `facebookCollaborators` - Page IDs to invite on Reels
+- `facebookCollaborators` - Page IDs to invite on Reels (an invitation, not a branded content label)
+- `facebookSponsorId` - Numeric id of the sponsor's Page, for the branded content tag. Page photos, Page videos (`facebookMediaType: 'VIDEO'`) and feed posts; not Reels or Stories
 
 ### Pinterest
 - `pinterestBoardId` - Board ID
@@ -942,6 +943,7 @@ for those options.
 - `pinterestCoverImageKeyFrameTime` - Key frame time in seconds (values larger than the video duration are treated as milliseconds)
 - `pinterestBoardSectionId` - Board section ID
 - `pinterestAiDisclosures` - `AI_MODIFIED` and/or `SYNTHETIC_PERFORMER`
+- `pinterestSponsorId` - Numeric id of the sponsor's Pinterest account (paid partnership, Pinterest closed beta)
 - `pinterestCarouselTitles` / `pinterestCarouselDescriptions` / `pinterestCarouselLinks` / `pinterestCarouselIndex` - 2–5 photo carousel
 
 ### X (Twitter)
@@ -1052,6 +1054,7 @@ These options work across all upload methods:
 | `user` | Profile name (required) |
 | `platforms` | Target platforms array (required) |
 | `firstComment` | First comment to post |
+| `paidPartnership` | Mark the post as paid or sponsored on TikTok, YouTube and X. See [Commercial disclosure](#commercial-disclosure-paid-partnership--branded-content) |
 | `tiktokFirstComment` | First comment for TikTok only (needs the `comments` capability) |
 | `replyToId` | Publish as a reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). Alias: `xReplyToId` |
 | `altText` | Alt text for accessibility |
@@ -1061,6 +1064,36 @@ These options work across all upload methods:
 | `maxPostsPerSlot` | Max posts per queue slot (overrides profile setting) |
 | `asyncUpload` | Process asynchronously (default: true) |
 | `idempotencyKey` | Collapses duplicate uploads within 24h. Reuse the same value when retrying. Alias: `requestId` |
+
+## Commercial disclosure (paid partnership / branded content)
+
+`paidPartnership: true` marks a post as paid or sponsored on every selected network that needs nothing else. Nothing is sent unless you set it.
+
+| Network | What it sends | Option |
+|---------|---------------|--------|
+| TikTok | `brand_content_toggle` (`is_branded_content`). Direct posts only; not with `SELF_ONLY` | `paidPartnership` or `brandContentToggle` |
+| YouTube | `paidProductPlacementDetails.hasPaidProductPlacement` | `paidPartnership` or `youtubeHasPaidProductPlacement` |
+| X | `paid_partnership` on the first post | `paidPartnership` or `xPaidPartnership` |
+| Facebook Page photos, Page videos, feed posts | `sponsor_id` | `facebookSponsorId` (the sponsor's Page id) |
+| Pinterest | `sponsor_id` (closed beta) | `pinterestSponsorId` |
+| Instagram, Facebook Reels and Stories, LinkedIn, Threads, Bluesky, Google Business Profile | **Not supported by the network's API.** The upload goes ahead and the result carries a `warnings` entry | - |
+
+```javascript
+await client.upload('./video.mp4', {
+  user: 'my-profile',
+  title: 'Our new sneakers',
+  platforms: ['tiktok', 'youtube'],
+  paidPartnership: true,
+});
+```
+
+The network's own option always wins, even when it is `false`. `paidPartnership: true` with `brandContentToggle: false` sends `false` to TikTok. A `paidPartnership` that is not a boolean, or a non-numeric sponsor id, is rejected with `error_code: "commercial_disclosure_invalid_value"`; `paidPartnership: true` on a TikTok direct post with `SELF_ONLY` is rejected with `commercial_disclosure_privacy_conflict`.
+
+**YouTube may not keep the value.** YouTube's API reference lists `paidProductPlacementDetails` as a part but not among the properties you can set. When YouTube visibly did not save it, the platform result carries a `warnings` entry. To check it yourself, call YouTube's `videos.list` with `part=paidProductPlacementDetails`. To correct it after publishing, send `hasPaidProductPlacement: true` to the edit-post endpoint (a 50-unit `videos.update`); the response says `not_applied: ["hasPaidProductPlacement"]` when YouTube still does not return `true`.
+
+**TikTok Music Usage Confirmation** is not an API parameter. It is a consent line TikTok asks an app to show before a post is published, so there is nothing to send. Upload-Post does not return the label TikTok applied: check the post in the TikTok app.
+
+Full details: [Commercial disclosure](https://docs.upload-post.com/api/commercial-disclosure).
 
 ## Google Business Profile
 

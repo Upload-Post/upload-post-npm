@@ -58,6 +58,14 @@ declare module 'upload-post' {
     user: string;
     /** First comment to post after publishing */
     firstComment?: string;
+    /**
+     * Mark the post as paid or sponsored on the networks that take it alone: TikTok
+     * (`brandContentToggle`), YouTube (`youtubeHasPaidProductPlacement`) and X
+     * (`xPaidPartnership`). The network's own option always wins. Facebook and Pinterest also
+     * need the sponsor's id (`facebookSponsorId` / `pinterestSponsorId`); Instagram has no
+     * native label. Networks that cannot carry it add a warning to the response.
+     */
+    paidPartnership?: boolean;
     /** Reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). */
     replyToId?: string;
     /** Alt text for accessibility */
@@ -413,8 +421,12 @@ declare module 'upload-post' {
     facebookNoStory?: boolean;
     /** Secret/unpublished video */
     facebookSecret?: boolean;
-    /** Page IDs to invite as Reel collaborators (max 10 / 24h) */
+    /** Page IDs to invite as Reel collaborators (max 10 / 24h). An invitation, not a branded content label. */
     facebookCollaborators?: string | string[];
+    /**
+     * Numeric id of the sponsor's Facebook Page, for the branded content tag. Page videos only (`facebookMediaType: 'VIDEO'`): Reels and Stories have no sponsor field, so it is not sent there and a warning is returned.
+     */
+    facebookSponsorId?: string | number;
   }
 
   export interface FacebookPhotoOptions {
@@ -430,6 +442,10 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /**
+     * Numeric id of the sponsor's Facebook Page, for the branded content tag. Page photos and feed photo albums. Not Stories.
+     */
+    facebookSponsorId?: string | number;
   }
 
   export interface FacebookTextOptions {
@@ -449,6 +465,10 @@ declare module 'upload-post' {
     facebookChildAttachments?: Array<Record<string, unknown>> | string;
     /** Show the multi-share end card (requires child attachments) */
     facebookMultiShareEndCard?: boolean;
+    /**
+     * Numeric id of the sponsor's Facebook Page, for the branded content tag. Sent with the feed post.
+     */
+    facebookSponsorId?: string | number;
   }
 
   // ==================== Pinterest Options ====================
@@ -470,6 +490,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Numeric id of the sponsor's Pinterest account (paid partnership; Pinterest closed beta) */
+    pinterestSponsorId?: string | number;
   }
 
   export interface PinterestPhotoOptions {
@@ -487,6 +509,8 @@ declare module 'upload-post' {
     pinterestCarouselTitles?: string | string[];
     /** Per-slide descriptions on a 2–5 photo carousel */
     pinterestCarouselDescriptions?: string | string[];
+    /** Numeric id of the sponsor's Pinterest account (paid partnership; Pinterest closed beta) */
+    pinterestSponsorId?: string | number;
     /** Per-slide links on a 2–5 photo carousel */
     pinterestCarouselLinks?: string | string[];
     /** 0-based cover index on a carousel */

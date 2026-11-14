@@ -169,6 +169,12 @@ export class UploadPost {
 
     // Optional common parameters
     if (options.firstComment) form.append('first_comment', options.firstComment);
+    // Paid partnership / branded content. One switch the API maps to each network's
+    // native label: TikTok (brand_content_toggle), YouTube (hasPaidProductPlacement)
+    // and X (x_paid_partnership). Facebook and Pinterest also need the sponsor's id
+    // (facebookSponsorId / pinterestSponsorId); Instagram has no native label. The
+    // network's own field always wins. Nothing is sent unless you set it.
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
     // Reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). The
     // API has always accepted `reply_to_id`; the SDK simply never mapped it.
     const replyToId = options.replyToId || options.xReplyToId || options.blueskyReplyToId;
@@ -439,6 +445,9 @@ export class UploadPost {
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
     this._appendField(form, 'facebook_feed_targeting', this._pick(options, 'facebookFeedTargeting', 'facebook_feed_targeting'));
+    // Numeric id of the sponsor's Page for the branded content tag. Page photos, Page
+    // videos (facebookMediaType VIDEO) and feed posts; Reels and Stories have no such field.
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
 
     if (isVideo) {
       if (options.facebookVideoState) form.append('video_state', options.facebookVideoState);
@@ -473,6 +482,8 @@ export class UploadPost {
    */
   _addPinterestParams(form, options, isVideo = false) {
     if (options.pinterestBoardId) form.append('pinterest_board_id', options.pinterestBoardId);
+    // Numeric id of the sponsor's Pinterest account (paid partnership; Pinterest closed beta).
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
     if (options.pinterestAltText) form.append('pinterest_alt_text', options.pinterestAltText);
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
@@ -868,21 +879,26 @@ export class UploadPost {
    * @param {string} [options.youtubeDefaultAudioLanguage] - Audio language (BCP-47)
    * @param {string} [options.youtubeAllowedCountries] - Comma-separated country codes
    * @param {string} [options.youtubeBlockedCountries] - Comma-separated country codes
-   * @param {boolean} [options.youtubeHasPaidProductPlacement] - Paid placement flag
+   * @param {boolean} [options.youtubeHasPaidProductPlacement] - Paid placement flag. YouTube may not keep it: read the result's `warnings`, or check with videos.list part=paidProductPlacementDetails
    * @param {string} [options.youtubeRecordingDate] - Recording date (ISO 8601)
    * 
    * LinkedIn options:
    * @param {string} [options.linkedinVisibility] - PUBLIC, CONNECTIONS, LOGGED_IN, CONTAINER
    * @param {string} [options.targetLinkedinPageId] - Page ID for organization posts
    * 
+   * Commercial disclosure (paid partnership / branded content):
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid or sponsored on the networks that take it alone: TikTok, YouTube and X. The network's own field wins
+   *
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string|number} [options.facebookSponsorId] - Numeric id of the sponsor's Facebook Page (branded content tag)
    * @param {string} [options.facebookVideoState] - PUBLISHED or DRAFT
    * @param {string} [options.facebookMediaType] - REELS, STORIES, or VIDEO
    * @param {string} [options.thumbnailUrl] - Thumbnail URL for normal page videos (VIDEO type only)
    *
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
+   * @param {string|number} [options.pinterestSponsorId] - Numeric id of the sponsor's Pinterest account (paid partnership, Pinterest closed beta)
    * @param {string} [options.pinterestLink] - Destination link
    * @param {string} [options.pinterestCoverImageUrl] - Cover image URL
    * @param {number} [options.pinterestCoverImageKeyFrameTime] - Key frame time in ms
@@ -993,11 +1009,16 @@ export class UploadPost {
    * @param {string} [options.linkedinVisibility] - PUBLIC (only PUBLIC supported for photos)
    * @param {string} [options.targetLinkedinPageId] - Page ID for organization posts
    * 
+   * Commercial disclosure (paid partnership / branded content):
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid or sponsored on the networks that take it alone: TikTok and X. The network's own field wins
+   *
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string|number} [options.facebookSponsorId] - Numeric id of the sponsor's Facebook Page (branded content tag)
    * 
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
+   * @param {string|number} [options.pinterestSponsorId] - Numeric id of the sponsor's Pinterest account (paid partnership, Pinterest closed beta)
    * @param {string} [options.pinterestAltText] - Alt text
    * @param {string} [options.pinterestLink] - Destination link
    * 
@@ -1071,8 +1092,12 @@ export class UploadPost {
    * Bluesky options:
    * @param {string} [options.blueskyLinkUrl] - URL to attach as external embed link preview on Bluesky
    *
+   * Commercial disclosure (paid partnership / branded content):
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid or sponsored on the networks that take it alone: X. The network's own field wins
+   *
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string|number} [options.facebookSponsorId] - Numeric id of the sponsor's Facebook Page (branded content tag)
    * @param {string} [options.facebookLinkUrl] - URL to attach as link preview on Facebook
    * 
    * X (Twitter) options:
