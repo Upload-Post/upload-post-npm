@@ -933,6 +933,7 @@ for those options.
 - `facebookUnpublishedContentType` - DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED (do not send SCHEDULED; use `scheduledDate`)
 - `facebookNoStory` / `facebookSecret` - Page video flags
 - `facebookCollaborators` - Page IDs to invite on Reels
+- `facebookSponsorId` - Sponsor's Facebook Page ID (digits only) for a sponsored post. Applies to Page photos, videos and feed posts, not to Reels or Stories
 
 ### Pinterest
 - `pinterestBoardId` - Board ID
@@ -943,6 +944,7 @@ for those options.
 - `pinterestBoardSectionId` - Board section ID
 - `pinterestAiDisclosures` - `AI_MODIFIED` and/or `SYNTHETIC_PERFORMER`
 - `pinterestCarouselTitles` / `pinterestCarouselDescriptions` / `pinterestCarouselLinks` / `pinterestCarouselIndex` - 2–5 photo carousel
+- `pinterestSponsorId` - Sponsor's Pinterest account ID (digits only). Pinterest closed beta
 
 ### X (Twitter)
 - `xReplySettings` - everyone, following, mentionedUsers, subscribers, verified
@@ -1060,6 +1062,7 @@ These options work across all upload methods:
 | `addToQueue` | Add to posting queue |
 | `maxPostsPerSlot` | Max posts per queue slot (overrides profile setting) |
 | `asyncUpload` | Process asynchronously (default: true) |
+| `paidPartnership` | Mark the post as paid / sponsored on every network that supports it (sent as `paid_partnership`; alias `paid_partnership`). Mapped per network: TikTok `brand_content_toggle` (direct posts only; `SELF_ONLY` privacy is rejected with `commercial_disclosure_privacy_conflict`), YouTube `hasPaidProductPlacement`, X `x_paid_partnership`, each only when the network-specific option (`brandContentToggle`, `youtubeHasPaidProductPlacement`, `xPaidPartnership`) was not sent. Other networks just return a note in `warnings` (Instagram and Facebook Reels have no native label). `false` is sent when you set it explicitly ("not paid"); leave it out to send nothing. Invalid value: 400 `commercial_disclosure_invalid_value` |
 | `idempotencyKey` | Collapses duplicate uploads within 24h. Reuse the same value when retrying. Alias: `requestId` |
 
 ## Google Business Profile
