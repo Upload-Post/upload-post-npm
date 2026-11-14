@@ -868,7 +868,7 @@ export class UploadPost {
    * @param {string} [options.youtubeDefaultAudioLanguage] - Audio language (BCP-47)
    * @param {string} [options.youtubeAllowedCountries] - Comma-separated country codes
    * @param {string} [options.youtubeBlockedCountries] - Comma-separated country codes
-   * @param {boolean} [options.youtubeHasPaidProductPlacement] - Paid placement flag
+   * @param {boolean} [options.youtubeHasPaidProductPlacement] - Paid placement flag ("Paid promotion"). YouTube does not document it as settable, so check `youtube_paid_product_placement.applied` in the YouTube result, not only `success`
    * @param {string} [options.youtubeRecordingDate] - Recording date (ISO 8601)
    * 
    * LinkedIn options:
