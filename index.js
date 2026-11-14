@@ -822,8 +822,8 @@ export class UploadPost {
    * @param {number} [options.tiktokCoverTimestamp] - Timestamp in ms for video cover
    * @param {boolean} [options.tiktokIsAigc] - AI-generated content flag
    * @param {string} [options.tiktokPostMode] - DIRECT_POST or MEDIA_UPLOAD. MEDIA_UPLOAD is the same draft as tiktokUploadToDraft
-   * @param {boolean} [options.brandContentToggle] - Branded content toggle
-   * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
+   * @param {boolean} [options.brandContentToggle] - TikTok branded content: native "Paid partnership" label (sent as is_branded_content). Not readable afterwards; check the post in the TikTok app
+   * @param {boolean} [options.brandOrganicToggle] - TikTok "Promotional content" label for your own business (sent as is_brand_organic)
    * @param {boolean} [options.tiktokIsAdsOnly] - Only show the video in ads
    * @param {string} [options.tiktokTtoInviteLink] - TikTok One invite link (requires branded content)
    *
@@ -868,7 +868,7 @@ export class UploadPost {
    * @param {string} [options.youtubeDefaultAudioLanguage] - Audio language (BCP-47)
    * @param {string} [options.youtubeAllowedCountries] - Comma-separated country codes
    * @param {string} [options.youtubeBlockedCountries] - Comma-separated country codes
-   * @param {boolean} [options.youtubeHasPaidProductPlacement] - Paid placement flag
+   * @param {boolean} [options.youtubeHasPaidProductPlacement] - YouTube "Includes paid promotion". Read back and, if it did not stick, set with one extra videos.update (50 quota units); the result reports youtube_paid_product_placement (applied, not_applied or unverified)
    * @param {string} [options.youtubeRecordingDate] - Recording date (ISO 8601)
    * 
    * LinkedIn options:
@@ -965,8 +965,8 @@ export class UploadPost {
    * @param {boolean} [options.tiktokDisableComment] - Disable comments
    * @param {number} [options.tiktokPhotoCoverIndex] - Index of photo for cover (0-based). Sent as `photo_cover_index`
    * @param {string} [options.tiktokPrivacyLevel] - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY. TikTok requires one on photo posts, so it defaults to PUBLIC_TO_EVERYONE; asking for one the account does not have fails with error_code tiktok_privacy_unavailable listing the allowed ones.
-   * @param {boolean} [options.brandContentToggle] - Branded content toggle
-   * @param {boolean} [options.brandOrganicToggle] - Brand organic toggle
+   * @param {boolean} [options.brandContentToggle] - TikTok branded content: native "Paid partnership" label (sent as is_branded_content). Not readable afterwards; check the post in the TikTok app
+   * @param {boolean} [options.brandOrganicToggle] - TikTok "Promotional content" label for your own business (sent as is_brand_organic)
    *
    * TikTok music, location, AI disclosure and draft on photo posts. TikTok's
    * photo contract takes the track id alone — no volume/trim, no custom cover
