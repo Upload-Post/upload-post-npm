@@ -14,10 +14,17 @@ const API_BASE_URL = 'https://api.upload-post.com/api';
 export class UploadPost {
   /**
    * @param {string} apiKey - Your API key from Upload-Post
+   * @param {Object} [options] - Client options
+   * @param {string} [options.actAsUser] - Team members only: email of the account
+   *   owner to act on. Sent as the `X-Act-As-User` header on every request. If the
+   *   owner's current plan no longer covers your team seat, requests fail with HTTP
+   *   403 and `error.code === 'TEAM_SEAT_SUSPENDED'` until the owner upgrades or
+   *   frees a seat.
    */
-  constructor(apiKey) {
+  constructor(apiKey, options = {}) {
     this.apiKey = apiKey;
     this.baseUrl = API_BASE_URL;
+    this.actAsUser = options.actAsUser || null;
   }
 
   /**
@@ -31,6 +38,7 @@ export class UploadPost {
       headers: {
         'Authorization': `Apikey ${this.apiKey}`,
         'X-Upload-Post-Source': 'npm',
+        ...(this.actAsUser ? { 'X-Act-As-User': this.actAsUser } : {}),
         ...extraHeaders,
       },
       maxContentLength: Infinity,
@@ -53,8 +61,22 @@ export class UploadPost {
       const response = await axios(config);
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || error.response?.data?.detail || error.message;
-      throw new Error(`Upload-Post API error: ${message}`);
+      const data = error.response?.data;
+      const apiError = typeof data?.error === 'string' ? data.error : undefined;
+      const message = data?.message || data?.detail || apiError || error.message;
+      const err = new Error(`Upload-Post API error: ${message}`);
+      // Machine-readable details, so callers can branch on the code instead of
+      // parsing the message (e.g. TEAM_SEAT_SUSPENDED, bluesky_dm_scope_missing,
+      // webhook_subscription_failed, linkedin_comment_not_found).
+      err.status = error.response?.status;
+      // No response at all (DNS, timeout): keep the network code (ECONNABORTED...).
+      err.code = (data && (data.code || data.error_code)) || (error.response ? undefined : error.code);
+      err.errorCode = data?.error_code;
+      err.reason = data?.reason;
+      const retryAfter = error.response?.headers?.['retry-after'];
+      if (retryAfter !== undefined) err.retryAfter = Number(retryAfter);
+      err.response = data;
+      throw err;
     }
   }
 
@@ -1248,6 +1270,19 @@ export class UploadPost {
    * the watch times (`average_time_watched`, `total_time_watched`,
    * `full_video_watched_rate`).
    *
+   * TikTok drafts (`postMode: 'MEDIA_UPLOAD'` / `tiktokUploadToDraft`) have no
+   * post until the creator publishes them from the TikTok app. Call this with
+   * the upload's request_id afterwards: Upload-Post asks TikTok which post came
+   * from the draft, then returns its metrics and fills in `platform_post_id`
+   * and `post_url`. Until then `post_metrics_error` says the draft is not
+   * published yet (that answer is reused for a while, from ~5 minutes on a new
+   * upload to 6 hours on an old one); after 30 days without a post it stops
+   * asking TikTok — use getPostAnalyticsByPlatformId() with the post id. TikTok
+   * only gives the id of a **public**, moderated post, so a draft published as
+   * private never gets per-post analytics. `original_publish_id` (TikTok only)
+   * is the upload's TikTok `publish_id`; `post_url` stays empty when the
+   * account's @username is not known.
+   *
    * @param {string} requestId - The request_id from the upload
    * @returns {Promise<Object>} Post analytics with per-platform metrics
    */
@@ -1580,9 +1615,13 @@ export class UploadPost {
    * Update notification configuration (including webhook settings)
    *
    * @param {Object} options - Notification config options
-   * @param {string[]} [options.webhookEvents] - Webhook event types to subscribe to (upload_completed, social_account_connected, social_account_disconnected, social_account_reauth_required)
-   * @param {string} [options.webhookUrl] - Webhook URL for notifications
-   * @returns {Promise<Object>} Updated notification config
+   * @param {string[]} [options.webhookEvents] - Webhook event types to subscribe to (upload_completed, social_account_connected, social_account_disconnected, social_account_reauth_required, dm_received, comment_received). `dm_received` and `comment_received` are opt-in.
+   * @param {string} [options.webhookUrl] - Webhook URL for notifications. Changing it resets the webhook's failure pause.
+   * @param {Object.<string, boolean>} [options.channels] - Channels to turn on or off, e.g. `{ webhook: true, telegram: false }`
+   * @param {string} [options.telegramChatId] - Telegram chat id for notifications
+   * @param {string} [options.slackWebhookUrl] - Slack incoming webhook URL
+   * @param {string} [options.whatsappToPhone] - WhatsApp number for notifications
+   * @returns {Promise<Object>} `{ success, notifications }`
    */
   async updateNotificationConfig(options = {}) {
     const body = {};
@@ -1604,6 +1643,153 @@ export class UploadPost {
     return this._request('/uploadposts/users/notifications/test', 'POST', {});
   }
 
+  /**
+   * Remove the account webhook (URL and events) and turn the webhook channel
+   * off. Telegram, Slack and WhatsApp are left as they are.
+   *
+   * @returns {Promise<Object>} `{ success, notifications }`
+   */
+  async deleteNotificationWebhook() {
+    return this._request('/uploadposts/users/notifications', 'DELETE');
+  }
+
+  /**
+   * Rotate the secret that signs every webhook delivery (`X-Upload-Post-Signature`).
+   * The old secret stops working at once: update your verifier with the new one.
+   *
+   * @returns {Promise<Object>} `{ success, webhook_secret }`
+   */
+  async rotateWebhookSecret() {
+    return this._request('/uploadposts/users/webhook-secret', 'POST', {});
+  }
+
+  /**
+   * Get the webhook of one profile (sent alongside the account webhook)
+   *
+   * @param {string} profileUsername - Profile username
+   * @returns {Promise<Object>} `{ success, profile_username, webhook_url, webhook_events }`
+   */
+  async getProfileWebhook(profileUsername) {
+    return this._request('/uploadposts/users/profile-webhook', 'GET', { profile_username: profileUsername });
+  }
+
+  /**
+   * Set (or replace) the webhook of one profile. Its deliveries are signed with
+   * the account's webhook secret and paused on their own after repeated failures.
+   *
+   * @param {Object} options
+   * @param {string} options.profileUsername - Profile username
+   * @param {string} options.webhookUrl - Public https URL
+   * @param {Object.<string, boolean>|null} [options.webhookEvents] - Event -> on/off
+   *   (`upload_completed`, `social_account_connected`, `social_account_disconnected`,
+   *   `social_account_reauth_required`, `dm_received`, `comment_received`). `null`
+   *   clears the per-profile selection; omit it to keep the current one.
+   * @returns {Promise<Object>} The profile webhook
+   */
+  async setProfileWebhook(options) {
+    const body = { profile_username: options.profileUsername, webhook_url: options.webhookUrl };
+    if (options.webhookEvents !== undefined) body.webhook_events = options.webhookEvents;
+    return this._request('/uploadposts/users/profile-webhook', 'POST', body);
+  }
+
+  /**
+   * Remove the webhook of one profile
+   *
+   * @param {string} profileUsername - Profile username
+   * @returns {Promise<Object>} `{ success, message, profile_username }`
+   */
+  async deleteProfileWebhook(profileUsername) {
+    return this._request('/uploadposts/users/profile-webhook', 'DELETE', { profile_username: profileUsername });
+  }
+
+  // ==================== Webhook deliveries ====================
+
+  /**
+   * List the webhook deliveries of the account (account and per-profile
+   * webhooks), newest first. Deliveries are kept for 7 days.
+   *
+   * Webhooks are delivered at least once: a timeout, connection error, 5xx, 408
+   * or 429 is retried up to 6 attempts over about 8.5 hours, with the same
+   * `X-Upload-Post-Delivery` id (deduplicate on it). Other 4xx answers are final.
+   *
+   * @param {Object} [options] - Filters
+   * @param {string} [options.event] - e.g. `upload_completed`, `dm_received`
+   * @param {('pending'|'delivered'|'failed'|'cancelled')} [options.status]
+   * @param {string} [options.requestId] - Deliveries of one upload
+   * @param {string} [options.jobId] - Deliveries of one scheduled/async job
+   * @param {string} [options.profileUsername] - Deliveries of that profile's webhook
+   * @param {number} [options.limit] - Page size, 1-100 (default 20)
+   * @param {number} [options.page] - Page number, 1-50 (narrow with filters for older rows)
+   * @param {boolean} [options.includePayload] - Include each delivery's `payload`
+   *   (left out by default; getWebhookDelivery() always includes it)
+   * @returns {Promise<Object>} `{ success, page, limit, total, has_more, retention_days, deliveries }`
+   */
+  async listWebhookDeliveries(options = {}) {
+    const params = {};
+    if (options.event) params.event = options.event;
+    if (options.status) params.status = options.status;
+    if (options.requestId) params.request_id = options.requestId;
+    if (options.jobId) params.job_id = options.jobId;
+    if (options.profileUsername) params.profile_username = options.profileUsername;
+    if (options.limit !== undefined) params.limit = options.limit;
+    if (options.page !== undefined) params.page = options.page;
+    if (options.includePayload !== undefined) params.include_payload = String(Boolean(options.includePayload));
+    return this._request('/uploadposts/webhooks/deliveries', 'GET', params);
+  }
+
+  /**
+   * Get one webhook delivery, always with its `payload` (the exact body sent).
+   * 404 when it does not exist, is older than 7 days or belongs to another account.
+   *
+   * @param {string} deliveryId - The `delivery_id` (= `X-Upload-Post-Delivery` header)
+   * @returns {Promise<Object>} `{ success, delivery }`
+   */
+  async getWebhookDelivery(deliveryId) {
+    return this._request(`/uploadposts/webhooks/deliveries/${encodeURIComponent(deliveryId)}`, 'GET');
+  }
+
+  /**
+   * Send a logged delivery again, right away, with the same body. It is a new
+   * delivery: own `delivery_id`, the original in `X-Upload-Post-Redelivery-Of`,
+   * sent to the webhook URL configured now, and retried like any other.
+   *
+   * Errors: 404 (unknown, older than 7 days or another account's), 409 with
+   * `error.reason` `webhook_removed` / `event_unsubscribed` / `blocked_url`, 503
+   * `delivery_log_disabled`.
+   *
+   * @param {string} deliveryId - The delivery to send again
+   * @returns {Promise<Object>} `{ success, delivery }` (the new delivery, with `redelivery_of`)
+   */
+  async redeliverWebhook(deliveryId) {
+    return this._request(`/uploadposts/webhooks/deliveries/${encodeURIComponent(deliveryId)}/redeliver`, 'POST', {});
+  }
+
+  // ==================== Teams ====================
+
+  /**
+   * List the members of your team (account owner only; a member acting with
+   * `actAsUser` gets 403). When seat limits are enforced each member carries
+   * `suspended` / `suspended_reason` (`owner_plan_limit`) and the response adds
+   * `plan` and `seat_limit`: after a downgrade the last invited members are
+   * suspended, not removed, until you upgrade or remove someone.
+   *
+   * @returns {Promise<Object>} `{ success, team_members, plan?, seat_limit? }`
+   */
+  async listTeamMembers() {
+    return this._request('/uploadposts/teams/members', 'GET');
+  }
+
+  /**
+   * List the accounts shared with you as a team member. Each one may carry
+   * `suspended` / `suspended_reason`: a suspended seat cannot act on that
+   * account (403 `TEAM_SEAT_SUSPENDED`) until its owner upgrades or frees a seat.
+   *
+   * @returns {Promise<Object>} `{ success, accounts: [{ owner_email, owner_name, status, suspended?, suspended_reason? }] }`
+   */
+  async listSharedAccounts() {
+    return this._request('/uploadposts/teams/shared-with-me', 'GET');
+  }
+
   // ==================== Comments ====================
 
   /**
@@ -1618,9 +1804,24 @@ export class UploadPost {
    * `capabilities` on the TikTok account returned by listUsers()). TikTok grants
    * it at connect time, so an account connected earlier has to be reconnected.
    *
+   * Replies (`commentId`) can be read on TikTok, Threads, YouTube, Instagram,
+   * Facebook and LinkedIn (company Pages only). X, Bluesky and Reddit answer
+   * `400 platform_not_supported`. Notes per platform:
+   * - Instagram: `commentId` is the numeric comment id.
+   * - Facebook: `postId` is still required (its `{pageId}_` prefix picks the
+   *   Page); `commentId` is `{post}_{comment}`.
+   * - LinkedIn: pass the full `comment_urn` (`urn:li:comment:(urn:li:activity:N,N)`)
+   *   for a single call; a bare numeric id is looked up in the post's first 250
+   *   comments, otherwise `404 linkedin_comment_not_found`. `after` is a numeric
+   *   offset. Errors: `403 linkedin_personal_not_supported` (personal profile post),
+   *   `403 linkedin_page_access_denied` (no longer a Page admin: reconnect).
+   * - A malformed `commentId` gives `400 invalid_comment_id`; an unknown one on
+   *   Instagram/Facebook gives `404 comment_not_found`. A comment with no replies
+   *   is a 200 with an empty list.
+   *
    * @param {Object} options - Query options
    * @param {string} options.user - Profile username
-   * @param {string} [options.platform='instagram'] - Platform (instagram, facebook, youtube, linkedin, tiktok)
+   * @param {string} [options.platform='instagram'] - Platform (instagram, facebook, youtube, linkedin, tiktok, threads, x, bluesky, reddit)
    * @param {string} [options.postId] - Native post/media ID (provide postId or postUrl).
    *   Required on TikTok, which has no post URL lookup.
    * @param {string} [options.postUrl] - Full post URL (provide postId or postUrl)
@@ -1628,7 +1829,8 @@ export class UploadPost {
    *   of the post's top-level comments
    * @param {number} [options.limit] - Max number of comments to return
    * @param {string} [options.after] - Pagination cursor for the next page
-   * @returns {Promise<Object>} Comments data
+   *   (`pagination.next_cursor`; a numeric offset on LinkedIn replies)
+   * @returns {Promise<Object>} `{ success, comments, pagination? }`
    */
   async getPostComments(options = {}) {
     // Backwards compatibility: getPostComments(user, { postId, postUrl })
@@ -1776,6 +1978,299 @@ export class UploadPost {
     return this._request('/uploadposts/comments/action', 'POST', body);
   }
 
+  // ==================== AutoDM ====================
+
+  /**
+   * Start a per-post monitor: answers every new comment on one post, with a
+   * private DM on Instagram or a public reply on TikTok, YouTube, Facebook,
+   * Threads and Bluesky. Monitors stop after 15 days and a profile can create 2
+   * per day. For the whole Instagram account use createAutodmRule() instead.
+   *
+   * @param {Object} options
+   * @param {string} options.profileUsername - Profile username
+   * @param {string} options.replyMessage - DM text (Instagram) or public reply
+   * @param {('instagram'|'tiktok'|'youtube'|'facebook'|'threads'|'bluesky')} [options.platform='instagram']
+   * @param {string} [options.postUrl] - Post URL (required on Instagram)
+   * @param {string} [options.postId] - Post id on the other platforms (or postUrl)
+   * @param {string[]} [options.replyMessages] - Public replies only: up to 5 alternative texts, rotated
+   * @param {Array<{title: string, url: string}>} [options.buttons] - Instagram only: up to 3 link buttons
+   * @param {number} [options.monitoringInterval] - Minutes between checks (min and default 15)
+   * @param {string|string[]} [options.triggerKeywords] - Only answer comments containing one of these
+   * @returns {Promise<Object>} Monitor result with `monitor_id`
+   */
+  async startAutodm(options) {
+    const body = {
+      profile_username: options.profileUsername,
+      reply_message: options.replyMessage,
+    };
+    if (options.platform) body.platform = options.platform;
+    if (options.postUrl) body.post_url = options.postUrl;
+    if (options.postId) body.post_id = options.postId;
+    if (options.replyMessages) body.reply_messages = options.replyMessages;
+    if (options.buttons) body.buttons = options.buttons;
+    if (options.monitoringInterval !== undefined) body.monitoring_interval = options.monitoringInterval;
+    if (options.triggerKeywords !== undefined) body.trigger_keywords = options.triggerKeywords;
+    return this._request('/uploadposts/autodms/start', 'POST', body);
+  }
+
+  /** @private */
+  _autodmMonitorAction(action, monitorId) {
+    return this._request(`/uploadposts/autodms/${action}`, 'POST', { monitor_id: monitorId });
+  }
+
+  /**
+   * Stop a per-post monitor (it stays listed with `include_inactive`)
+   * @param {string} monitorId - The monitor id
+   * @returns {Promise<Object>}
+   */
+  async stopAutodm(monitorId) {
+    return this._autodmMonitorAction('stop', monitorId);
+  }
+
+  /**
+   * Pause a per-post monitor
+   * @param {string} monitorId - The monitor id
+   * @returns {Promise<Object>}
+   */
+  async pauseAutodm(monitorId) {
+    return this._autodmMonitorAction('pause', monitorId);
+  }
+
+  /**
+   * Resume a paused per-post monitor
+   * @param {string} monitorId - The monitor id
+   * @returns {Promise<Object>}
+   */
+  async resumeAutodm(monitorId) {
+    return this._autodmMonitorAction('resume', monitorId);
+  }
+
+  /**
+   * Delete a per-post monitor
+   * @param {string} monitorId - The monitor id
+   * @returns {Promise<Object>}
+   */
+  async deleteAutodm(monitorId) {
+    return this._autodmMonitorAction('delete', monitorId);
+  }
+
+  /**
+   * List per-post monitors and their stats
+   * @param {Object} [options]
+   * @param {boolean} [options.includeInactive=false] - Also return stopped/expired monitors
+   * @returns {Promise<Object>}
+   */
+  async getAutodmStatus(options = {}) {
+    const params = {};
+    if (options.includeInactive !== undefined) params.include_inactive = String(Boolean(options.includeInactive));
+    return this._request('/uploadposts/autodms/status', 'GET', params);
+  }
+
+  /**
+   * Get the log of one per-post monitor
+   * @param {string} monitorId - The monitor id
+   * @returns {Promise<Object>}
+   */
+  async getAutodmLogs(monitorId) {
+    return this._request('/uploadposts/autodms/logs', 'GET', { monitor_id: monitorId });
+  }
+
+  /**
+   * Create an account-wide AutoDM rule on Instagram: it answers comments on
+   * every post and reel (present and future), story replies, story mentions
+   * and keyword DMs, with no expiry. Up to 10 rules per Instagram account; they
+   * do not count towards the 2 monitors/day. Rules work only from Meta's
+   * webhooks: creating one subscribes the account, and if Meta refuses the
+   * rule is not created (`502 webhook_subscription_failed`: reconnect Instagram).
+   *
+   * Other errors (see `error.code`): `400` invalid fields / `reconnect_required`,
+   * `409` `duplicate_rule` / `rule_limit_reached` / `rule_creation_in_progress`
+   * (retry in a few seconds), `503` `account_rules_disabled`.
+   *
+   * @param {Object} options
+   * @param {string} options.profileUsername - Profile with the Instagram account
+   * @param {string} options.replyMessage - DM text (max 1,000 characters; 640 with buttons)
+   * @param {Array<('comment'|'story_reply'|'story_mention'|'dm_keyword')>|string} [options.triggers] - Default `['comment']`
+   * @param {string|string[]} [options.triggerKeywords] - Up to 20, case- and accent-insensitive.
+   *   Required for `dm_keyword`; not applied to `story_mention`. Omit (or `[]`) for no filter.
+   * @param {Array<{title: string, url: string}>} [options.buttons] - Up to 3 link buttons
+   * @param {number} [options.perUserCooldownHours] - Whole number 0-720 (default 24): one DM per person
+   *   per rule in this window. Story/DM triggers never go below 24 (`message_cooldown_hours`).
+   * @returns {Promise<Object>} `{ success, rule }` with `status`, `stats`, `pending` and `webhook`
+   */
+  async createAutodmRule(options) {
+    const body = {
+      profile_username: options.profileUsername,
+      reply_message: options.replyMessage,
+    };
+    if (options.platform) body.platform = options.platform;
+    if (options.triggers !== undefined) body.triggers = options.triggers;
+    if (options.triggerKeywords !== undefined) body.trigger_keywords = options.triggerKeywords;
+    if (options.buttons) body.buttons = options.buttons;
+    if (options.perUserCooldownHours !== undefined) body.per_user_cooldown_hours = options.perUserCooldownHours;
+    return this._request('/uploadposts/autodms/rules', 'POST', body);
+  }
+
+  /**
+   * List account-wide AutoDM rules. Each rule has `status` (`active`, `paused`,
+   * `reconnect_required`, `stopped` with `stop_reason`, `disabled`), `stats`,
+   * `pending` and `webhook` (`subscribed`, `receiving_events`, `last_event_at`,
+   * `last_event_age_hours`, `hint`, `error`): if no events arrive for an
+   * account, it shows here instead of failing silently.
+   *
+   * @param {Object} [options]
+   * @param {string} [options.profileUsername] - Only this profile's rules
+   * @returns {Promise<Object>} `{ success, enabled, rules, total }`
+   */
+  async listAutodmRules(options = {}) {
+    const params = {};
+    if (options.profileUsername) params.profile_username = options.profileUsername;
+    return this._request('/uploadposts/autodms/rules', 'GET', params);
+  }
+
+  /** @private */
+  _autodmRuleAction(action, ruleId) {
+    return this._request(`/uploadposts/autodms/rules/${action}`, 'POST', { rule_id: ruleId });
+  }
+
+  /**
+   * Pause an account-wide rule (it answers nothing until resumed)
+   * @param {string} ruleId - The `rule_id`
+   * @returns {Promise<Object>}
+   */
+  async pauseAutodmRule(ruleId) {
+    return this._autodmRuleAction('pause', ruleId);
+  }
+
+  /**
+   * Resume an account-wide rule. A `stopped` rule comes back only once its
+   * Instagram account is connected to its profile again (else `409 rule_stopped`).
+   * @param {string} ruleId - The `rule_id`
+   * @returns {Promise<Object>}
+   */
+  async resumeAutodmRule(ruleId) {
+    return this._autodmRuleAction('resume', ruleId);
+  }
+
+  /**
+   * Delete an account-wide rule and its queued events
+   * @param {string} ruleId - The `rule_id`
+   * @returns {Promise<Object>}
+   */
+  async deleteAutodmRule(ruleId) {
+    return this._autodmRuleAction('delete', ruleId);
+  }
+
+  // ==================== Direct messages ====================
+
+  /** camelCase option -> API field, for sendDm / getDmConversations. @private */
+  _dmBody(options, map) {
+    const out = {};
+    for (const [key, value] of Object.entries(options || {})) {
+      if (value === undefined) continue;
+      // Known camelCase names are mapped; anything else (snake_case or a field
+      // added to the API later) is sent as given, so nothing is dropped silently.
+      out[map[key] || key] = value;
+    }
+    return out;
+  }
+
+  /**
+   * Send a direct message, or a DM action, on Instagram, Facebook Messenger,
+   * WhatsApp or Bluesky. One endpoint for every platform, chosen with `platform`.
+   *
+   * Bluesky needs an app password created with "Allow access to your direct
+   * messages" (else `403 bluesky_dm_scope_missing`: reconnect). There
+   * `recipientId` is a handle, `@handle`, DID or profile link, or pass
+   * `conversationId` (also for groups); `message` is at most 1,000 characters
+   * with up to 10 `@mentions`; `attachments` can only share a post
+   * (`{ type: 'post', url }`); `senderAction` is `mark_seen`/`mark_read`, `react`,
+   * `unreact` (one emoji in `reaction`), `delete`, `accept`, `mute`, `unmute` or
+   * `leave`. Buttons, quick replies, templates and typing are rejected with 400.
+   * A `504 bluesky_send_unconfirmed` (`retryable: false`) means the DM may have
+   * gone out: check the conversation before sending it again.
+   *
+   * Known options are camelCase and mapped to the API names; any other key is
+   * sent as given.
+   *
+   * @param {Object} options
+   * @param {('instagram'|'facebook'|'whatsapp'|'bluesky')} options.platform
+   * @param {string} options.user - Profile username
+   * @param {string} [options.recipientId] - Platform id of the person (Bluesky: handle/DID)
+   * @param {string} [options.conversationId] - Bluesky: send into this conversation
+   * @param {string} [options.message] - Text (optional with attachments, templates or senderAction)
+   * @param {Object|Object[]} [options.attachments] - Media/attachments (Bluesky: a shared post)
+   * @param {Array<{title: string, url: string}>} [options.buttons] - Instagram/Messenger/WhatsApp buttons
+   * @param {Object[]} [options.quickReplies] - Instagram/Messenger quick replies
+   * @param {Object|Object[]} [options.genericTemplate] - Instagram generic template
+   * @param {string} [options.senderAction] - e.g. `typing_on`, `mark_seen`, `react`, `mark_read`
+   * @param {string|Object} [options.reaction] - Emoji for `react` (WhatsApp: reaction object)
+   * @param {string} [options.messageId] - Message to react to / mark read / delete
+   * @param {string} [options.replyTo] - Message to reply to
+   * @param {Object} [options.template] - WhatsApp approved template / Messenger utility template
+   * @param {string} [options.tag] - Messenger message tag (`HUMAN_AGENT`)
+   * @param {string} [options.pageId] - Messenger: Facebook Page id
+   * @param {Object} [options.location] - WhatsApp location
+   * @param {Object[]} [options.contacts] - WhatsApp contacts
+   * @param {Object} [options.list] - WhatsApp interactive list
+   * @param {Object} [options.ctaUrl] - WhatsApp CTA URL button
+   * @param {Object|string} [options.header] - WhatsApp interactive header
+   * @param {string} [options.footer] - WhatsApp interactive footer
+   * @param {boolean} [options.typing] - WhatsApp typing indicator
+   * @returns {Promise<Object>} Send result (Bluesky: `conversation_id`, `message_id`)
+   */
+  async sendDm(options) {
+    const body = this._dmBody(options, {
+      recipientId: 'recipient_id',
+      conversationId: 'conversation_id',
+      quickReplies: 'quick_replies',
+      genericTemplate: 'generic_template',
+      senderAction: 'sender_action',
+      messageId: 'message_id',
+      replyTo: 'reply_to',
+      pageId: 'page_id',
+      facebookPageId: 'facebook_page_id',
+      ctaUrl: 'cta_url',
+    });
+    return this._request('/uploadposts/dms/send', 'POST', body);
+  }
+
+  /**
+   * List DM conversations with their latest messages, on Instagram, Facebook
+   * Messenger, WhatsApp or Bluesky. Each message has `from`/`to`/`message`/
+   * `direction`; Bluesky adds `reactions`, `reply_to`, `status`
+   * (`request`/`accepted`), `unread_count`, `muted`, `kind` (`direct`/`group`).
+   * On Bluesky at most 25 conversations come per page; ones past the time
+   * budget carry only their last message and `messages_truncated: true`.
+   *
+   * @param {Object} options
+   * @param {('instagram'|'facebook'|'whatsapp'|'bluesky')} options.platform
+   * @param {string} options.user - Profile username
+   * @param {number} [options.limit] - Conversations per page (Bluesky max 25)
+   * @param {string} [options.cursor] - `pagination.next_cursor` of the previous page
+   * @param {string|number} [options.since] - Unix seconds/ms or ISO 8601
+   * @param {string} [options.participantId] - Only the 1:1 conversation with this person (Bluesky: handle/DID)
+   * @param {number} [options.messagesLimit] - Messages per conversation, 1-25 (default 10)
+   * @param {string} [options.conversationId] - Bluesky: one conversation (direct or group)
+   * @param {string} [options.messagesCursor] - Bluesky: older messages of `conversationId`
+   * @param {('request'|'accepted')} [options.status] - Bluesky: requests or accepted chats
+   * @param {'unread'} [options.readState] - Bluesky: only unread conversations
+   * @param {string} [options.pageId] - Messenger: Facebook Page id
+   * @returns {Promise<Object>} `{ success, conversations, pagination, ... }`
+   */
+  async getDmConversations(options) {
+    const params = this._dmBody(options, {
+      participantId: 'participant_id',
+      messagesLimit: 'messages_limit',
+      conversationId: 'conversation_id',
+      messagesCursor: 'messages_cursor',
+      readState: 'read_state',
+      pageId: 'page_id',
+      facebookPageId: 'facebook_page_id',
+    });
+    return this._request('/uploadposts/dms/conversations', 'GET', params);
+  }
+
   // ==================== Post Management ====================
 
   /**
@@ -1799,9 +2294,13 @@ export class UploadPost {
   /**
    * Unpublish (delete) a post from the platform
    *
+   * Not available for Instagram (Meta only allows it through Facebook Login and
+   * Upload-Post connects Instagram with Instagram Login: delete it in the app),
+   * TikTok (no delete API) or Reddit; those answer 400 with the reason.
+   *
    * @param {Object} options - Unpublish options
    * @param {string} options.user - Profile username
-   * @param {string} options.platform - Platform (facebook, youtube, x, linkedin, threads)
+   * @param {string} options.platform - Platform (facebook, youtube, x, linkedin, threads, pinterest, bluesky, google_business)
    * @param {string} options.postId - Native post ID to unpublish
    * @returns {Promise<Object>} Unpublish result
    */
@@ -1835,6 +2334,32 @@ export class UploadPost {
   async getLinkedinPages(profile) {
     const params = profile ? { profile } : {};
     return this._request('/uploadposts/linkedin/pages', 'GET', params);
+  }
+
+  /**
+   * Resolve a LinkedIn company Page to its URN and exact name, to mention it in
+   * a post as `@[Exact Name](urn:li:organization:ID)`. LinkedIn only links the
+   * mention when the name matches exactly, capitals included; otherwise it is
+   * published as plain text. Uses the profile's LinkedIn connection.
+   *
+   * People cannot be resolved (LinkedIn member ids are app-scoped): a `/in/` URL
+   * or `urn:li:person` gives `400 linkedin_person_not_resolvable`. Other errors
+   * (`error.code`): `400 invalid_parameter`, `401 linkedin_reauth_required`,
+   * `403 linkedin_permission_missing` (reconnect LinkedIn), `404
+   * organization_not_found`, `429 rate_limited` / `linkedin_rate_limited`, `502
+   * linkedin_unavailable`. Cached answers do not call LinkedIn (`cached: true`).
+   *
+   * @param {Object} options
+   * @param {string} options.user - Profile username with LinkedIn connected
+   * @param {string} options.url - Page URL (`linkedin.com/company|showcase|school/<vanity>`),
+   *   vanity name (with or without `@`), numeric id or `urn:li:organization:ID`
+   * @returns {Promise<Object>} `{ success, urn, id, name, vanity_name, mention, cached }`
+   */
+  async resolveLinkedinOrganization(options) {
+    return this._request('/uploadposts/linkedin/resolve-organization', 'GET', {
+      user: options.user,
+      url: options.url,
+    });
   }
 
   /**
