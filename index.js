@@ -179,6 +179,11 @@ export class UploadPost {
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
     if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
+    // Cross-network paid partnership. The API maps it to each network's native field
+    // (TikTok brand_content_toggle, YouTube hasPaidProductPlacement, X x_paid_partnership)
+    // unless that field is also sent; networks without a native label answer with a
+    // `warnings` entry. Not a boolean: 400 commercial_disclosure_invalid_value.
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
     // AI auto-generation of native per-platform copy from the media (fills blank fields)
 
     // Platform-specific title overrides
@@ -435,6 +440,9 @@ export class UploadPost {
    */
   _addFacebookParams(form, options, isVideo = false, isText = false) {
     if (options.facebookPageId) form.append('facebook_page_id', options.facebookPageId);
+    // Branded content: numeric Page id of the sponsor (Page photos, videos with
+    // facebookMediaType 'VIDEO', and text posts; not Reels or Stories).
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
 
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
@@ -473,6 +481,8 @@ export class UploadPost {
    */
   _addPinterestParams(form, options, isVideo = false) {
     if (options.pinterestBoardId) form.append('pinterest_board_id', options.pinterestBoardId);
+    // Paid partnership: numeric id of the sponsor's Pinterest account (closed beta).
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
     if (options.pinterestAltText) form.append('pinterest_alt_text', options.pinterestAltText);
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
@@ -809,6 +819,7 @@ export class UploadPost {
    * @param {string[]} options.platforms - Target platforms (tiktok, instagram, youtube, linkedin, facebook, pinterest, threads, bluesky, x, discord, telegram)
    * @param {string} [options.description] - Video description
    * @param {string} [options.firstComment] - First comment to post
+   * @param {boolean} [options.paidPartnership] - Paid partnership: TikTok brand_content_toggle, YouTube hasPaidProductPlacement, X x_paid_partnership (others: `warnings` entry)
    * @param {string} [options.scheduledDate] - ISO date for scheduling (e.g., "2024-12-25T10:00:00Z")
    * @param {string} [options.timezone] - Timezone for scheduled date (e.g., "Europe/Madrid")
    * @param {boolean} [options.addToQueue] - Add to posting queue instead of immediate post
@@ -868,7 +879,7 @@ export class UploadPost {
    * @param {string} [options.youtubeDefaultAudioLanguage] - Audio language (BCP-47)
    * @param {string} [options.youtubeAllowedCountries] - Comma-separated country codes
    * @param {string} [options.youtubeBlockedCountries] - Comma-separated country codes
-   * @param {boolean} [options.youtubeHasPaidProductPlacement] - Paid placement flag
+   * @param {boolean} [options.youtubeHasPaidProductPlacement] - Paid placement flag. YouTube may not keep it (a `warnings` entry says so); set or check it with `editPost`
    * @param {string} [options.youtubeRecordingDate] - Recording date (ISO 8601)
    * 
    * LinkedIn options:
@@ -877,12 +888,14 @@ export class UploadPost {
    * 
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookSponsorId] - Numeric Page id of the sponsor (branded content; Page photos/videos/text, not Reels or Stories)
    * @param {string} [options.facebookVideoState] - PUBLISHED or DRAFT
    * @param {string} [options.facebookMediaType] - REELS, STORIES, or VIDEO
    * @param {string} [options.thumbnailUrl] - Thumbnail URL for normal page videos (VIDEO type only)
    *
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
+   * @param {string} [options.pinterestSponsorId] - Numeric id of the sponsor's account (paid partnership; closed beta)
    * @param {string} [options.pinterestLink] - Destination link
    * @param {string} [options.pinterestCoverImageUrl] - Cover image URL
    * @param {number} [options.pinterestCoverImageKeyFrameTime] - Key frame time in ms
@@ -954,6 +967,7 @@ export class UploadPost {
    * @param {string[]} options.platforms - Target platforms (tiktok, instagram, linkedin, facebook, x, threads, pinterest, reddit, bluesky, discord, telegram)
    * @param {string} [options.description] - Photo description
    * @param {string} [options.firstComment] - First comment to post
+   * @param {boolean} [options.paidPartnership] - Paid partnership: TikTok brand_content_toggle, YouTube hasPaidProductPlacement, X x_paid_partnership (others: `warnings` entry)
    * @param {string} [options.altText] - Alt text for accessibility
    * @param {string} [options.scheduledDate] - ISO date for scheduling
    * @param {string} [options.timezone] - Timezone for scheduled date
@@ -995,9 +1009,11 @@ export class UploadPost {
    * 
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookSponsorId] - Numeric Page id of the sponsor (branded content; Page photos/videos/text, not Reels or Stories)
    * 
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
+   * @param {string} [options.pinterestSponsorId] - Numeric id of the sponsor's account (paid partnership; closed beta)
    * @param {string} [options.pinterestAltText] - Alt text
    * @param {string} [options.pinterestLink] - Destination link
    * 
@@ -1058,6 +1074,7 @@ export class UploadPost {
    * @param {string} options.user - User identifier (profile name)
    * @param {string[]} options.platforms - Target platforms (x, linkedin, facebook, threads, reddit, bluesky, discord, telegram)
    * @param {string} [options.firstComment] - First comment to post
+   * @param {boolean} [options.paidPartnership] - Paid partnership: TikTok brand_content_toggle, YouTube hasPaidProductPlacement, X x_paid_partnership (others: `warnings` entry)
    * @param {string} [options.scheduledDate] - ISO date for scheduling
    * @param {string} [options.timezone] - Timezone for scheduled date
    * @param {boolean} [options.addToQueue] - Add to posting queue
@@ -1073,6 +1090,7 @@ export class UploadPost {
    *
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookSponsorId] - Numeric Page id of the sponsor (branded content; Page photos/videos/text, not Reels or Stories)
    * @param {string} [options.facebookLinkUrl] - URL to attach as link preview on Facebook
    * 
    * X (Twitter) options:
@@ -2289,6 +2307,68 @@ export class UploadPost {
     if (options.requestId) body.request_id = options.requestId;
     if (options.jobId) body.job_id = options.jobId;
     return this._request('/uploadposts/posts/retry', 'POST', body);
+  }
+
+  /**
+   * Edit a published post (`POST /api/uploadposts/posts/edit`). Fields you omit
+   * are left unchanged. Facebook, LinkedIn, X, YouTube and Google Business only:
+   * Instagram, TikTok and Threads have no edit API.
+   *
+   * YouTube can set or clear the paid-promotion declaration here
+   * (`hasPaidProductPlacement`, alias `paidPartnership`). The call is a
+   * `videos.update` (50 YouTube quota units) and the response carries
+   * `paidProductPlacementDetails.hasPaidProductPlacement`, the value YouTube
+   * stored: `true` = kept; `false` or `null` = YouTube did not apply it, so turn
+   * on "Paid promotion" in YouTube Studio.
+   *
+   * @param {Object} options - Edit options
+   * @param {string} options.user - Profile username
+   * @param {string} options.platform - facebook, linkedin, x, youtube, google_business
+   * @param {string} options.postId - Native post ID (YouTube: the video id)
+   * @param {string} [options.message] - Facebook caption
+   * @param {string} [options.text] - X text
+   * @param {string} [options.commentary] - LinkedIn text
+   * @param {boolean} [options.isPinned] - Facebook: pin/unpin
+   * @param {string|number} [options.scheduledPublishTime] - Facebook: Unix seconds
+   * @param {string} [options.facebookPageId] - Facebook Page when not the profile default
+   * @param {string} [options.title] - YouTube
+   * @param {string} [options.description] - YouTube
+   * @param {string|string[]} [options.tags] - YouTube
+   * @param {string} [options.privacyStatus] - YouTube: public, unlisted, private
+   * @param {string} [options.categoryId] - YouTube
+   * @param {string} [options.publishAt] - YouTube: RFC 3339
+   * @param {boolean} [options.hasPaidProductPlacement] - YouTube paid promotion (alias `paidPartnership`)
+   * @returns {Promise<Object>} Edit result
+   */
+  async editPost(options) {
+    const body = {
+      platform: options.platform,
+      user: options.user,
+      post_id: options.postId
+    };
+    const fields = {
+      message: 'message',
+      text: 'text',
+      commentary: 'commentary',
+      isPinned: 'is_pinned',
+      scheduledPublishTime: 'scheduled_publish_time',
+      facebookPageId: 'facebook_page_id',
+      title: 'title',
+      description: 'description',
+      tags: 'tags',
+      privacyStatus: 'privacyStatus',
+      categoryId: 'categoryId',
+      publishAt: 'publishAt',
+      hasPaidProductPlacement: 'hasPaidProductPlacement',
+      youtubeHasPaidProductPlacement: 'hasPaidProductPlacement',
+      paidPartnership: 'paid_partnership'
+    };
+    for (const [option, field] of Object.entries(fields)) {
+      if (options[option] !== undefined && options[option] !== null && body[field] === undefined) {
+        body[field] = options[option];
+      }
+    }
+    return this._request('/uploadposts/posts/edit', 'POST', body);
   }
 
   /**
