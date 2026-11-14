@@ -326,7 +326,7 @@ declare module 'upload-post' {
     youtubeAllowedCountries?: string;
     /** Comma-separated blocked country codes */
     youtubeBlockedCountries?: string;
-    /** Paid product placement flag */
+    /** Paid product placement flag ("Paid promotion"). YouTube does not document it as settable: check `youtube_paid_product_placement.applied` in the YouTube result, not only `success` */
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
