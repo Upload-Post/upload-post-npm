@@ -844,8 +844,8 @@ gets per-post analytics; after 30 days without a post, use
 - `tiktokCoverTimestamp` - Timestamp in ms for cover
 - `tiktokIsAigc` - AI-generated content flag
 - `tiktokPostMode` / `postMode` - DIRECT_POST or MEDIA_UPLOAD. `MEDIA_UPLOAD` is the same draft as `tiktokUploadToDraft`
-- `brandContentToggle` - Branded content toggle
-- `brandOrganicToggle` - Brand organic toggle
+- `brandContentToggle` - Branded content toggle (third-party brand). TikTok does not allow it on private posts, and its API does not return the label: check it in the TikTok app
+- `brandOrganicToggle` - Brand organic toggle (your own business)
 - `tiktokIsAdsOnly` - Only show the video in ads
 - `tiktokTtoInviteLink` - TikTok One invite link (requires branded content)
 
@@ -902,7 +902,7 @@ for those options.
 - `youtubeDefaultLanguage` - Title/description language (BCP-47)
 - `youtubeDefaultAudioLanguage` - Audio language (BCP-47)
 - `youtubeAllowedCountries` / `youtubeBlockedCountries` - Country restrictions
-- `youtubeHasPaidProductPlacement` - Paid placement flag
+- `youtubeHasPaidProductPlacement` - Paid placement flag. YouTube may ignore it (it is not a documented writable field); the response has a `warnings` entry when YouTube's answer shows `false`. Alias: `paidPartnership`
 - `youtubeRecordingDate` - Recording date (ISO 8601)
 - `youtubeNotifySubscribers` - Notify subscribers (default true)
 - `youtubePublishAt` - RFC3339 time; video stays private until then
@@ -932,7 +932,8 @@ for those options.
 - `facebookIsAiGenerated` - AI disclosure on Reels
 - `facebookUnpublishedContentType` - DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED (do not send SCHEDULED; use `scheduledDate`)
 - `facebookNoStory` / `facebookSecret` - Page video flags
-- `facebookCollaborators` - Page IDs to invite on Reels
+- `facebookCollaborators` - Page IDs to invite on Reels (an invitation, not a branded content label)
+- `facebookSponsorId` - Sponsor's numeric Page id (`sponsor_id`): branded content on Page videos (`facebookMediaType: 'VIDEO'`), photos and text posts. Reels and Stories have no such field. The Page needs Meta's branded content access
 
 ### Pinterest
 - `pinterestBoardId` - Board ID
@@ -942,6 +943,7 @@ for those options.
 - `pinterestCoverImageKeyFrameTime` - Key frame time in seconds (values larger than the video duration are treated as milliseconds)
 - `pinterestBoardSectionId` - Board section ID
 - `pinterestAiDisclosures` - `AI_MODIFIED` and/or `SYNTHETIC_PERFORMER`
+- `pinterestSponsorId` - Sponsor's numeric account id for a paid partnership Pin (Pinterest closed beta)
 - `pinterestCarouselTitles` / `pinterestCarouselDescriptions` / `pinterestCarouselLinks` / `pinterestCarouselIndex` - 2–5 photo carousel
 
 ### X (Twitter)
@@ -1052,6 +1054,7 @@ These options work across all upload methods:
 | `user` | Profile name (required) |
 | `platforms` | Target platforms array (required) |
 | `firstComment` | First comment to post |
+| `paidPartnership` | Mark the post as paid/sponsored. Sets each network's native field: TikTok `brand_content_toggle` (direct posts only), YouTube `hasPaidProductPlacement`, X `paid_partnership`. Instagram, LinkedIn, Threads and the rest have no native label: the post is published and the response has a `warnings` entry. A network-specific option you also send wins. See [Paid Partnerships](https://docs.upload-post.com/guides/commercial-disclosure) |
 | `tiktokFirstComment` | First comment for TikTok only (needs the `comments` capability) |
 | `replyToId` | Publish as a reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). Alias: `xReplyToId` |
 | `altText` | Alt text for accessibility |

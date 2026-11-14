@@ -169,6 +169,10 @@ export class UploadPost {
 
     // Optional common parameters
     if (options.firstComment) form.append('first_comment', options.firstComment);
+    // Paid partnership / branded content: one switch, mapped by the API to each network's
+    // native field (TikTok brand_content_toggle, YouTube hasPaidProductPlacement, X paid_partnership).
+    // Networks without a native label ignore it and the response carries a `warnings` entry.
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
     // Reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). The
     // API has always accepted `reply_to_id`; the SDK simply never mapped it.
     const replyToId = options.replyToId || options.xReplyToId || options.blueskyReplyToId;
@@ -439,6 +443,8 @@ export class UploadPost {
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
     this._appendField(form, 'facebook_feed_targeting', this._pick(options, 'facebookFeedTargeting', 'facebook_feed_targeting'));
+    // Branded content: the sponsor's numeric Page id (not on Reels/Stories, which have no such field).
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
 
     if (isVideo) {
       if (options.facebookVideoState) form.append('video_state', options.facebookVideoState);
@@ -477,6 +483,8 @@ export class UploadPost {
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
     this._appendField(form, 'pinterest_ai_disclosures', this._pick(options, 'pinterestAiDisclosures', 'pinterest_ai_disclosures'));
+    // Paid partnership: the sponsor's account id (Pinterest closed beta).
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
 
     if (!isVideo) {
       this._appendRepeated(form, 'pinterest_carousel_titles[]', this._pick(options, 'pinterestCarouselTitles', 'pinterest_carousel_titles'));
@@ -809,6 +817,7 @@ export class UploadPost {
    * @param {string[]} options.platforms - Target platforms (tiktok, instagram, youtube, linkedin, facebook, pinterest, threads, bluesky, x, discord, telegram)
    * @param {string} [options.description] - Video description
    * @param {string} [options.firstComment] - First comment to post
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid/sponsored; sets each network's native field (TikTok, YouTube, X). Networks without one add a `warnings` entry
    * @param {string} [options.scheduledDate] - ISO date for scheduling (e.g., "2024-12-25T10:00:00Z")
    * @param {string} [options.timezone] - Timezone for scheduled date (e.g., "Europe/Madrid")
    * @param {boolean} [options.addToQueue] - Add to posting queue instead of immediate post
@@ -954,6 +963,7 @@ export class UploadPost {
    * @param {string[]} options.platforms - Target platforms (tiktok, instagram, linkedin, facebook, x, threads, pinterest, reddit, bluesky, discord, telegram)
    * @param {string} [options.description] - Photo description
    * @param {string} [options.firstComment] - First comment to post
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid/sponsored; sets each network's native field (TikTok, YouTube, X). Networks without one add a `warnings` entry
    * @param {string} [options.altText] - Alt text for accessibility
    * @param {string} [options.scheduledDate] - ISO date for scheduling
    * @param {string} [options.timezone] - Timezone for scheduled date
@@ -1058,6 +1068,7 @@ export class UploadPost {
    * @param {string} options.user - User identifier (profile name)
    * @param {string[]} options.platforms - Target platforms (x, linkedin, facebook, threads, reddit, bluesky, discord, telegram)
    * @param {string} [options.firstComment] - First comment to post
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid/sponsored; sets each network's native field (TikTok, YouTube, X). Networks without one add a `warnings` entry
    * @param {string} [options.scheduledDate] - ISO date for scheduling
    * @param {string} [options.timezone] - Timezone for scheduled date
    * @param {boolean} [options.addToQueue] - Add to posting queue
