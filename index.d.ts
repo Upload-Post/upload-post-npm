@@ -72,6 +72,15 @@ declare module 'upload-post' {
     maxPostsPerSlot?: number;
     /** Process upload asynchronously (default: true) */
     asyncUpload?: boolean;
+    /**
+     * Mark the post as paid/sponsored. The API maps it to TikTok branded content
+     * (direct posts only; 400 `commercial_disclosure_privacy_conflict` with
+     * `SELF_ONLY`), YouTube paid promotion and X paid partnership. Other networks
+     * add a `warnings` entry and still publish. The per-network field
+     * (`brandContentToggle`, `youtubeHasPaidProductPlacement`, `xPaidPartnership`) wins.
+     * Alias: `paid_partnership`.
+     */
+    paidPartnership?: boolean;
     /** If true, AI generates native per-platform title/description from the media and fills any field left empty */
     /** Generate only the title with AI */
     /** Generate only the description with AI */
@@ -393,6 +402,11 @@ declare module 'upload-post' {
   export interface FacebookVideoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Sponsor's Facebook Page id (numeric): branded content tag on Page videos (`facebookMediaType: 'VIDEO'`).
+     * Reels and Stories have no sponsor field (a warning is returned). Alias: `facebook_sponsor_id`.
+     */
+    facebookSponsorId?: string;
     /** Video state */
     facebookVideoState?: FacebookVideoState;
     /** Media type */
@@ -420,6 +434,11 @@ declare module 'upload-post' {
   export interface FacebookPhotoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Sponsor's Facebook Page id (numeric): branded content tag on Page photos.
+     * Stories have no sponsor field. Alias: `facebook_sponsor_id`.
+     */
+    facebookSponsorId?: string;
     /** Alt text per photo */
     facebookAltText?: string | string[];
     /** POSTS (default) publishes to the feed, STORIES as a Page story */
@@ -435,6 +454,11 @@ declare module 'upload-post' {
   export interface FacebookTextOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Sponsor's Facebook Page id (numeric): branded content tag on /feed posts.
+     * Alias: `facebook_sponsor_id`.
+     */
+    facebookSponsorId?: string;
     /** URL to attach as link preview */
     facebookLinkUrl?: string;
     /** Facebook Place ID */
@@ -456,6 +480,8 @@ declare module 'upload-post' {
   export interface PinterestVideoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Sponsor's Pinterest account id (numeric). Pinterest keeps paid partnership to a closed beta. Alias: `pinterest_sponsor_id`. */
+    pinterestSponsorId?: string;
     /** Destination link */
     pinterestLink?: string;
     /** Cover image URL */
@@ -475,6 +501,8 @@ declare module 'upload-post' {
   export interface PinterestPhotoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Sponsor's Pinterest account id (numeric). Pinterest keeps paid partnership to a closed beta. Alias: `pinterest_sponsor_id`. */
+    pinterestSponsorId?: string;
     /** Alt text */
     pinterestAltText?: string;
     /** Destination link */

@@ -834,6 +834,32 @@ gets per-post analytics; after 30 days without a post, use
 | `tiktokIsAdsOnly` | boolean | Only show the video in ads |
 | `tiktokTtoInviteLink` | string | TikTok One invite link (requires branded content) |
 
+## Commercial disclosure (paid partnership / branded content)
+
+`paidPartnership: true` works on `upload`, `uploadPhotos` and `uploadText`. The API
+maps it to each network's native label:
+
+| Network | What it sets | Notes |
+| --- | --- | --- |
+| TikTok | `brandContentToggle` (branded content) | Direct posts only. Not on drafts. With `tiktokPrivacyLevel: 'SELF_ONLY'` the API answers 400 `commercial_disclosure_privacy_conflict` (TikTok does not allow private branded content). `brandContentToggle` wins when you send it too |
+| YouTube | `youtubeHasPaidProductPlacement` | The result carries a warning if YouTube did not keep it |
+| X | `xPaidPartnership` | First post only |
+| Facebook | `facebookSponsorId` (sponsor's numeric Page id) | Page photos, Page videos (`facebookMediaType: 'VIDEO'`) and `/feed` posts. Reels and Stories have no sponsor field |
+| Pinterest | `pinterestSponsorId` (sponsor's numeric account id) | Closed beta on Pinterest's side |
+| Instagram and the rest | not available | The response has a `warnings` entry and the post still publishes |
+
+```js
+await client.upload('./video.mp4', {
+  title: 'Launch day',
+  user: 'my-profile',
+  platforms: ['tiktok', 'youtube', 'x'],
+  paidPartnership: true,
+});
+```
+
+A value that is not `true`/`false`, or a non-numeric sponsor id, is rejected with
+`error_code` `commercial_disclosure_invalid_value`.
+
 ## Platform-Specific Options
 
 ### TikTok (Video)
@@ -844,7 +870,7 @@ gets per-post analytics; after 30 days without a post, use
 - `tiktokCoverTimestamp` - Timestamp in ms for cover
 - `tiktokIsAigc` - AI-generated content flag
 - `tiktokPostMode` / `postMode` - DIRECT_POST or MEDIA_UPLOAD. `MEDIA_UPLOAD` is the same draft as `tiktokUploadToDraft`
-- `brandContentToggle` - Branded content toggle
+- `brandContentToggle` - Branded content toggle (`paidPartnership` is the cross-network alias)
 - `brandOrganicToggle` - Brand organic toggle
 - `tiktokIsAdsOnly` - Only show the video in ads
 - `tiktokTtoInviteLink` - TikTok One invite link (requires branded content)
@@ -902,7 +928,7 @@ for those options.
 - `youtubeDefaultLanguage` - Title/description language (BCP-47)
 - `youtubeDefaultAudioLanguage` - Audio language (BCP-47)
 - `youtubeAllowedCountries` / `youtubeBlockedCountries` - Country restrictions
-- `youtubeHasPaidProductPlacement` - Paid placement flag
+- `youtubeHasPaidProductPlacement` - Paid promotion declaration (`paidPartnership` is the cross-network alias)
 - `youtubeRecordingDate` - Recording date (ISO 8601)
 - `youtubeNotifySubscribers` - Notify subscribers (default true)
 - `youtubePublishAt` - RFC3339 time; video stays private until then
@@ -933,10 +959,12 @@ for those options.
 - `facebookUnpublishedContentType` - DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED (do not send SCHEDULED; use `scheduledDate`)
 - `facebookNoStory` / `facebookSecret` - Page video flags
 - `facebookCollaborators` - Page IDs to invite on Reels
+- `facebookSponsorId` - Sponsor's Page id (numeric): branded content tag on Page photos, Page videos and `/feed` posts. Not for Reels or Stories
 
 ### Pinterest
 - `pinterestBoardId` - Board ID
 - `pinterestLink` - Destination link
+- `pinterestSponsorId` - Sponsor's account id (numeric). Pinterest paid partnership is a closed beta
 - `pinterestAltText` - Alt text for photos
 - `pinterestCoverImageUrl` - Cover image URL (video)
 - `pinterestCoverImageKeyFrameTime` - Key frame time in seconds (values larger than the video duration are treated as milliseconds)
