@@ -179,6 +179,11 @@ export class UploadPost {
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
     if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
+    // Cross-network commercial disclosure. The API maps it to TikTok branded
+    // content, YouTube paid promotion and X paid partnership; other networks
+    // answer with a warning and the upload goes on. The per-network field
+    // (brandContentToggle, youtubeHasPaidProductPlacement, xPaidPartnership) wins.
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
     // AI auto-generation of native per-platform copy from the media (fills blank fields)
 
     // Platform-specific title overrides
@@ -435,6 +440,9 @@ export class UploadPost {
    */
   _addFacebookParams(form, options, isVideo = false, isText = false) {
     if (options.facebookPageId) form.append('facebook_page_id', options.facebookPageId);
+    // Sponsor's Page id (numeric): branded content tag on Page photos, Page
+    // videos and /feed posts. Reels and Stories have no sponsor field.
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
 
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
@@ -475,6 +483,8 @@ export class UploadPost {
     if (options.pinterestBoardId) form.append('pinterest_board_id', options.pinterestBoardId);
     if (options.pinterestAltText) form.append('pinterest_alt_text', options.pinterestAltText);
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
+    // Sponsor's account id (numeric). Pinterest keeps paid partnership to a closed beta.
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
     this._appendField(form, 'pinterest_ai_disclosures', this._pick(options, 'pinterestAiDisclosures', 'pinterest_ai_disclosures'));
 
@@ -808,6 +818,7 @@ export class UploadPost {
    * @param {string} options.user - User identifier (profile name)
    * @param {string[]} options.platforms - Target platforms (tiktok, instagram, youtube, linkedin, facebook, pinterest, threads, bluesky, x, discord, telegram)
    * @param {string} [options.description] - Video description
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid/sponsored (TikTok branded content, YouTube paid promotion, X paid partnership; other networks return a warning and still publish)
    * @param {string} [options.firstComment] - First comment to post
    * @param {string} [options.scheduledDate] - ISO date for scheduling (e.g., "2024-12-25T10:00:00Z")
    * @param {string} [options.timezone] - Timezone for scheduled date (e.g., "Europe/Madrid")
@@ -877,12 +888,14 @@ export class UploadPost {
    * 
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookSponsorId] - Sponsor's Page id (numeric): branded content tag on Page photos, Page videos and /feed posts (not Reels or Stories)
    * @param {string} [options.facebookVideoState] - PUBLISHED or DRAFT
    * @param {string} [options.facebookMediaType] - REELS, STORIES, or VIDEO
    * @param {string} [options.thumbnailUrl] - Thumbnail URL for normal page videos (VIDEO type only)
    *
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
+   * @param {string} [options.pinterestSponsorId] - Sponsor's account id (numeric; Pinterest paid partnership is a closed beta)
    * @param {string} [options.pinterestLink] - Destination link
    * @param {string} [options.pinterestCoverImageUrl] - Cover image URL
    * @param {number} [options.pinterestCoverImageKeyFrameTime] - Key frame time in ms
@@ -953,6 +966,7 @@ export class UploadPost {
    * @param {string} options.user - User identifier (profile name)
    * @param {string[]} options.platforms - Target platforms (tiktok, instagram, linkedin, facebook, x, threads, pinterest, reddit, bluesky, discord, telegram)
    * @param {string} [options.description] - Photo description
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid/sponsored (TikTok branded content, YouTube paid promotion, X paid partnership; other networks return a warning and still publish)
    * @param {string} [options.firstComment] - First comment to post
    * @param {string} [options.altText] - Alt text for accessibility
    * @param {string} [options.scheduledDate] - ISO date for scheduling
@@ -995,9 +1009,11 @@ export class UploadPost {
    * 
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookSponsorId] - Sponsor's Page id (numeric): branded content tag on Page photos, Page videos and /feed posts (not Reels or Stories)
    * 
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
+   * @param {string} [options.pinterestSponsorId] - Sponsor's account id (numeric; Pinterest paid partnership is a closed beta)
    * @param {string} [options.pinterestAltText] - Alt text
    * @param {string} [options.pinterestLink] - Destination link
    * 
@@ -1057,6 +1073,7 @@ export class UploadPost {
    * @param {string} options.title - Text content for the post
    * @param {string} options.user - User identifier (profile name)
    * @param {string[]} options.platforms - Target platforms (x, linkedin, facebook, threads, reddit, bluesky, discord, telegram)
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid/sponsored (TikTok branded content, YouTube paid promotion, X paid partnership; other networks return a warning and still publish)
    * @param {string} [options.firstComment] - First comment to post
    * @param {string} [options.scheduledDate] - ISO date for scheduling
    * @param {string} [options.timezone] - Timezone for scheduled date
@@ -1073,6 +1090,7 @@ export class UploadPost {
    *
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookSponsorId] - Sponsor's Page id (numeric): branded content tag on Page photos, Page videos and /feed posts (not Reels or Stories)
    * @param {string} [options.facebookLinkUrl] - URL to attach as link preview on Facebook
    * 
    * X (Twitter) options:
