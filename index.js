@@ -868,7 +868,7 @@ export class UploadPost {
    * @param {string} [options.youtubeDefaultAudioLanguage] - Audio language (BCP-47)
    * @param {string} [options.youtubeAllowedCountries] - Comma-separated country codes
    * @param {string} [options.youtubeBlockedCountries] - Comma-separated country codes
-   * @param {boolean} [options.youtubeHasPaidProductPlacement] - Paid placement flag
+   * @param {boolean} [options.youtubeHasPaidProductPlacement] - YouTube "Includes paid promotion" label; verified after upload (the result carries youtube_has_paid_product_placement and warnings)
    * @param {string} [options.youtubeRecordingDate] - Recording date (ISO 8601)
    * 
    * LinkedIn options:
