@@ -179,6 +179,10 @@ export class UploadPost {
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
     if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
+    // Cross-network paid-partnership switch. The API maps it to each network's native
+    // field (TikTok branded content, YouTube paid product placement, X paid partnership)
+    // and answers with a `warnings` entry on networks that have none. Only sent when set.
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
     // AI auto-generation of native per-platform copy from the media (fills blank fields)
 
     // Platform-specific title overrides
@@ -436,6 +440,9 @@ export class UploadPost {
   _addFacebookParams(form, options, isVideo = false, isText = false) {
     if (options.facebookPageId) form.append('facebook_page_id', options.facebookPageId);
 
+    // Branded content: the sponsor's Page ID. Page photos, Page videos
+    // (facebookMediaType VIDEO) and feed posts only; Reels and Stories have no such field.
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
     this._appendField(form, 'facebook_feed_targeting', this._pick(options, 'facebookFeedTargeting', 'facebook_feed_targeting'));
@@ -477,6 +484,8 @@ export class UploadPost {
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
     this._appendField(form, 'pinterest_ai_disclosures', this._pick(options, 'pinterestAiDisclosures', 'pinterest_ai_disclosures'));
+    // Paid partnership: the sponsor's account ID. Pinterest only opens it to its closed beta.
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
 
     if (!isVideo) {
       this._appendRepeated(form, 'pinterest_carousel_titles[]', this._pick(options, 'pinterestCarouselTitles', 'pinterest_carousel_titles'));
@@ -2289,6 +2298,39 @@ export class UploadPost {
     if (options.requestId) body.request_id = options.requestId;
     if (options.jobId) body.job_id = options.jobId;
     return this._request('/uploadposts/posts/retry', 'POST', body);
+  }
+
+  /**
+   * Edit a post that is already live (Facebook, LinkedIn, X, YouTube, Google Business
+   * and the credential channels that implement edit). Fields you omit are left unchanged.
+   * Instagram, TikTok and Threads have no edit API.
+   *
+   * For YouTube this is how to correct the paid-promotion declaration after upload:
+   * `editPost({ user, platform: 'youtube', postId, hasPaidProductPlacement: true })`
+   * runs videos.update with part=paidProductPlacementDetails (50 YouTube quota units).
+   *
+   * @param {Object} options - Edit options
+   * @param {string} options.user - Profile username
+   * @param {string} options.platform - Platform (facebook, linkedin, x, youtube, google_business, ...)
+   * @param {string} options.postId - Native post ID
+   * @param {string} [options.message] - New caption (Facebook `message`)
+   * @param {boolean} [options.hasPaidProductPlacement] - YouTube: paid promotion declaration
+   * @param {boolean} [options.paidPartnership] - Alias of hasPaidProductPlacement on YouTube (`paid_partnership`)
+   * @param {Object} [options.fields] - Any other body field of the API, by its API name
+   *   (e.g. { title: '...', tags: ['a'], privacyStatus: 'unlisted' } for YouTube,
+   *   { text: '...' } for X, { commentary: '...' } for LinkedIn). The named options above win.
+   * @returns {Promise<Object>} Edit result. On YouTube it carries `paidProductPlacementDetails`
+   *   when the declaration was sent.
+   */
+  async editPost(options) {
+    const body = { ...(options.fields || {}) };
+    body.platform = options.platform;
+    body.user = options.user;
+    body.post_id = options.postId;
+    if (options.message !== undefined) body.message = options.message;
+    if (options.hasPaidProductPlacement !== undefined) body.hasPaidProductPlacement = options.hasPaidProductPlacement;
+    if (options.paidPartnership !== undefined) body.paid_partnership = options.paidPartnership;
+    return this._request('/uploadposts/posts/edit', 'POST', body);
   }
 
   /**

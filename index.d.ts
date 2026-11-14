@@ -68,6 +68,18 @@ declare module 'upload-post' {
     timezone?: string;
     /** Add to posting queue instead of immediate post */
     addToQueue?: boolean;
+    /**
+     * Mark the post as a paid partnership / sponsored content on every network that has a native
+     * field: TikTok (branded content, direct posts only; refused with `privacy_level` SELF_ONLY),
+     * YouTube (paid product placement) and X. Networks without one (Instagram, Facebook Reels,
+     * LinkedIn, Threads, ...) are not labelled: the response carries a `warnings` entry and the
+     * post still publishes. A network-specific field you also send (`brandContentToggle`,
+     * `youtubeHasPaidProductPlacement`, `xPaidPartnership`) wins.
+     * Alias: `paid_partnership`.
+     */
+    paidPartnership?: boolean;
+    /** Alias of {@link CommonUploadOptions.paidPartnership}. */
+    paid_partnership?: boolean;
     /** Maximum number of posts allowed per queue slot (overrides profile setting). Only used when addToQueue is true. */
     maxPostsPerSlot?: number;
     /** Process upload asynchronously (default: true) */
@@ -393,6 +405,12 @@ declare module 'upload-post' {
   export interface FacebookVideoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Branded content: numeric Page ID of the sponsor. Applied to Page photos, Page videos
+     * (`facebookMediaType: 'VIDEO'`) and feed posts. Reels and Stories have no such field
+     * (warning). The Page needs access to Meta's Branded Content tool. Alias: `facebook_sponsor_id`.
+     */
+    facebookSponsorId?: string;
     /** Video state */
     facebookVideoState?: FacebookVideoState;
     /** Media type */
@@ -420,6 +438,12 @@ declare module 'upload-post' {
   export interface FacebookPhotoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Branded content: numeric Page ID of the sponsor. Applied to Page photos, Page videos
+     * (`facebookMediaType: 'VIDEO'`) and feed posts. Reels and Stories have no such field
+     * (warning). The Page needs access to Meta's Branded Content tool. Alias: `facebook_sponsor_id`.
+     */
+    facebookSponsorId?: string;
     /** Alt text per photo */
     facebookAltText?: string | string[];
     /** POSTS (default) publishes to the feed, STORIES as a Page story */
@@ -435,6 +459,12 @@ declare module 'upload-post' {
   export interface FacebookTextOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Branded content: numeric Page ID of the sponsor. Applied to Page photos, Page videos
+     * (`facebookMediaType: 'VIDEO'`) and feed posts. Reels and Stories have no such field
+     * (warning). The Page needs access to Meta's Branded Content tool. Alias: `facebook_sponsor_id`.
+     */
+    facebookSponsorId?: string;
     /** URL to attach as link preview */
     facebookLinkUrl?: string;
     /** Facebook Place ID */
@@ -456,6 +486,11 @@ declare module 'upload-post' {
   export interface PinterestVideoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /**
+     * Paid partnership: numeric ID of the sponsor's Pinterest account. Pinterest only opens this
+     * to accounts in its closed beta. Alias: `pinterest_sponsor_id`.
+     */
+    pinterestSponsorId?: string;
     /** Destination link */
     pinterestLink?: string;
     /** Cover image URL */
@@ -475,6 +510,11 @@ declare module 'upload-post' {
   export interface PinterestPhotoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /**
+     * Paid partnership: numeric ID of the sponsor's Pinterest account. Pinterest only opens this
+     * to accounts in its closed beta. Alias: `pinterest_sponsor_id`.
+     */
+    pinterestSponsorId?: string;
     /** Alt text */
     pinterestAltText?: string;
     /** Destination link */
@@ -1212,6 +1252,32 @@ declare module 'upload-post' {
   }
 
   // ==================== Client options & errors ====================
+
+  export interface EditPostOptions {
+    user: string;
+    platform: 'facebook' | 'linkedin' | 'x' | 'youtube' | 'google_business' | (string & {});
+    /** Native post ID (YouTube: the video ID) */
+    postId: string;
+    /** New caption (Facebook `message`) */
+    message?: string;
+    /** YouTube: paid promotion declaration (`paidProductPlacementDetails.hasPaidProductPlacement`) */
+    hasPaidProductPlacement?: boolean;
+    /** Alias of `hasPaidProductPlacement` on YouTube (sent as `paid_partnership`) */
+    paidPartnership?: boolean;
+    /** Any other body field of the API, by its API name. The named options above win. */
+    fields?: Record<string, unknown>;
+  }
+
+  export interface EditPostResponse {
+    success: boolean;
+    message?: string;
+    error?: string;
+    /** `commercial_disclosure_invalid_value` for a `hasPaidProductPlacement` that is not true/false */
+    error_code?: string;
+    /** YouTube: the value YouTube returned after the update (present when the declaration was sent) */
+    paidProductPlacementDetails?: { hasPaidProductPlacement?: boolean | null };
+    [key: string]: unknown;
+  }
 
   export interface UploadPostClientOptions {
     /**
@@ -2163,6 +2229,14 @@ declare module 'upload-post' {
       message?: string;
       error?: string;
     }>;
+
+    /**
+     * Edit a post that is already live. Fields you omit are left unchanged. Instagram, TikTok
+     * and Threads have no edit API. On YouTube, `hasPaidProductPlacement` (or `paidPartnership`)
+     * corrects the paid-promotion declaration with videos.update (50 YouTube quota units).
+     * @param options - Edit options
+     */
+    editPost(options: EditPostOptions): Promise<EditPostResponse>;
 
     /**
      * Unpublish (delete) a post from the platform
