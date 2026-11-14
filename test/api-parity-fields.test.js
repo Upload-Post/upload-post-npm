@@ -243,3 +243,81 @@ describe('fields agents reported as dropped (2.17.0)', () => {
     assert.equal(formFields(text).facebook_media_type, undefined);
   });
 });
+
+describe('commercial disclosure fields (2.20.0)', () => {
+  function captured() {
+    const c = client();
+    c._request = async (_path, _method, form) => form;
+    return c;
+  }
+  const count = (form, name) => form.getBuffer().toString('utf8').split(`name="${name}"`).length - 1;
+
+  test('paidPartnership goes as paid_partnership on video, photo and text uploads', async () => {
+    const video = await captured().upload('https://cdn.example.com/v.mp4', {
+      user: 'p', title: 't', platforms: ['tiktok', 'youtube'], paidPartnership: true,
+    });
+    assert.equal(formFields(video).paid_partnership, 'true');
+
+    const photos = await captured().uploadPhotos(['https://cdn.example.com/a.jpg'], {
+      user: 'p', title: 't', platforms: ['tiktok'], paidPartnership: true,
+    });
+    assert.equal(formFields(photos).paid_partnership, 'true');
+
+    const text = await captured().uploadText({
+      user: 'p', title: 't', platforms: ['x'], paidPartnership: true,
+    });
+    assert.equal(formFields(text).paid_partnership, 'true');
+  });
+
+  test('paid_partnership snake_case alias works and an explicit false is still sent', async () => {
+    const alias = await captured().upload('https://cdn.example.com/v.mp4', {
+      user: 'p', title: 't', platforms: ['x'], paid_partnership: true,
+    });
+    assert.equal(formFields(alias).paid_partnership, 'true');
+
+    const off = await captured().upload('https://cdn.example.com/v.mp4', {
+      user: 'p', title: 't', platforms: ['x'], paidPartnership: false,
+    });
+    assert.equal(formFields(off).paid_partnership, 'false');
+  });
+
+  test('nothing about commercial disclosure is sent when the options are not set', async () => {
+    const form = await captured().upload('https://cdn.example.com/v.mp4', {
+      user: 'p', title: 't', platforms: ['tiktok', 'facebook', 'pinterest'],
+      facebookPageId: '1', pinterestBoardId: 'b',
+    });
+    for (const name of ['paid_partnership', 'facebook_sponsor_id', 'pinterest_sponsor_id']) {
+      assert.equal(count(form, name), 0, name);
+    }
+  });
+
+  test('facebookSponsorId goes as facebook_sponsor_id on video, photo and text, as the string it was given', () => {
+    const big = '1234567890123456'; // beyond what a JS number holds exactly
+    for (const [isVideo, isText] of [[true, false], [false, false], [false, true]]) {
+      const form = new FormData();
+      client()._addFacebookParams(form, { facebookPageId: '1', facebookSponsorId: big }, isVideo, isText);
+      assert.equal(formFields(form).facebook_sponsor_id, big);
+    }
+    const alias = new FormData();
+    client()._addFacebookParams(alias, { facebook_sponsor_id: '42' }, false, false);
+    assert.equal(formFields(alias).facebook_sponsor_id, '42');
+  });
+
+  test('facebook_sponsor_id is not sent when Facebook is not a target', async () => {
+    const form = await captured().upload('https://cdn.example.com/v.mp4', {
+      user: 'p', title: 't', platforms: ['x'], facebookSponsorId: '42',
+    });
+    assert.equal(count(form, 'facebook_sponsor_id'), 0);
+  });
+
+  test('pinterestSponsorId goes as pinterest_sponsor_id on video and photo pins', () => {
+    for (const isVideo of [true, false]) {
+      const form = new FormData();
+      client()._addPinterestParams(form, { pinterestBoardId: 'b', pinterestSponsorId: '99' }, isVideo);
+      assert.equal(formFields(form).pinterest_sponsor_id, '99');
+    }
+    const alias = new FormData();
+    client()._addPinterestParams(alias, { pinterest_sponsor_id: '7' }, true);
+    assert.equal(formFields(alias).pinterest_sponsor_id, '7');
+  });
+});

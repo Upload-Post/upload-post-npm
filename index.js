@@ -179,6 +179,9 @@ export class UploadPost {
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
     if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
+    // Paid partnership / branded content on the networks with a native label
+    // (TikTok, YouTube, X); the network-specific field wins when both are sent.
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
     // AI auto-generation of native per-platform copy from the media (fills blank fields)
 
     // Platform-specific title overrides
@@ -437,6 +440,8 @@ export class UploadPost {
     if (options.facebookPageId) form.append('facebook_page_id', options.facebookPageId);
 
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
+    // Branded content tag: the sponsor's Page id. Pass it as a string: Page ids can exceed what a JS number holds exactly.
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
     this._appendField(form, 'facebook_feed_targeting', this._pick(options, 'facebookFeedTargeting', 'facebook_feed_targeting'));
 
@@ -477,6 +482,8 @@ export class UploadPost {
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
     this._appendField(form, 'pinterest_ai_disclosures', this._pick(options, 'pinterestAiDisclosures', 'pinterest_ai_disclosures'));
+    // Paid partnership Pin: the sponsor's account id (Pinterest closed beta).
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
 
     if (!isVideo) {
       this._appendRepeated(form, 'pinterest_carousel_titles[]', this._pick(options, 'pinterestCarouselTitles', 'pinterest_carousel_titles'));
@@ -811,6 +818,7 @@ export class UploadPost {
    * @param {string} [options.firstComment] - First comment to post
    * @param {string} [options.scheduledDate] - ISO date for scheduling (e.g., "2024-12-25T10:00:00Z")
    * @param {string} [options.timezone] - Timezone for scheduled date (e.g., "Europe/Madrid")
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid/sponsored on TikTok, YouTube and X (native labels); other networks return a warning
    * @param {boolean} [options.addToQueue] - Add to posting queue instead of immediate post
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
    * 
@@ -877,12 +885,14 @@ export class UploadPost {
    * 
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookSponsorId] - Sponsor's Facebook Page ID for the branded content tag (pass as a string; not for Reels or Stories)
    * @param {string} [options.facebookVideoState] - PUBLISHED or DRAFT
    * @param {string} [options.facebookMediaType] - REELS, STORIES, or VIDEO
    * @param {string} [options.thumbnailUrl] - Thumbnail URL for normal page videos (VIDEO type only)
    *
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
+   * @param {string} [options.pinterestSponsorId] - Sponsor's Pinterest account ID (closed beta)
    * @param {string} [options.pinterestLink] - Destination link
    * @param {string} [options.pinterestCoverImageUrl] - Cover image URL
    * @param {number} [options.pinterestCoverImageKeyFrameTime] - Key frame time in ms
@@ -957,6 +967,7 @@ export class UploadPost {
    * @param {string} [options.altText] - Alt text for accessibility
    * @param {string} [options.scheduledDate] - ISO date for scheduling
    * @param {string} [options.timezone] - Timezone for scheduled date
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid/sponsored on TikTok, YouTube and X (native labels); other networks return a warning
    * @param {boolean} [options.addToQueue] - Add to posting queue
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
    * 
@@ -995,9 +1006,11 @@ export class UploadPost {
    * 
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookSponsorId] - Sponsor's Facebook Page ID for the branded content tag (pass as a string; not for Reels or Stories)
    * 
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
+   * @param {string} [options.pinterestSponsorId] - Sponsor's Pinterest account ID (closed beta)
    * @param {string} [options.pinterestAltText] - Alt text
    * @param {string} [options.pinterestLink] - Destination link
    * 
@@ -1060,6 +1073,7 @@ export class UploadPost {
    * @param {string} [options.firstComment] - First comment to post
    * @param {string} [options.scheduledDate] - ISO date for scheduling
    * @param {string} [options.timezone] - Timezone for scheduled date
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid/sponsored on TikTok, YouTube and X (native labels); other networks return a warning
    * @param {boolean} [options.addToQueue] - Add to posting queue
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
    * @param {string} [options.linkUrl] - Generic URL for link preview card (works for LinkedIn, Bluesky, Facebook). Platform-specific params take priority.
@@ -1073,6 +1087,7 @@ export class UploadPost {
    *
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookSponsorId] - Sponsor's Facebook Page ID for the branded content tag (pass as a string; not for Reels or Stories)
    * @param {string} [options.facebookLinkUrl] - URL to attach as link preview on Facebook
    * 
    * X (Twitter) options:
