@@ -179,6 +179,11 @@ export class UploadPost {
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
     if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
+    // Cross-network "this post is paid / sponsored" switch. The API maps it to each
+    // network's own label (TikTok brand_content_toggle, YouTube hasPaidProductPlacement,
+    // X x_paid_partnership) only where that network's own field was not sent. Sent
+    // once per request, and only when the caller set it (false is sent as "false").
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
     // AI auto-generation of native per-platform copy from the media (fills blank fields)
 
     // Platform-specific title overrides
@@ -439,6 +444,9 @@ export class UploadPost {
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
     this._appendField(form, 'facebook_feed_targeting', this._pick(options, 'facebookFeedTargeting', 'facebook_feed_targeting'));
+    // Sponsor's Facebook Page id (digits). Sent to Graph as sponsor_id on Page photos,
+    // Page videos (facebookMediaType VIDEO) and feed posts; the API warns on Reels and Stories.
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
 
     if (isVideo) {
       if (options.facebookVideoState) form.append('video_state', options.facebookVideoState);
@@ -477,6 +485,8 @@ export class UploadPost {
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
     this._appendField(form, 'pinterest_ai_disclosures', this._pick(options, 'pinterestAiDisclosures', 'pinterest_ai_disclosures'));
+    // Sponsor's Pinterest account id (digits), sent as sponsor_id on the Pin. Closed beta on Pinterest's side.
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
 
     if (!isVideo) {
       this._appendRepeated(form, 'pinterest_carousel_titles[]', this._pick(options, 'pinterestCarouselTitles', 'pinterest_carousel_titles'));
@@ -813,6 +823,7 @@ export class UploadPost {
    * @param {string} [options.timezone] - Timezone for scheduled date (e.g., "Europe/Madrid")
    * @param {boolean} [options.addToQueue] - Add to posting queue instead of immediate post
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid / sponsored on every network that has a native label: TikTok (brand content toggle, direct posts only, not with SELF_ONLY), YouTube (paid promotion) and X. Used only where the network-specific field (brandContentToggle, youtubeHasPaidProductPlacement, xPaidPartnership) was not sent; other networks get a `warnings` entry. Alias: `paid_partnership`
    * 
    * TikTok options:
    * @param {string} [options.tiktokPrivacyLevel] - PUBLIC_TO_EVERYONE, MUTUAL_FOLLOW_FRIENDS, FOLLOWER_OF_CREATOR, SELF_ONLY. TikTok decides per account which of these are available (a private account has no PUBLIC_TO_EVERYONE); asking for another one fails with error_code tiktok_privacy_unavailable listing the allowed ones. Omit it to keep the account's own default.
@@ -880,12 +891,14 @@ export class UploadPost {
    * @param {string} [options.facebookVideoState] - PUBLISHED or DRAFT
    * @param {string} [options.facebookMediaType] - REELS, STORIES, or VIDEO
    * @param {string} [options.thumbnailUrl] - Thumbnail URL for normal page videos (VIDEO type only)
+   * @param {string} [options.facebookSponsorId] - Facebook Page id (digits) of the sponsor, for a branded Page video. Only applies with facebookMediaType VIDEO (Reels and Stories get a `warnings` entry). The Page needs access to Meta's branded content tool
    *
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
    * @param {string} [options.pinterestLink] - Destination link
    * @param {string} [options.pinterestCoverImageUrl] - Cover image URL
    * @param {number} [options.pinterestCoverImageKeyFrameTime] - Key frame time in ms
+   * @param {string} [options.pinterestSponsorId] - Pinterest account id (digits) of the sponsor, sent as sponsor_id on the Pin. Pinterest keeps this to a closed beta
    * 
    * X (Twitter) options:
    * @param {string} [options.xReplySettings] - everyone, following, mentionedUsers, subscribers, verified
@@ -959,6 +972,7 @@ export class UploadPost {
    * @param {string} [options.timezone] - Timezone for scheduled date
    * @param {boolean} [options.addToQueue] - Add to posting queue
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid / sponsored on every network that has a native label: TikTok (brand content toggle, direct posts only, not with SELF_ONLY), YouTube (paid promotion) and X. Used only where the network-specific field (brandContentToggle, xPaidPartnership) was not sent; other networks get a `warnings` entry. Alias: `paid_partnership`
    * 
    * TikTok options:
    * @param {boolean} [options.tiktokAutoAddMusic] - Auto add music
@@ -995,11 +1009,13 @@ export class UploadPost {
    * 
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
+   * @param {string} [options.facebookSponsorId] - Facebook Page id (digits) of the sponsor, for a branded Page photo. Not applied to photo Stories (`warnings` entry). The Page needs access to Meta's branded content tool
    * 
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
    * @param {string} [options.pinterestAltText] - Alt text
    * @param {string} [options.pinterestLink] - Destination link
+   * @param {string} [options.pinterestSponsorId] - Pinterest account id (digits) of the sponsor, sent as sponsor_id on the Pin. Pinterest keeps this to a closed beta
    * 
    * X (Twitter) options:
    * @param {string} [options.xReplySettings] - Who can reply
@@ -1062,6 +1078,7 @@ export class UploadPost {
    * @param {string} [options.timezone] - Timezone for scheduled date
    * @param {boolean} [options.addToQueue] - Add to posting queue
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
+   * @param {boolean} [options.paidPartnership] - Mark the post as paid / sponsored on the networks that have a native label (X: xPaidPartnership). Used only where the network-specific field was not sent; other networks get a `warnings` entry. Alias: `paid_partnership`
    * @param {string} [options.linkUrl] - Generic URL for link preview card (works for LinkedIn, Bluesky, Facebook). Platform-specific params take priority.
    *
    * LinkedIn options:
@@ -1074,6 +1091,7 @@ export class UploadPost {
    * Facebook options:
    * @param {string} [options.facebookPageId] - Facebook Page ID
    * @param {string} [options.facebookLinkUrl] - URL to attach as link preview on Facebook
+   * @param {string} [options.facebookSponsorId] - Facebook Page id (digits) of the sponsor, for a branded feed post. The Page needs access to Meta's branded content tool
    * 
    * X (Twitter) options:
    * @param {string} [options.xReplySettings] - Who can reply
