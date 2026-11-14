@@ -243,3 +243,53 @@ describe('fields agents reported as dropped (2.17.0)', () => {
     assert.equal(formFields(text).facebook_media_type, undefined);
   });
 });
+
+describe('commercial disclosure (paid partnership / branded content)', () => {
+  test('paidPartnership goes on every upload method as paid_partnership', () => {
+    for (const value of [true, false]) {
+      const form = new FormData();
+      client()._addCommonParams(form, { user: 'u', platforms: ['tiktok'], paidPartnership: value });
+      assert.equal(formFields(form).paid_partnership, String(value));
+    }
+  });
+
+  test('paid_partnership (snake_case) is accepted and nothing is sent when unset', () => {
+    const snake = new FormData();
+    client()._addCommonParams(snake, { user: 'u', platforms: ['youtube'], paid_partnership: true });
+    assert.equal(formFields(snake).paid_partnership, 'true');
+
+    const none = new FormData();
+    client()._addCommonParams(none, { user: 'u', platforms: ['youtube'] });
+    assert.equal('paid_partnership' in formFields(none), false);
+  });
+
+  test('facebookSponsorId on photo, video and text posts', () => {
+    for (const [isVideo, isText] of [[false, false], [true, false], [false, true]]) {
+      const form = new FormData();
+      client()._addFacebookParams(form, { facebookPageId: '1', facebookSponsorId: '123456789' }, isVideo, isText);
+      assert.equal(formFields(form).facebook_sponsor_id, '123456789');
+    }
+    const none = new FormData();
+    client()._addFacebookParams(none, { facebookPageId: '1' }, true, false);
+    assert.equal('facebook_sponsor_id' in formFields(none), false);
+  });
+
+  test('pinterestSponsorId on photo and video pins', () => {
+    for (const isVideo of [false, true]) {
+      const form = new FormData();
+      client()._addPinterestParams(form, { pinterestBoardId: 'b', pinterestSponsorId: '5555' }, isVideo);
+      assert.equal(formFields(form).pinterest_sponsor_id, '5555');
+    }
+  });
+
+  test('the existing network fields still map as before', () => {
+    const tiktok = new FormData();
+    client()._addTiktokParams(tiktok, { brandContentToggle: true, brandOrganicToggle: false }, true);
+    assert.equal(formFields(tiktok).brand_content_toggle, 'true');
+    assert.equal(formFields(tiktok).brand_organic_toggle, 'false');
+
+    const youtube = new FormData();
+    client()._addYoutubeParams(youtube, { youtubeHasPaidProductPlacement: true });
+    assert.equal(formFields(youtube).hasPaidProductPlacement, 'true');
+  });
+});

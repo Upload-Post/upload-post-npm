@@ -902,7 +902,7 @@ for those options.
 - `youtubeDefaultLanguage` - Title/description language (BCP-47)
 - `youtubeDefaultAudioLanguage` - Audio language (BCP-47)
 - `youtubeAllowedCountries` / `youtubeBlockedCountries` - Country restrictions
-- `youtubeHasPaidProductPlacement` - Paid placement flag
+- `youtubeHasPaidProductPlacement` - Paid promotion declaration. YouTube may ignore it, so the result carries `youtube_paid_placement` (what YouTube stored) and a `warnings` entry when it was dropped
 - `youtubeRecordingDate` - Recording date (ISO 8601)
 - `youtubeNotifySubscribers` - Notify subscribers (default true)
 - `youtubePublishAt` - RFC3339 time; video stays private until then
@@ -933,6 +933,7 @@ for those options.
 - `facebookUnpublishedContentType` - DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED (do not send SCHEDULED; use `scheduledDate`)
 - `facebookNoStory` / `facebookSecret` - Page video flags
 - `facebookCollaborators` - Page IDs to invite on Reels
+- `facebookSponsorId` - Sponsor's numeric Page id: Meta's branded content tag on Page photos, Page videos (`facebookMediaType: 'VIDEO'`) and text posts. Reels and Stories have no sponsor field (the result has a `warnings` entry)
 
 ### Pinterest
 - `pinterestBoardId` - Board ID
@@ -942,6 +943,7 @@ for those options.
 - `pinterestCoverImageKeyFrameTime` - Key frame time in seconds (values larger than the video duration are treated as milliseconds)
 - `pinterestBoardSectionId` - Board section ID
 - `pinterestAiDisclosures` - `AI_MODIFIED` and/or `SYNTHETIC_PERFORMER`
+- `pinterestSponsorId` - Sponsor's Pinterest account id for a paid partnership Pin (Pinterest closed beta)
 - `pinterestCarouselTitles` / `pinterestCarouselDescriptions` / `pinterestCarouselLinks` / `pinterestCarouselIndex` - 2–5 photo carousel
 
 ### X (Twitter)
@@ -1055,6 +1057,7 @@ These options work across all upload methods:
 | `tiktokFirstComment` | First comment for TikTok only (needs the `comments` capability) |
 | `replyToId` | Publish as a reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). Alias: `xReplyToId` |
 | `altText` | Alt text for accessibility |
+| `paidPartnership` | Mark the post as paid / sponsored with each network's native label (TikTok `brandContentToggle`, YouTube `youtubeHasPaidProductPlacement`, X `xPaidPartnership`). Networks without a native field get a `warnings` entry; a network-specific option wins. See [Paid Partnership & Branded Content Labels](https://docs.upload-post.com/guides/commercial-disclosure) |
 | `scheduledDate` | ISO date for scheduling |
 | `timezone` | Timezone for scheduled date |
 | `addToQueue` | Add to posting queue |
