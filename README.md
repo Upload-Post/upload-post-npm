@@ -38,6 +38,11 @@ console.log(response);
 - ✅ **First Comments** - Auto-post first comment after publishing
 - ✅ **Analytics** - Get engagement metrics
 - ✅ **Audience** - Who follows a profile, per platform
+- ✅ **Comments** - Read, reply, moderate; replies under a comment on TikTok, Threads, YouTube, Instagram, Facebook and LinkedIn
+- ✅ **Direct messages** - Instagram, Messenger, WhatsApp and Bluesky inboxes
+- ✅ **AutoDM** - Per-post monitors and account-wide Instagram rules (every post, story replies, story mentions, keyword DMs)
+- ✅ **Webhooks** - Delivery log, retries and redelivery
+- ✅ **Teams** - Act on the account you were invited to (`actAsUser`)
 - ✅ **Suggestions** - Hashtags and searches to post about, per platform
 - ✅ **Full TypeScript Support**
 
@@ -331,6 +336,36 @@ const found = await client.searchTiktokMusic('my-profile', {
 const locations = await client.getTiktokLocations('my-profile', 'Madrid');
 ```
 
+### LinkedIn mentions
+
+Mention a company Page in a LinkedIn post or comment with
+`@[Exact Page Name](urn:li:organization:ID)`, a person with
+`@[Name](urn:li:person:ID)`, or a Page by its vanity name (`@company-vanity`).
+LinkedIn only links a company mention when the name matches exactly, capitals
+included; otherwise it is published as plain text. Get the URN and the exact
+name from the Page URL:
+
+```javascript
+const org = await client.resolveLinkedinOrganization({
+  user: 'my-profile',                              // uses this profile's LinkedIn connection
+  url: 'https://www.linkedin.com/company/linkedin/', // or 'linkedin', '@linkedin', '1337', 'urn:li:organization:1337'
+});
+// { urn: 'urn:li:organization:1337', id: '1337', name: 'LinkedIn', vanity_name: 'linkedin',
+//   mention: '@[LinkedIn](urn:li:organization:1337)', cached: false }
+
+await client.uploadText({
+  user: 'my-profile',
+  platforms: ['linkedin'],
+  title: `Great talk by ${org.mention} today`,
+});
+```
+
+People cannot be resolved (LinkedIn member ids are app-scoped), so a `/in/` URL
+fails with `linkedin_person_not_resolvable`. Other errors: `invalid_parameter`,
+`linkedin_reauth_required`, `linkedin_permission_missing` (reconnect LinkedIn),
+`organization_not_found`, `rate_limited` / `linkedin_rate_limited`,
+`linkedin_unavailable`.
+
 ### Comments
 
 The same methods cover every platform that has comments — Instagram, Facebook,
@@ -352,6 +387,14 @@ const { comments: replies } = await client.getPostComments({
   platform: 'tiktok',
   postId: '7412345678901234567',
   commentId: comments[0].id,
+});
+
+// LinkedIn (company Pages): pass the full comment_urn for a single call
+await client.getPostComments({
+  user: 'my-profile',
+  platform: 'linkedin',
+  postId: 'urn:li:share:7300000000000000000',
+  commentId: 'urn:li:comment:(urn:li:activity:7300000000000000000,7300000000000000001)',
 });
 
 // Comment on the post, or reply to a comment
@@ -383,6 +426,20 @@ You can also have the first comment posted for you right after publishing, with
 On TikTok all of this needs the `comments` capability, which the account grants
 when it connects — see
 [What a TikTok connection can do](#what-a-tiktok-connection-can-do-capabilities).
+
+Replies under a comment (`commentId`) can be read on TikTok, Threads, YouTube,
+Instagram, Facebook and LinkedIn; X, Bluesky and Reddit answer
+`platform_not_supported`.
+
+- **Instagram:** numeric comment id.
+- **Facebook:** `postId` is still required (its `{pageId}_` prefix picks the Page).
+- **LinkedIn:** company Pages only. A bare numeric id is looked up in the post's
+  first 250 comments (`linkedin_comment_not_found` if it is not there: pass the
+  `comment_urn`). `after` is a numeric offset. A personal profile post gives
+  `linkedin_personal_not_supported`; a Page you no longer administer,
+  `linkedin_page_access_denied`.
+- A malformed id gives `invalid_comment_id`, an unknown one on Instagram or
+  Facebook `comment_not_found`. A comment without replies returns an empty list.
 
 #### Moderating a comment: hide, like, pin
 
@@ -497,6 +554,194 @@ vs non-followers), `new_followers`, `reach` and the watch times.
 Asking a platform a question it cannot answer fails with
 `platform_not_supported` and the list of the ones that can.
 
+### Direct messages
+
+`sendDm()` and `getDmConversations()` cover Instagram, Facebook Messenger
+(`platform: 'facebook'`), WhatsApp and Bluesky. Options are camelCase; any other
+key is sent to the API as given.
+
+```javascript
+// Read the inbox
+const { conversations, pagination } = await client.getDmConversations({
+  platform: 'instagram',
+  user: 'my-profile',
+  messagesLimit: 5,
+});
+
+// Reply to someone
+await client.sendDm({
+  platform: 'instagram',
+  user: 'my-profile',
+  recipientId: '17841400000000000',
+  message: 'Thanks for writing!',
+  buttons: [{ title: 'Open the guide', url: 'https://example.com/guide' }],
+});
+```
+
+#### Bluesky DMs
+
+Bluesky DMs need an app password created with **"Allow access to your direct
+messages"** (Bluesky > Settings > Privacy and security > App passwords).
+Without it every call fails with `bluesky_dm_scope_missing`: create a new app
+password with that box ticked and reconnect Bluesky.
+
+```javascript
+// recipientId: handle, @handle, DID or profile link
+const sent = await client.sendDm({
+  platform: 'bluesky',
+  user: 'my-profile',
+  recipientId: 'alice.bsky.social',
+  message: 'Hi @alice.bsky.social, here it is: https://example.com #launch',
+});
+
+// Share a post, reply to a message, react, mark as read...
+await client.sendDm({
+  platform: 'bluesky', user: 'my-profile', recipientId: 'alice.bsky.social',
+  message: 'look at this',
+  attachments: { type: 'post', url: 'https://bsky.app/profile/alice.bsky.social/post/3l...' },
+});
+await client.sendDm({
+  platform: 'bluesky', user: 'my-profile', conversationId: sent.conversation_id,
+  senderAction: 'react', messageId: sent.message_id, reaction: '🔥',
+});
+
+// Conversations: at most 25 per page; requests only, unread only, or one chat's history
+await client.getDmConversations({ platform: 'bluesky', user: 'my-profile', status: 'request' });
+await client.getDmConversations({ platform: 'bluesky', user: 'my-profile', readState: 'unread' });
+await client.getDmConversations({
+  platform: 'bluesky', user: 'my-profile',
+  conversationId: sent.conversation_id, messagesCursor: '...',
+});
+```
+
+- `message`: at most 1,000 characters and 10 `@mentions`; links, mentions and
+  hashtags are clickable. Too long: `bluesky_message_too_long`.
+- `senderAction`: `mark_seen` / `mark_read`, `react` / `unreact` (exactly one
+  emoji in `reaction`), `delete` (for you), `accept` (a request), `mute`,
+  `unmute`, `leave`. None of them counts towards the daily DM allowance.
+- Buttons, quick replies, templates and typing do not exist on Bluesky and are
+  rejected with 400.
+- `bluesky_send_unconfirmed` (HTTP 504, `retryable: false`): the DM may have gone
+  out. Check the conversation before sending it again.
+- Other errors: `bluesky_recipient_unavailable` (403, with `reason`),
+  `bluesky_recipient_not_found`, `bluesky_conversation_not_found`,
+  `bluesky_post_not_found` (404), `bluesky_rejected` (400),
+  `bluesky_reauth_required` (401), `bluesky_rate_limited` (429, `retryAfter`),
+  `bluesky_chat_unavailable` / `bluesky_edge_rate_limited` (502/503).
+- New Bluesky DMs reach your webhook as `dm_received` (subscribe to it with
+  `updateNotificationConfig`). They are checked every few minutes, not in real time.
+
+### AutoDM
+
+**Per-post monitors** answer every new comment on one post: a private DM on
+Instagram, a public reply on TikTok, YouTube, Facebook, Threads and Bluesky.
+They stop after 15 days and a profile can start 2 per day.
+
+```javascript
+const monitor = await client.startAutodm({
+  profileUsername: 'my-profile',
+  postUrl: 'https://www.instagram.com/p/ABC123/',
+  replyMessage: 'Here is your guide: https://example.com/guide',
+  triggerKeywords: ['guide'],
+});
+
+await client.getAutodmStatus({ includeInactive: true });
+await client.getAutodmLogs(monitor.monitor_id);
+await client.pauseAutodm(monitor.monitor_id);   // resumeAutodm, stopAutodm, deleteAutodm
+```
+
+**Account-wide rules (Instagram)** watch the whole account instead: every post
+and reel, present and future, plus story replies, story mentions and DMs with a
+keyword. They never expire, up to 10 per Instagram account, and do not count
+towards the 2 monitors per day.
+
+```javascript
+const { rule } = await client.createAutodmRule({
+  profileUsername: 'my-profile',
+  triggers: ['comment', 'story_reply', 'story_mention', 'dm_keyword'],
+  triggerKeywords: ['guide'],          // required for dm_keyword
+  replyMessage: 'Here is your free guide!',
+  buttons: [{ title: 'Get the guide', url: 'https://example.com/guide' }],
+  perUserCooldownHours: 24,            // whole number 0-720
+});
+
+const { rules } = await client.listAutodmRules({ profileUsername: 'my-profile' });
+for (const r of rules) {
+  if (!r.webhook.receiving_events || r.webhook.error) console.warn(r.rule_id, r.webhook.hint || r.webhook.error);
+}
+
+await client.pauseAutodmRule(rule.rule_id);   // resumeAutodmRule, deleteAutodmRule
+```
+
+- Rules work only from Meta's webhooks. If Meta refuses the subscription the
+  rule is not created: `webhook_subscription_failed` (502), reconnect Instagram.
+- `status` is `active`, `paused`, `reconnect_required`, `stopped` (with
+  `stop_reason`, e.g. `account_moved`) or `disabled`. A stopped rule resumes
+  only once its account is back on its profile (`rule_stopped` otherwise).
+- For `story_reply`, `story_mention` and `dm_keyword` the cooldown is never below
+  24 hours (`message_cooldown_hours`), so two bots cannot answer each other.
+- Errors: `duplicate_rule`, `rule_limit_reached`, `rule_creation_in_progress`
+  (409, retry in a few seconds), `account_rules_disabled` (503).
+- A post with its own monitor is answered by that monitor only.
+
+### Webhooks
+
+```javascript
+// Subscribe the account webhook (dm_received / comment_received are opt-in)
+await client.updateNotificationConfig({
+  webhookUrl: 'https://example.com/upload-post',
+  webhookEvents: ['upload_completed', 'dm_received', 'comment_received'],
+  channels: { webhook: true },
+});
+
+// A different endpoint for one profile
+await client.setProfileWebhook({
+  profileUsername: 'my-profile',
+  webhookUrl: 'https://example.com/hooks/my-profile',
+  webhookEvents: { upload_completed: true, comment_received: true },
+});
+
+const { webhook_secret } = await client.rotateWebhookSecret();
+```
+
+Webhooks are delivered **at least once**. A timeout, connection error, `5xx`,
+`408` or `429` is retried up to 6 attempts over about 8.5 hours with the same
+body and the same `X-Upload-Post-Delivery` id (deduplicate on it);
+`X-Upload-Post-Attempt` says which attempt it is. Other `4xx` answers are final.
+Every delivery is logged for 7 days:
+
+```javascript
+const { deliveries } = await client.listWebhookDeliveries({
+  status: 'failed',          // pending, delivered, failed, cancelled
+  event: 'upload_completed',
+  // requestId, jobId, profileUsername, limit (1-100), page (1-50)
+});
+
+const { delivery } = await client.getWebhookDelivery(deliveries[0].delivery_id); // with payload
+const { delivery: again } = await client.redeliverWebhook(delivery.delivery_id);
+console.log(again.delivery_id, again.redelivery_of);
+```
+
+A redelivery is a new delivery (`X-Upload-Post-Redelivery-Of` names the
+original) sent to the webhook URL configured now. It fails with 409 and
+`error.reason` `webhook_removed`, `event_unsubscribed` or `blocked_url` when
+there is nowhere to send it.
+
+### Teams
+
+A team member acts on the owner's account by passing the owner's email:
+
+```javascript
+const owner = new UploadPost('MEMBER_API_KEY', { actAsUser: 'owner@example.com' });
+await owner.listUsers();
+```
+
+When the owner's plan covers fewer seats than it has members (after a
+downgrade), the last invited members are **suspended, not removed**: their
+requests fail with HTTP 403 and `error.code === 'TEAM_SEAT_SUSPENDED'` until the
+owner upgrades or removes someone. `listTeamMembers()` (owner) and
+`listSharedAccounts()` (member) show `suspended` and `suspended_reason`.
+
 ## What a TikTok connection can do (`capabilities`)
 
 Not every TikTok connection can do the same things. `listUsers()`
@@ -559,6 +804,17 @@ await client.upload('./video.mp4', {
   // postMode: 'MEDIA_UPLOAD',      // alias of the same draft
 });
 ```
+
+#### Analytics of a draft
+
+A draft has no post until the creator publishes it from the TikTok app. Ask
+`getPostAnalytics(requestId)` after that: Upload-Post finds the post that came
+from the draft and returns its metrics with `platform_post_id`, `post_url` and
+`original_publish_id` (the upload's TikTok `publish_id`). While the draft is
+still in the inbox, `post_metrics_error` says so. TikTok only gives the id of a
+**public** post that passed moderation, so a draft published as private never
+gets per-post analytics; after 30 days without a post, use
+`getPostAnalyticsByPlatformId()` with the TikTok post id.
 
 ### Options
 
@@ -707,7 +963,7 @@ for those options.
 - `xPaidPartnership` - Paid partnership label
 - `madeWithAi` - Disclose AI-generated media on X (`made_with_ai`; alias `isAiGenerated`)
 - `thumbnailUrl` - Custom video cover (generic field; applied by X as the post's preview image)
-- `xArticleTitle` / `xArticleBody` / `xArticleContentState` / `xArticleDraft` / `xArticleCoverMedia` - X Articles (Premium)
+- `xArticleTitle` / `xArticleBody` / `xArticleContentState` / `xArticleDraft` / `xArticleCoverMedia` - X Articles (Premium). Articles have two heading levels: `###` and `header-three` become `header-two`
 
 ### Threads
 - `threadsLongTextAsPost` - Post long text as single post (vs thread)
@@ -734,7 +990,7 @@ Reddit is currently unavailable. Uploads, OAuth and comments return HTTP 503 wit
 - `blueskyAltText` - Alt text per image/video
 - `blueskyLangs` - Up to 3 BCP-47 language codes
 - `blueskyLabels` - `porn`, `sexual`, `nudity`, `graphic-media`
-- `blueskyGallery` - Publish up to 20 images as a gallery
+- `blueskyGallery` - Publish up to 10 images as a gallery (`app.bsky.embed.gallery`). With 11 or more, the first 10 are published and the response carries a `warnings` entry; without it, Bluesky takes the first 4
 - `blueskyThreadgate` / `blueskyReplySettings` - Who can reply
 - `blueskyPostgate` / `blueskyQuoteSettings` - Block quotes with `disable_quotes`
 - `blueskyQuoteUri` - Quote a post (URL or `at://` URI)
@@ -903,8 +1159,18 @@ try {
   console.log('Upload successful:', response);
 } catch (error) {
   console.error('Upload failed:', error.message);
+  // Machine-readable details:
+  console.error(error.status);     // HTTP status
+  console.error(error.code);       // `code` / `error_code` of the body, e.g. 'TEAM_SEAT_SUSPENDED'
+  console.error(error.reason);     // e.g. 'webhook_removed'
+  console.error(error.retryAfter); // seconds, on rate limits
+  console.error(error.response);   // the full error body
 }
 ```
+
+`unpublishPost()` cannot delete Instagram posts (Meta only allows it through
+Facebook Login, and Upload-Post connects Instagram with Instagram Login), TikTok
+posts (no delete API) or Reddit posts: they fail with a 400 that says so.
 
 ## Links
 

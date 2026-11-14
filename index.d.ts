@@ -558,9 +558,9 @@ declare module 'upload-post' {
     xCardUri?: string;
     /** X Article title (≤100 chars, Premium) */
     xArticleTitle?: string;
-    /** X Article body (plain text / light Markdown) */
+    /** X Article body (plain text / light Markdown). Articles have two heading levels: `###` becomes `header-two`. */
     xArticleBody?: string;
-    /** DraftJS content_state JSON */
+    /** DraftJS content_state JSON (`header-one` / `header-two`; a `header-three` block is converted to `header-two`) */
     xArticleContentState?: Record<string, unknown> | string;
     /** Create the Article as a draft only */
     xArticleDraft?: boolean;
@@ -625,7 +625,11 @@ declare module 'upload-post' {
     blueskyLangs?: string | string[];
     /** Content labels: porn, sexual, nudity, graphic-media */
     blueskyLabels?: string | string[];
-    /** Publish up to 20 images as a gallery (default: first 4) */
+    /**
+     * Publish up to 10 images as an `app.bsky.embed.gallery` (default: first 4).
+     * With 11 or more, the first 10 are published and the response carries a
+     * `warnings` entry; the post does not fail.
+     */
     blueskyGallery?: boolean;
     /** Who can reply: everyone, nobody, mention, following, followers, list:<at://uri> */
     blueskyThreadgate?: string;
@@ -1207,6 +1211,358 @@ declare module 'upload-post' {
     [key: string]: any;
   }
 
+  // ==================== Client options & errors ====================
+
+  export interface UploadPostClientOptions {
+    /**
+     * Team members only: email of the account owner to act on, sent as the
+     * `X-Act-As-User` header. A seat the owner's plan no longer covers fails
+     * with HTTP 403 and `error.code === 'TEAM_SEAT_SUSPENDED'`.
+     */
+    actAsUser?: string;
+  }
+
+  /**
+   * What every method throws on a non-2xx answer. `message` keeps the
+   * `Upload-Post API error: ...` text; the rest is machine-readable.
+   */
+  export interface UploadPostApiError extends Error {
+    /** HTTP status, when the API answered */
+    status?: number;
+    /** `code` or `error_code` of the body (e.g. `TEAM_SEAT_SUSPENDED`, `bluesky_dm_scope_missing`); the network code when there was no answer */
+    code?: string;
+    /** `error_code` of the body, when present */
+    errorCode?: string;
+    /** `reason` of the body (e.g. `owner_plan_limit`, `webhook_removed`) */
+    reason?: string;
+    /** `Retry-After` header in seconds, when sent (rate limits) */
+    retryAfter?: number;
+    /** The full error body */
+    response?: any;
+  }
+
+  // ==================== Notifications & webhooks ====================
+
+  export type WebhookEvent =
+    | 'upload_completed'
+    | 'social_account_connected'
+    | 'social_account_disconnected'
+    | 'social_account_reauth_required'
+    | 'dm_received'
+    | 'comment_received';
+
+  export interface NotificationsResponse {
+    success: boolean;
+    notifications?: {
+      channels?: Record<string, boolean>;
+      webhook_url?: string;
+      webhook_events?: string[];
+      webhook_secret?: string;
+      channel_health?: Record<string, any>;
+      [key: string]: any;
+    };
+    /** @deprecated The API answers with `notifications`; kept for compatibility. */
+    config?: { webhook_events?: string[]; webhook_url?: string; [key: string]: any };
+  }
+
+  export interface ProfileWebhookResponse {
+    success: boolean;
+    profile_username?: string;
+    webhook_url?: string | null;
+    webhook_events?: Partial<Record<WebhookEvent, boolean>> | null;
+    message?: string;
+  }
+
+  export type WebhookDeliveryStatus = 'pending' | 'delivered' | 'failed' | 'cancelled';
+
+  export interface WebhookDeliveryAttempt {
+    attempt: number;
+    at: string;
+    ok: boolean;
+    status_code: number | null;
+    /** `timeout`, `connection_error` or another short label when there was no HTTP answer */
+    error: string | null;
+    duration_ms: number;
+  }
+
+  export interface WebhookDelivery {
+    /** Same as the `X-Upload-Post-Delivery` header; unchanged across retries */
+    delivery_id: string;
+    event: string;
+    status: WebhookDeliveryStatus;
+    target: 'account' | 'profile';
+    profile_username: string | null;
+    /** Webhook URL without its query string */
+    url: string;
+    request_id: string | null;
+    job_id: string | null;
+    platform: string | null;
+    /** Sent by testNotifications(): logged, never retried */
+    test: boolean;
+    attempt_count: number;
+    max_attempts: number;
+    last_status_code: number | null;
+    last_error: string | null;
+    next_attempt_at: string | null;
+    created_at: string;
+    updated_at: string;
+    delivered_at: string | null;
+    redelivery_of: string | null;
+    redelivery_count: number;
+    attempts: WebhookDeliveryAttempt[];
+    /** The exact body sent. Only with includePayload, or from getWebhookDelivery() */
+    payload?: Record<string, any>;
+    [key: string]: any;
+  }
+
+  export interface ListWebhookDeliveriesOptions {
+    event?: WebhookEvent | string;
+    status?: WebhookDeliveryStatus;
+    requestId?: string;
+    jobId?: string;
+    profileUsername?: string;
+    /** 1-100, default 20 */
+    limit?: number;
+    /** 1-50 */
+    page?: number;
+    includePayload?: boolean;
+  }
+
+  export interface WebhookDeliveriesResponse {
+    success: boolean;
+    page: number;
+    limit: number;
+    total: number;
+    has_more: boolean;
+    retention_days: number;
+    deliveries: WebhookDelivery[];
+  }
+
+  export interface WebhookDeliveryResponse {
+    success: boolean;
+    delivery: WebhookDelivery;
+  }
+
+  // ==================== Teams ====================
+
+  export interface TeamMember {
+    email: string;
+    status?: string;
+    invited_at?: string;
+    /** Only when seat limits are enforced */
+    suspended?: boolean;
+    suspended_reason?: 'owner_plan_limit' | null;
+    [key: string]: any;
+  }
+
+  export interface TeamMembersResponse {
+    success: boolean;
+    team_members: TeamMember[];
+    /** Plan group (basic, professional, advanced, business), when seat limits are enforced */
+    plan?: string;
+    /** Members the plan covers, when seat limits are enforced */
+    seat_limit?: number;
+  }
+
+  export interface SharedAccountsResponse {
+    success: boolean;
+    accounts: Array<{
+      owner_email: string;
+      owner_name: string;
+      status: string;
+      suspended?: boolean;
+      suspended_reason?: 'owner_plan_limit' | null;
+    }>;
+  }
+
+  // ==================== AutoDM ====================
+
+  export type AutodmPlatform = 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'threads' | 'bluesky';
+
+  export interface StartAutodmOptions {
+    profileUsername: string;
+    replyMessage: string;
+    platform?: AutodmPlatform;
+    /** Required on Instagram */
+    postUrl?: string;
+    /** Post id on the other platforms (or postUrl) */
+    postId?: string;
+    /** Public replies only: up to 5 alternative texts, rotated */
+    replyMessages?: string[];
+    /** Instagram only: up to 3 link buttons */
+    buttons?: Array<{ title: string; url: string }>;
+    /** Minutes, minimum and default 15 */
+    monitoringInterval?: number;
+    triggerKeywords?: string | string[];
+  }
+
+  export type AutodmRuleTrigger = 'comment' | 'story_reply' | 'story_mention' | 'dm_keyword';
+
+  export interface CreateAutodmRuleOptions {
+    /** Profile with the Instagram account connected */
+    profileUsername: string;
+    /** Max 1,000 characters; 640 with buttons */
+    replyMessage: string;
+    /** Default `['comment']` */
+    triggers?: AutodmRuleTrigger[] | AutodmRuleTrigger;
+    /** Up to 20, case- and accent-insensitive. Required for `dm_keyword`. Omit or `[]` for no filter */
+    triggerKeywords?: string[] | string;
+    /** Up to 3 link buttons */
+    buttons?: Array<{ title: string; url: string }>;
+    /** Whole number 0-720, default 24. Story/DM triggers never go below 24 */
+    perUserCooldownHours?: number;
+    /** Only `instagram` is supported */
+    platform?: 'instagram';
+  }
+
+  export interface AutodmRule {
+    rule_id: string;
+    scope: 'account';
+    platform: 'instagram';
+    profile_username: string;
+    triggers: AutodmRuleTrigger[];
+    trigger_keywords: string[];
+    reply_message: string;
+    buttons: Array<{ type: string; url: string; title: string }>;
+    per_user_cooldown_hours: number;
+    /** Effective cooldown for story/DM triggers (at least 24) */
+    message_cooldown_hours: number;
+    status: 'active' | 'paused' | 'reconnect_required' | 'stopped' | 'disabled';
+    /** Set when `status` is `stopped`: account_moved, account_disconnected, profile_unlinked, profile_deleted, user_missing */
+    stop_reason: string | null;
+    is_paused: boolean;
+    created_at: string;
+    paused_at: string | null;
+    last_triggered_at: string | null;
+    last_sent_at: string | null;
+    stats: Record<string, number>;
+    /** Events queued for sending */
+    pending: number;
+    webhook: {
+      subscribed: boolean;
+      fields: string[];
+      receiving_events: boolean;
+      last_event_at: string | null;
+      last_event_age_hours: number | null;
+      /** Plain-language hint when no events arrived in 6 hours */
+      hint: string | null;
+      error: string | null;
+    };
+    [key: string]: any;
+  }
+
+  export interface AutodmRuleResponse {
+    success: boolean;
+    rule?: AutodmRule;
+    [key: string]: any;
+  }
+
+  export interface AutodmRulesResponse {
+    success: boolean;
+    enabled: boolean;
+    rules: AutodmRule[];
+    total: number;
+  }
+
+  // ==================== Direct messages ====================
+
+  export type DmPlatform = 'instagram' | 'facebook' | 'whatsapp' | 'bluesky';
+
+  export interface SendDmOptions {
+    platform: DmPlatform;
+    /** Profile username */
+    user: string;
+    /** Platform id of the person. Bluesky: handle, `@handle`, DID or profile link */
+    recipientId?: string;
+    /** Bluesky: send into this conversation (also groups) instead of recipientId */
+    conversationId?: string;
+    /** Optional with attachments, templates or senderAction. Bluesky: max 1,000 characters, 10 mentions */
+    message?: string;
+    /** Media / attachments. Bluesky: only a shared post, `{ type: 'post', url }` or `{ type: 'post', uri }` */
+    attachments?: Record<string, any> | Array<Record<string, any>>;
+    /** Instagram, Messenger, WhatsApp: link buttons */
+    buttons?: Array<{ title: string; url?: string; [key: string]: any }>;
+    /** Instagram / Messenger */
+    quickReplies?: Array<Record<string, any>>;
+    /** Instagram generic template */
+    genericTemplate?: Record<string, any> | Array<Record<string, any>>;
+    /**
+     * Instagram: typing_on, typing_off, mark_seen, react, unreact.
+     * Bluesky: mark_seen / mark_read, react, unreact, delete, accept, mute, unmute, leave.
+     * WhatsApp: mark_read.
+     */
+    senderAction?: string;
+    /** Emoji for react/unreact (Bluesky: exactly one emoji). WhatsApp: reaction object */
+    reaction?: string | Record<string, any>;
+    /** Message to react to, mark read or delete */
+    messageId?: string;
+    /** Message to reply to */
+    replyTo?: string;
+    /** WhatsApp approved template / Messenger utility template */
+    template?: Record<string, any>;
+    /** Messenger message tag (`HUMAN_AGENT`) */
+    tag?: string;
+    /** Messenger: Facebook Page id */
+    pageId?: string;
+    /** WhatsApp rich bodies */
+    location?: Record<string, any>;
+    contacts?: Array<Record<string, any>>;
+    list?: Record<string, any>;
+    ctaUrl?: Record<string, any>;
+    header?: Record<string, any> | string;
+    footer?: string;
+    typing?: boolean;
+    /** Any other API field, sent as given */
+    [key: string]: any;
+  }
+
+  export interface DmConversationsOptions {
+    platform: DmPlatform;
+    user: string;
+    /** Conversations per page (Bluesky max 25) */
+    limit?: number;
+    cursor?: string;
+    /** Unix seconds/ms or ISO 8601 */
+    since?: string | number;
+    /** Bluesky: handle or DID */
+    participantId?: string;
+    /** 1-25, default 10 */
+    messagesLimit?: number;
+    /** Bluesky only */
+    conversationId?: string;
+    /** Bluesky only, with conversationId */
+    messagesCursor?: string;
+    /** Bluesky only */
+    status?: 'request' | 'accepted';
+    /** Bluesky only */
+    readState?: 'unread';
+    /** Messenger: Facebook Page id */
+    pageId?: string;
+    [key: string]: any;
+  }
+
+  export interface DmConversationsResponse {
+    success: boolean;
+    conversations: Array<Record<string, any>>;
+    pagination?: { next_cursor?: string | null; has_more?: boolean; [key: string]: any };
+    [key: string]: any;
+  }
+
+  // ==================== LinkedIn ====================
+
+  export interface LinkedinOrganizationResponse {
+    success: boolean;
+    /** `urn:li:organization:ID` */
+    urn: string;
+    id: string;
+    /** Exact Page name LinkedIn requires for the mention to link */
+    name: string;
+    vanity_name: string | null;
+    /** Ready to paste: `@[Name](urn:li:organization:ID)` */
+    mention: string | null;
+    cached: boolean;
+  }
+
   // ==================== Client Class ====================
 
   /**
@@ -1219,8 +1575,9 @@ declare module 'upload-post' {
     /**
      * Create a new Upload-Post client
      * @param apiKey - Your API key from Upload-Post
+     * @param options - Client options (e.g. `actAsUser` for team members)
      */
-    constructor(apiKey: string);
+    constructor(apiKey: string, options?: UploadPostClientOptions);
 
     // Upload methods
     /**
@@ -1324,6 +1681,8 @@ declare module 'upload-post' {
         post_metrics?: Record<string, any>;
         post_metrics_source?: string;
         post_metrics_error?: string;
+        /** TikTok only, when present: the upload's TikTok `publish_id` (drafts get their post id once published publicly) */
+        original_publish_id?: string;
         profile_snapshot_at_post_date?: Record<string, number>;
         profile_snapshot_latest?: Record<string, number>;
         profile_snapshot_latest_date?: string;
@@ -1367,6 +1726,8 @@ declare module 'upload-post' {
         post_url?: string | null;
         media_type?: string | null;
         upload_timestamp?: string | null;
+        /** TikTok only, when present: the upload's TikTok `publish_id` */
+        original_publish_id?: string | null;
       }>;
       limit: number;
       next_cursor: string | null;
@@ -1545,25 +1906,83 @@ declare module 'upload-post' {
     /**
      * Get notification configuration (including webhook settings)
      */
-    getNotificationConfig(): Promise<{ success: boolean; config?: { webhook_events?: string[]; webhook_url?: string; [key: string]: any } }>;
+    getNotificationConfig(): Promise<NotificationsResponse>;
 
     /**
      * Update notification configuration (including webhook settings)
      * @param options - Notification config options
      */
     updateNotificationConfig(options?: {
-      webhookEvents?: string[];
+      /** upload_completed, social_account_*, and the opt-in dm_received / comment_received */
+      webhookEvents?: Array<WebhookEvent | string>;
       webhookUrl?: string;
-      channels?: string[];
+      /** Channels to turn on/off, e.g. `{ webhook: true }` */
+      channels?: Record<string, boolean> | string[];
       telegramChatId?: string;
       slackWebhookUrl?: string;
       whatsappToPhone?: string;
-    }): Promise<{ success: boolean; config?: { webhook_events?: string[]; webhook_url?: string; [key: string]: any } }>;
+    }): Promise<NotificationsResponse>;
 
     /**
-     * Send a test notification through the configured channels
+     * Send a test notification through the configured channels. Webhook test
+     * deliveries are logged (`test: true`) but never retried.
      */
     testNotifications(): Promise<{ success: boolean; [key: string]: any }>;
+
+    /** Remove the account webhook (URL and events) and turn the webhook channel off. */
+    deleteNotificationWebhook(): Promise<NotificationsResponse>;
+
+    /** Rotate the webhook signing secret. The old one stops working at once. */
+    rotateWebhookSecret(): Promise<{ success: boolean; webhook_secret: string }>;
+
+    /** Get the webhook of one profile */
+    getProfileWebhook(profileUsername: string): Promise<ProfileWebhookResponse>;
+
+    /**
+     * Set the webhook of one profile. `webhookEvents: null` clears the
+     * per-profile selection; omit it to keep the current one.
+     */
+    setProfileWebhook(options: {
+      profileUsername: string;
+      webhookUrl: string;
+      webhookEvents?: Partial<Record<WebhookEvent, boolean>> | null;
+    }): Promise<ProfileWebhookResponse>;
+
+    /** Remove the webhook of one profile */
+    deleteProfileWebhook(profileUsername: string): Promise<ProfileWebhookResponse>;
+
+    // Webhook deliveries
+
+    /**
+     * List webhook deliveries (account and per-profile), newest first, kept 7
+     * days. Delivery is at least once: retryable failures (timeout, connection
+     * error, 5xx, 408, 429) are retried up to 6 attempts over ~8.5 hours with
+     * the same `X-Upload-Post-Delivery` id.
+     */
+    listWebhookDeliveries(options?: ListWebhookDeliveriesOptions): Promise<WebhookDeliveriesResponse>;
+
+    /** Get one delivery, always with its `payload`. 404 if unknown or older than 7 days. */
+    getWebhookDelivery(deliveryId: string): Promise<WebhookDeliveryResponse>;
+
+    /**
+     * Send a logged delivery again as a new delivery (new id, original in
+     * `X-Upload-Post-Redelivery-Of`). 404 unknown; 409 with `reason`
+     * `webhook_removed` / `event_unsubscribed` / `blocked_url`; 503
+     * `delivery_log_disabled`.
+     */
+    redeliverWebhook(deliveryId: string): Promise<WebhookDeliveryResponse>;
+
+    // Teams
+
+    /**
+     * List your team members (owner only). With seat limits enforced, members
+     * carry `suspended` / `suspended_reason` and the response adds `plan` and
+     * `seat_limit`.
+     */
+    listTeamMembers(): Promise<TeamMembersResponse>;
+
+    /** List the accounts shared with you, with `suspended` when your seat is not covered. */
+    listSharedAccounts(): Promise<SharedAccountsResponse>;
 
     // Comments
 
@@ -1577,12 +1996,18 @@ declare module 'upload-post' {
      */
     getPostComments(options: {
       user: string;
-      platform?: 'instagram' | 'facebook' | 'youtube' | 'linkedin' | 'tiktok';
+      platform?: 'instagram' | 'facebook' | 'youtube' | 'linkedin' | 'tiktok' | 'threads' | 'x' | 'bluesky' | 'reddit';
       postId?: string;
       postUrl?: string;
-      /** Read the replies to this comment instead of the post's top-level comments. */
+      /**
+       * Read the replies to this comment instead of the post's top-level comments.
+       * Supported on TikTok, Threads, YouTube, Instagram, Facebook and LinkedIn
+       * (company Pages; prefer the full `comment_urn`). X, Bluesky and Reddit
+       * answer `400 platform_not_supported`.
+       */
       commentId?: string;
       limit?: number;
+      /** `pagination.next_cursor` of the previous page (a numeric offset on LinkedIn replies) */
       after?: string;
     }): Promise<{
       success: boolean;
@@ -1591,7 +2016,9 @@ declare module 'upload-post' {
         text: string;
         timestamp: string;
         user: { id: string; username: string };
+        [key: string]: any;
       }>;
+      pagination?: { next_cursor?: string | null; has_next?: boolean; [key: string]: any };
     }>;
     /**
      * Get comments on an Instagram post (legacy positional signature)
@@ -1684,6 +2111,46 @@ declare module 'upload-post' {
       postId?: string;
     }): Promise<CommentActionResponse>;
 
+    // AutoDM
+
+    /**
+     * Start a per-post monitor (DM on Instagram, public reply on TikTok,
+     * YouTube, Facebook, Threads, Bluesky). 2 per profile per day, 15-day expiry.
+     */
+    startAutodm(options: StartAutodmOptions): Promise<{ success: boolean; monitor_id?: string; [key: string]: any }>;
+    stopAutodm(monitorId: string): Promise<{ success: boolean; [key: string]: any }>;
+    pauseAutodm(monitorId: string): Promise<{ success: boolean; [key: string]: any }>;
+    resumeAutodm(monitorId: string): Promise<{ success: boolean; [key: string]: any }>;
+    deleteAutodm(monitorId: string): Promise<{ success: boolean; [key: string]: any }>;
+    getAutodmStatus(options?: { includeInactive?: boolean }): Promise<{ success: boolean; [key: string]: any }>;
+    getAutodmLogs(monitorId: string): Promise<{ success: boolean; [key: string]: any }>;
+
+    /**
+     * Create an account-wide Instagram AutoDM rule: every post (present and
+     * future), story replies, story mentions and keyword DMs, no expiry, up to
+     * 10 per account. Webhook only: `502 webhook_subscription_failed` means
+     * reconnect Instagram.
+     */
+    createAutodmRule(options: CreateAutodmRuleOptions): Promise<AutodmRuleResponse>;
+    listAutodmRules(options?: { profileUsername?: string }): Promise<AutodmRulesResponse>;
+    pauseAutodmRule(ruleId: string): Promise<AutodmRuleResponse>;
+    /** A `stopped` rule resumes only once its account is back on its profile (else `409 rule_stopped`). */
+    resumeAutodmRule(ruleId: string): Promise<AutodmRuleResponse>;
+    deleteAutodmRule(ruleId: string): Promise<AutodmRuleResponse>;
+
+    // Direct messages
+
+    /**
+     * Send a DM or a DM action on Instagram, Messenger (`facebook`), WhatsApp or
+     * Bluesky. Bluesky needs an app password with DM access (else
+     * `403 bluesky_dm_scope_missing`); a `504 bluesky_send_unconfirmed` may have
+     * been delivered, so check the conversation before resending.
+     */
+    sendDm(options: SendDmOptions): Promise<{ success: boolean; conversation_id?: string; message_id?: string; [key: string]: any }>;
+
+    /** List DM conversations with their latest messages. */
+    getDmConversations(options: DmConversationsOptions): Promise<DmConversationsResponse>;
+
     // Post Management
     /**
      * Retry a failed post. Provide requestId or jobId.
@@ -1703,7 +2170,8 @@ declare module 'upload-post' {
      */
     unpublishPost(options: {
       user: string;
-      platform: 'facebook' | 'youtube' | 'x' | 'linkedin' | 'threads';
+      /** Not available for Instagram, TikTok or Reddit (400 with the reason). */
+      platform: 'facebook' | 'youtube' | 'x' | 'linkedin' | 'threads' | 'pinterest' | 'bluesky' | 'google_business';
       postId: string;
     }): Promise<{
       success: boolean;
@@ -1723,6 +2191,13 @@ declare module 'upload-post' {
      * @param profile - Profile username
      */
     getLinkedinPages(profile?: string): Promise<PagesResponse>;
+
+    /**
+     * Resolve a LinkedIn company Page (URL, vanity, id or URN) to its URN and
+     * exact name, for a `@[Name](urn:li:organization:ID)` mention. People cannot
+     * be resolved (`400 linkedin_person_not_resolvable`).
+     */
+    resolveLinkedinOrganization(options: { user: string; url: string }): Promise<LinkedinOrganizationResponse>;
 
     /**
      * Get Pinterest boards for a profile
