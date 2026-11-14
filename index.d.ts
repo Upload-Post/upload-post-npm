@@ -58,6 +58,13 @@ declare module 'upload-post' {
     user: string;
     /** First comment to post after publishing */
     firstComment?: string;
+    /**
+     * Mark the post as paid or sponsored (`paid_partnership`). Maps to each network's native field:
+     * TikTok `brandContentToggle` (Direct Post only, never private), YouTube `youtubeHasPaidProductPlacement`,
+     * X `xPaidPartnership`. The network's own option wins when sent. Networks without a native field
+     * (Instagram Login, LinkedIn, Threads, …) get an entry in `warnings`; the upload still goes ahead.
+     */
+    paidPartnership?: boolean;
     /** Reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). */
     replyToId?: string;
     /** Alt text for accessibility */
@@ -413,8 +420,10 @@ declare module 'upload-post' {
     facebookNoStory?: boolean;
     /** Secret/unpublished video */
     facebookSecret?: boolean;
-    /** Page IDs to invite as Reel collaborators (max 10 / 24h) */
+    /** Page IDs to invite as Reel collaborators (max 10 / 24h). A collaboration invite, not the branded-content label */
     facebookCollaborators?: string | string[];
+    /** Sponsor's Page id (digits) for Meta's branded content tag. The API applies it to `facebookMediaType: 'VIDEO'` videos only; Reels and Stories have no sponsor field (a warning is returned) */
+    facebookSponsorId?: string;
   }
 
   export interface FacebookPhotoOptions {
@@ -424,6 +433,8 @@ declare module 'upload-post' {
     facebookAltText?: string | string[];
     /** POSTS (default) publishes to the feed, STORIES as a Page story */
     facebookMediaType?: FacebookPhotoMediaType;
+    /** Sponsor's Page id (digits) for Meta's branded content tag. Photo posts only; Stories have no sponsor field (a warning is returned) */
+    facebookSponsorId?: string;
     /** Facebook Place ID */
     facebookPlaceId?: string;
     /** Geographic/age/language targeting */
@@ -449,6 +460,8 @@ declare module 'upload-post' {
     facebookChildAttachments?: Array<Record<string, unknown>> | string;
     /** Show the multi-share end card (requires child attachments) */
     facebookMultiShareEndCard?: boolean;
+    /** Sponsor's Page id (digits) for Meta's branded content tag */
+    facebookSponsorId?: string;
   }
 
   // ==================== Pinterest Options ====================
@@ -470,6 +483,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Sponsor's Pinterest account id (digits) for a paid partnership Pin. Closed beta on Pinterest's side */
+    pinterestSponsorId?: string;
   }
 
   export interface PinterestPhotoOptions {
@@ -483,6 +498,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Sponsor's Pinterest account id (digits) for a paid partnership Pin. Closed beta on Pinterest's side */
+    pinterestSponsorId?: string;
     /** Per-slide titles on a 2–5 photo carousel */
     pinterestCarouselTitles?: string | string[];
     /** Per-slide descriptions on a 2–5 photo carousel */

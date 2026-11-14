@@ -844,7 +844,7 @@ gets per-post analytics; after 30 days without a post, use
 - `tiktokCoverTimestamp` - Timestamp in ms for cover
 - `tiktokIsAigc` - AI-generated content flag
 - `tiktokPostMode` / `postMode` - DIRECT_POST or MEDIA_UPLOAD. `MEDIA_UPLOAD` is the same draft as `tiktokUploadToDraft`
-- `brandContentToggle` - Branded content toggle
+- `brandContentToggle` - Branded content toggle (Direct Post only, never private; TikTok does not return the label, check it in the app)
 - `brandOrganicToggle` - Brand organic toggle
 - `tiktokIsAdsOnly` - Only show the video in ads
 - `tiktokTtoInviteLink` - TikTok One invite link (requires branded content)
@@ -902,7 +902,7 @@ for those options.
 - `youtubeDefaultLanguage` - Title/description language (BCP-47)
 - `youtubeDefaultAudioLanguage` - Audio language (BCP-47)
 - `youtubeAllowedCountries` / `youtubeBlockedCountries` - Country restrictions
-- `youtubeHasPaidProductPlacement` - Paid placement flag
+- `youtubeHasPaidProductPlacement` - Paid placement flag ("Paid promotion"). YouTube may ignore it, so the response carries `youtube_has_paid_product_placement` with what YouTube stored, and a `warnings` entry when it did not keep it
 - `youtubeRecordingDate` - Recording date (ISO 8601)
 - `youtubeNotifySubscribers` - Notify subscribers (default true)
 - `youtubePublishAt` - RFC3339 time; video stays private until then
@@ -932,7 +932,8 @@ for those options.
 - `facebookIsAiGenerated` - AI disclosure on Reels
 - `facebookUnpublishedContentType` - DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED (do not send SCHEDULED; use `scheduledDate`)
 - `facebookNoStory` / `facebookSecret` - Page video flags
-- `facebookCollaborators` - Page IDs to invite on Reels
+- `facebookCollaborators` - Page IDs to invite on Reels (a collaboration invite, not the branded-content label)
+- `facebookSponsorId` - Sponsor's Page id (digits) for Meta's branded content tag. Page photos, `facebookMediaType: 'VIDEO'` videos and text/link posts only; Reels and Stories have no sponsor field
 
 ### Pinterest
 - `pinterestBoardId` - Board ID
@@ -942,6 +943,7 @@ for those options.
 - `pinterestCoverImageKeyFrameTime` - Key frame time in seconds (values larger than the video duration are treated as milliseconds)
 - `pinterestBoardSectionId` - Board section ID
 - `pinterestAiDisclosures` - `AI_MODIFIED` and/or `SYNTHETIC_PERFORMER`
+- `pinterestSponsorId` - Sponsor's Pinterest account id (digits) for a paid partnership Pin (Pinterest closed beta)
 - `pinterestCarouselTitles` / `pinterestCarouselDescriptions` / `pinterestCarouselLinks` / `pinterestCarouselIndex` - 2–5 photo carousel
 
 ### X (Twitter)
@@ -1060,6 +1062,7 @@ These options work across all upload methods:
 | `addToQueue` | Add to posting queue |
 | `maxPostsPerSlot` | Max posts per queue slot (overrides profile setting) |
 | `asyncUpload` | Process asynchronously (default: true) |
+| `paidPartnership` | Mark the post as paid or sponsored on TikTok (`brandContentToggle`), YouTube (`youtubeHasPaidProductPlacement`) and X (`xPaidPartnership`). The network's own option wins. Other networks get a `warnings` entry; Instagram and Facebook Reels have no native label through the API |
 | `idempotencyKey` | Collapses duplicate uploads within 24h. Reuse the same value when retrying. Alias: `requestId` |
 
 ## Google Business Profile
