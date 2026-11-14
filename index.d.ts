@@ -72,6 +72,13 @@ declare module 'upload-post' {
     maxPostsPerSlot?: number;
     /** Process upload asynchronously (default: true) */
     asyncUpload?: boolean;
+    /**
+     * Mark the post as paid or sponsored on every network that has a native label: TikTok branded content
+     * (direct posts only, not with privacy SELF_ONLY), YouTube paid promotion and X paid partnership.
+     * A network's own field (brandContentToggle, youtubeHasPaidProductPlacement, xPaidPartnership) wins when also sent.
+     * Other networks answer with an entry in `warnings`; the upload goes on. Instagram has no API field for it.
+     */
+    paidPartnership?: boolean;
     /** If true, AI generates native per-platform title/description from the media and fills any field left empty */
     /** Generate only the title with AI */
     /** Generate only the description with AI */
@@ -405,6 +412,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Sponsor's Page id (digits) for Facebook's branded content tag. Page photos, videos and text posts only; Reels and Stories have no such field. The Page needs access to Meta's branded content tool. */
+    facebookSponsorId?: string;
     /** AI-generated disclosure on Reels */
     facebookIsAiGenerated?: boolean;
     /** Unpublished type for page video: DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED. Do not send SCHEDULED — use scheduledDate. */
@@ -430,6 +439,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Sponsor's Page id (digits) for Facebook's branded content tag. Page photos, videos and text posts only; Reels and Stories have no such field. The Page needs access to Meta's branded content tool. */
+    facebookSponsorId?: string;
   }
 
   export interface FacebookTextOptions {
@@ -443,6 +454,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Sponsor's Page id (digits) for Facebook's branded content tag. Page photos, videos and text posts only; Reels and Stories have no such field. The Page needs access to Meta's branded content tool. */
+    facebookSponsorId?: string;
     /** Link-post CTA, e.g. { type: 'LEARN_MORE', link: 'https://…' } */
     facebookCallToAction?: Record<string, unknown> | string;
     /** Link carousel (2–5 objects with `link`) */
@@ -470,6 +483,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Sponsor's Pinterest account id (digits) for a paid partnership. Pinterest keeps this to a closed beta. */
+    pinterestSponsorId?: string;
   }
 
   export interface PinterestPhotoOptions {
@@ -483,6 +498,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Sponsor's Pinterest account id (digits) for a paid partnership. Pinterest keeps this to a closed beta. */
+    pinterestSponsorId?: string;
     /** Per-slide titles on a 2–5 photo carousel */
     pinterestCarouselTitles?: string | string[];
     /** Per-slide descriptions on a 2–5 photo carousel */

@@ -844,7 +844,7 @@ gets per-post analytics; after 30 days without a post, use
 - `tiktokCoverTimestamp` - Timestamp in ms for cover
 - `tiktokIsAigc` - AI-generated content flag
 - `tiktokPostMode` / `postMode` - DIRECT_POST or MEDIA_UPLOAD. `MEDIA_UPLOAD` is the same draft as `tiktokUploadToDraft`
-- `brandContentToggle` - Branded content toggle
+- `brandContentToggle` - Branded content toggle (paid partnership with a third-party brand). Direct posts only, and TikTok does not allow it on `SELF_ONLY`
 - `brandOrganicToggle` - Brand organic toggle
 - `tiktokIsAdsOnly` - Only show the video in ads
 - `tiktokTtoInviteLink` - TikTok One invite link (requires branded content)
@@ -902,7 +902,7 @@ for those options.
 - `youtubeDefaultLanguage` - Title/description language (BCP-47)
 - `youtubeDefaultAudioLanguage` - Audio language (BCP-47)
 - `youtubeAllowedCountries` / `youtubeBlockedCountries` - Country restrictions
-- `youtubeHasPaidProductPlacement` - Paid placement flag
+- `youtubeHasPaidProductPlacement` - Paid promotion declaration. If YouTube visibly did not keep it, the result carries a `warnings` entry
 - `youtubeRecordingDate` - Recording date (ISO 8601)
 - `youtubeNotifySubscribers` - Notify subscribers (default true)
 - `youtubePublishAt` - RFC3339 time; video stays private until then
@@ -933,6 +933,7 @@ for those options.
 - `facebookUnpublishedContentType` - DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED (do not send SCHEDULED; use `scheduledDate`)
 - `facebookNoStory` / `facebookSecret` - Page video flags
 - `facebookCollaborators` - Page IDs to invite on Reels
+- `facebookSponsorId` - Sponsor's Page id for Facebook's branded content tag (Page photos, videos and text posts; Reels and Stories have none)
 
 ### Pinterest
 - `pinterestBoardId` - Board ID
@@ -942,6 +943,7 @@ for those options.
 - `pinterestCoverImageKeyFrameTime` - Key frame time in seconds (values larger than the video duration are treated as milliseconds)
 - `pinterestBoardSectionId` - Board section ID
 - `pinterestAiDisclosures` - `AI_MODIFIED` and/or `SYNTHETIC_PERFORMER`
+- `pinterestSponsorId` - Sponsor's Pinterest account id for a paid partnership (closed beta on Pinterest's side)
 - `pinterestCarouselTitles` / `pinterestCarouselDescriptions` / `pinterestCarouselLinks` / `pinterestCarouselIndex` - 2–5 photo carousel
 
 ### X (Twitter)
@@ -1060,7 +1062,34 @@ These options work across all upload methods:
 | `addToQueue` | Add to posting queue |
 | `maxPostsPerSlot` | Max posts per queue slot (overrides profile setting) |
 | `asyncUpload` | Process asynchronously (default: true) |
+| `paidPartnership` | Mark the post as paid or sponsored on every network with a native label (see below) |
 | `idempotencyKey` | Collapses duplicate uploads within 24h. Reuse the same value when retrying. Alias: `requestId` |
+
+### Paid partnerships and branded content
+
+`paidPartnership: true` is one switch for the networks whose API has a native label. A network's own
+option wins when you send both. Anything a network cannot carry comes back as an entry in `warnings`;
+the upload goes on.
+
+| Network | Option | Notes |
+|---------|--------|-------|
+| TikTok | `paidPartnership` or `brandContentToggle` | Direct posts only. `SELF_ONLY` is refused with `commercial_disclosure_privacy_conflict` |
+| YouTube | `paidPartnership` or `youtubeHasPaidProductPlacement` | Read back after the upload; a `warnings` entry if YouTube did not keep it |
+| X | `paidPartnership` or `xPaidPartnership` | First post of a thread |
+| Facebook | `facebookSponsorId` | Page photos, videos and text posts; not Reels or Stories |
+| Pinterest | `pinterestSponsorId` | Closed beta on Pinterest's side |
+| Instagram, LinkedIn, Threads, others | none | No API field for it: use the app's own label |
+
+```javascript
+await client.upload('./clip.mp4', {
+  title: 'Launch day',
+  user: 'my-profile',
+  platforms: ['tiktok', 'youtube'],
+  paidPartnership: true,
+});
+```
+
+Full field specification, requirements and verification: [Paid partnerships guide](https://docs.upload-post.com/guides/paid-partnerships).
 
 ## Google Business Profile
 
