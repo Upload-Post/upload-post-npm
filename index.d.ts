@@ -54,6 +54,14 @@ declare module 'upload-post' {
     idempotencyKey?: string;
     /** Alias for {@link CommonUploadOptions.idempotencyKey}. */
     requestId?: string;
+    /**
+     * Mark the post as paid / sponsored with each network's native label where its API has one:
+     * TikTok `brandContentToggle`, YouTube `youtubeHasPaidProductPlacement`, X `xPaidPartnership`.
+     * Networks without a native field (Instagram, LinkedIn, Threads...) get a `warnings` entry in the
+     * response. A network-specific option you also send wins. Facebook and Pinterest need the sponsor's id:
+     * `facebookSponsorId` / `pinterestSponsorId`. See https://docs.upload-post.com/guides/commercial-disclosure
+     */
+    paidPartnership?: boolean;
     /** User identifier (profile name) */
     user: string;
     /** First comment to post after publishing */
@@ -326,7 +334,11 @@ declare module 'upload-post' {
     youtubeAllowedCountries?: string;
     /** Comma-separated blocked country codes */
     youtubeBlockedCountries?: string;
-    /** Paid product placement flag */
+    /**
+     * Declare paid promotion (YouTube's "Includes paid promotion" notice). YouTube does not document the
+     * property as settable, so Upload-Post reads back what it stored: the YouTube result has
+     * `youtube_paid_placement` (true/false) and a `warnings` entry when YouTube dropped it.
+     */
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
@@ -393,6 +405,8 @@ declare module 'upload-post' {
   export interface FacebookVideoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Sponsor's numeric Page id: branded content tag on a Page video (`facebookMediaType: 'VIDEO'`). Not available for Reels or Stories. */
+    facebookSponsorId?: string;
     /** Video state */
     facebookVideoState?: FacebookVideoState;
     /** Media type */
@@ -420,6 +434,8 @@ declare module 'upload-post' {
   export interface FacebookPhotoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Sponsor's numeric Page id: branded content tag on a Page photo post or carousel */
+    facebookSponsorId?: string;
     /** Alt text per photo */
     facebookAltText?: string | string[];
     /** POSTS (default) publishes to the feed, STORIES as a Page story */
@@ -435,6 +451,8 @@ declare module 'upload-post' {
   export interface FacebookTextOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /** Sponsor's numeric Page id: branded content tag on a Page text post */
+    facebookSponsorId?: string;
     /** URL to attach as link preview */
     facebookLinkUrl?: string;
     /** Facebook Place ID */
@@ -456,6 +474,8 @@ declare module 'upload-post' {
   export interface PinterestVideoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Sponsor's Pinterest account id for a paid partnership Pin (Pinterest closed beta) */
+    pinterestSponsorId?: string;
     /** Destination link */
     pinterestLink?: string;
     /** Cover image URL */
@@ -475,6 +495,8 @@ declare module 'upload-post' {
   export interface PinterestPhotoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Sponsor's Pinterest account id for a paid partnership Pin (Pinterest closed beta) */
+    pinterestSponsorId?: string;
     /** Alt text */
     pinterestAltText?: string;
     /** Destination link */

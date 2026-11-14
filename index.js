@@ -174,6 +174,10 @@ export class UploadPost {
     const replyToId = options.replyToId || options.xReplyToId || options.blueskyReplyToId;
     if (replyToId) form.append('reply_to_id', replyToId);
     if (options.altText) form.append('alt_text', options.altText);
+    // Native paid-partnership / branded-content label where the network's API has one
+    // (TikTok, YouTube, X); the rest answer with a `warnings` entry. A network-specific
+    // field (brandContentToggle, youtubeHasPaidProductPlacement, xPaidPartnership) wins.
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
     if (options.scheduledDate) form.append('scheduled_date', options.scheduledDate);
     if (options.timezone) form.append('timezone', options.timezone);
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
@@ -437,6 +441,9 @@ export class UploadPost {
     if (options.facebookPageId) form.append('facebook_page_id', options.facebookPageId);
 
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
+    // Sponsor's numeric Page id: Meta's branded content tag on Page photos, videos and text posts
+    // (not Reels or Stories).
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
     this._appendField(form, 'facebook_feed_targeting', this._pick(options, 'facebookFeedTargeting', 'facebook_feed_targeting'));
 
@@ -476,6 +483,8 @@ export class UploadPost {
     if (options.pinterestAltText) form.append('pinterest_alt_text', options.pinterestAltText);
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
+    // Sponsor's Pinterest account id (paid partnership; Pinterest closed beta).
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
     this._appendField(form, 'pinterest_ai_disclosures', this._pick(options, 'pinterestAiDisclosures', 'pinterest_ai_disclosures'));
 
     if (!isVideo) {
