@@ -179,6 +179,9 @@ export class UploadPost {
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
     if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
+    // Paid partnership / branded content on every network that has a native label
+    // (TikTok, YouTube, X). The network's own option wins when both are given.
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
     // AI auto-generation of native per-platform copy from the media (fills blank fields)
 
     // Platform-specific title overrides
@@ -439,6 +442,8 @@ export class UploadPost {
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
     this._appendField(form, 'facebook_feed_targeting', this._pick(options, 'facebookFeedTargeting', 'facebook_feed_targeting'));
+    // Branded content: the sponsor's Page id (Page photos, videos and feed posts; not Reels/Stories).
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
 
     if (isVideo) {
       if (options.facebookVideoState) form.append('video_state', options.facebookVideoState);
@@ -473,6 +478,8 @@ export class UploadPost {
    */
   _addPinterestParams(form, options, isVideo = false) {
     if (options.pinterestBoardId) form.append('pinterest_board_id', options.pinterestBoardId);
+    // Paid partnership: the sponsor's account id (Pinterest closed beta).
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
     if (options.pinterestAltText) form.append('pinterest_alt_text', options.pinterestAltText);
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));

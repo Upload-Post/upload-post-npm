@@ -243,3 +243,48 @@ describe('fields agents reported as dropped (2.17.0)', () => {
     assert.equal(formFields(text).facebook_media_type, undefined);
   });
 });
+
+describe('commercial disclosure fields', () => {
+  test('paidPartnership goes on video, photo and text uploads', () => {
+    const form = new FormData();
+    client()._addCommonParams(form, { user: 'u', platforms: ['tiktok', 'youtube'], paidPartnership: true });
+    assert.equal(formFields(form).paid_partnership, 'true');
+  });
+
+  test('paidPartnership false is sent as false and snake_case works', () => {
+    const off = new FormData();
+    client()._addCommonParams(off, { user: 'u', platforms: 'x', paidPartnership: false });
+    assert.equal(formFields(off).paid_partnership, 'false');
+
+    const snake = new FormData();
+    client()._addCommonParams(snake, { user: 'u', platforms: 'x', paid_partnership: true });
+    assert.equal(formFields(snake).paid_partnership, 'true');
+  });
+
+  test('nothing is sent when the options are not given', () => {
+    const form = new FormData();
+    client()._addCommonParams(form, { user: 'u', platforms: ['tiktok'] });
+    client()._addFacebookParams(form, { facebookPageId: '1' }, true);
+    client()._addPinterestParams(form, { pinterestBoardId: 'b' }, true);
+    const fields = formFields(form);
+    for (const key of ['paid_partnership', 'facebook_sponsor_id', 'pinterest_sponsor_id']) {
+      assert.equal(key in fields, false, `${key} must not be sent by default`);
+    }
+  });
+
+  test('facebookSponsorId goes on video, photo and text posts', () => {
+    for (const [isVideo, isText] of [[true, false], [false, false], [false, true]]) {
+      const form = new FormData();
+      client()._addFacebookParams(form, { facebookPageId: '1', facebookSponsorId: '123456789' }, isVideo, isText);
+      assert.equal(formFields(form).facebook_sponsor_id, '123456789');
+    }
+  });
+
+  test('pinterestSponsorId goes on video and photo pins', () => {
+    for (const isVideo of [true, false]) {
+      const form = new FormData();
+      client()._addPinterestParams(form, { pinterestBoardId: 'b', pinterestSponsorId: '987654321' }, isVideo);
+      assert.equal(formFields(form).pinterest_sponsor_id, '987654321');
+    }
+  });
+});

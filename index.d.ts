@@ -58,6 +58,16 @@ declare module 'upload-post' {
     user: string;
     /** First comment to post after publishing */
     firstComment?: string;
+    /**
+     * Mark the post as a paid partnership / branded content on the networks that have a
+     * native label: TikTok (`brandContentToggle`), YouTube (`youtubeHasPaidProductPlacement`)
+     * and X (`xPaidPartnership`). The network's own option wins when both are given.
+     * Other networks publish normally and the response adds a `warnings` note
+     * (Instagram and Facebook Reels have no native paid-partnership field in the API).
+     * With `tiktokPrivacyLevel: 'SELF_ONLY'` the API answers 400
+     * (`commercial_disclosure_privacy_conflict`): TikTok does not allow private branded content.
+     */
+    paidPartnership?: boolean;
     /** Reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). */
     replyToId?: string;
     /** Alt text for accessibility */
@@ -326,7 +336,12 @@ declare module 'upload-post' {
     youtubeAllowedCountries?: string;
     /** Comma-separated blocked country codes */
     youtubeBlockedCountries?: string;
-    /** Paid product placement flag */
+    /**
+     * Paid product placement ("Paid promotion" in YouTube Studio). YouTube's API documents the
+     * property but does not list it as writable on videos.insert, so YouTube can ignore it: the
+     * YouTube result carries `youtube_paid_product_placement` (what YouTube stored) and a
+     * `warnings` note when it was not kept.
+     */
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
@@ -393,6 +408,12 @@ declare module 'upload-post' {
   export interface FacebookVideoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Branded content: numeric ID of the sponsor's Facebook Page, sent as `sponsor_id`.
+     * Page photos, videos (`facebookMediaType: 'VIDEO'`) and feed posts only; Reels and Stories have no
+     * sponsor field. The Page needs access to Meta's branded content tool.
+     */
+    facebookSponsorId?: string;
     /** Video state */
     facebookVideoState?: FacebookVideoState;
     /** Media type */
@@ -420,6 +441,12 @@ declare module 'upload-post' {
   export interface FacebookPhotoOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Branded content: numeric ID of the sponsor's Facebook Page, sent as `sponsor_id`.
+     * Page photos, videos (`facebookMediaType: 'VIDEO'`) and feed posts only; Reels and Stories have no
+     * sponsor field. The Page needs access to Meta's branded content tool.
+     */
+    facebookSponsorId?: string;
     /** Alt text per photo */
     facebookAltText?: string | string[];
     /** POSTS (default) publishes to the feed, STORIES as a Page story */
@@ -435,6 +462,12 @@ declare module 'upload-post' {
   export interface FacebookTextOptions {
     /** Facebook Page ID */
     facebookPageId?: string;
+    /**
+     * Branded content: numeric ID of the sponsor's Facebook Page, sent as `sponsor_id`.
+     * Page photos, videos (`facebookMediaType: 'VIDEO'`) and feed posts only; Reels and Stories have no
+     * sponsor field. The Page needs access to Meta's branded content tool.
+     */
+    facebookSponsorId?: string;
     /** URL to attach as link preview */
     facebookLinkUrl?: string;
     /** Facebook Place ID */
@@ -456,6 +489,8 @@ declare module 'upload-post' {
   export interface PinterestVideoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Paid partnership: numeric ID of the sponsor's Pinterest account (Pinterest closed beta). */
+    pinterestSponsorId?: string;
     /** Destination link */
     pinterestLink?: string;
     /** Cover image URL */
@@ -475,6 +510,8 @@ declare module 'upload-post' {
   export interface PinterestPhotoOptions {
     /** Board ID */
     pinterestBoardId?: string;
+    /** Paid partnership: numeric ID of the sponsor's Pinterest account (Pinterest closed beta). */
+    pinterestSponsorId?: string;
     /** Alt text */
     pinterestAltText?: string;
     /** Destination link */
