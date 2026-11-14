@@ -179,6 +179,12 @@ export class UploadPost {
     if (options.addToQueue !== undefined) form.append('add_to_queue', String(options.addToQueue));
     if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
+    // Cross-network paid-partnership switch. The API maps it to each network's
+    // native label (TikTok branded content, YouTube paid promotion, X paid
+    // partnership) and answers with a `warnings` entry on networks that have
+    // none. A network-specific field (brandContentToggle,
+    // youtubeHasPaidProductPlacement, xPaidPartnership) always wins over it.
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
     // AI auto-generation of native per-platform copy from the media (fills blank fields)
 
     // Platform-specific title overrides
@@ -439,6 +445,10 @@ export class UploadPost {
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
     this._appendField(form, 'facebook_feed_targeting', this._pick(options, 'facebookFeedTargeting', 'facebook_feed_targeting'));
+    // Branded content tag: the sponsor's numeric Page id. Applies to Page photos,
+    // Page videos (facebookMediaType 'VIDEO') and text/link posts; Reels and
+    // Stories have no sponsor field, so the API ignores it there and warns.
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
 
     if (isVideo) {
       if (options.facebookVideoState) form.append('video_state', options.facebookVideoState);
@@ -477,6 +487,8 @@ export class UploadPost {
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
     this._appendField(form, 'pinterest_ai_disclosures', this._pick(options, 'pinterestAiDisclosures', 'pinterest_ai_disclosures'));
+    // Paid partnership: the sponsor's numeric account id. Pinterest keeps this to a closed beta.
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
 
     if (!isVideo) {
       this._appendRepeated(form, 'pinterest_carousel_titles[]', this._pick(options, 'pinterestCarouselTitles', 'pinterest_carousel_titles'));
@@ -868,7 +880,7 @@ export class UploadPost {
    * @param {string} [options.youtubeDefaultAudioLanguage] - Audio language (BCP-47)
    * @param {string} [options.youtubeAllowedCountries] - Comma-separated country codes
    * @param {string} [options.youtubeBlockedCountries] - Comma-separated country codes
-   * @param {boolean} [options.youtubeHasPaidProductPlacement] - Paid placement flag
+   * @param {boolean} [options.youtubeHasPaidProductPlacement] - Paid promotion declaration (the response warns if YouTube did not keep it)
    * @param {string} [options.youtubeRecordingDate] - Recording date (ISO 8601)
    * 
    * LinkedIn options:
@@ -880,11 +892,13 @@ export class UploadPost {
    * @param {string} [options.facebookVideoState] - PUBLISHED or DRAFT
    * @param {string} [options.facebookMediaType] - REELS, STORIES, or VIDEO
    * @param {string} [options.thumbnailUrl] - Thumbnail URL for normal page videos (VIDEO type only)
+   * @param {string} [options.facebookSponsorId] - Sponsor's Page id for the branded content tag (Page photos/videos/posts, not Reels or Stories)
    *
    * Pinterest options:
    * @param {string} [options.pinterestBoardId] - Board ID
    * @param {string} [options.pinterestLink] - Destination link
    * @param {string} [options.pinterestCoverImageUrl] - Cover image URL
+   * @param {string} [options.pinterestSponsorId] - Sponsor's account id for a paid partnership (closed beta)
    * @param {number} [options.pinterestCoverImageKeyFrameTime] - Key frame time in ms
    * 
    * X (Twitter) options:

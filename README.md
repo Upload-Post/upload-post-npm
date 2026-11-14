@@ -844,8 +844,8 @@ gets per-post analytics; after 30 days without a post, use
 - `tiktokCoverTimestamp` - Timestamp in ms for cover
 - `tiktokIsAigc` - AI-generated content flag
 - `tiktokPostMode` / `postMode` - DIRECT_POST or MEDIA_UPLOAD. `MEDIA_UPLOAD` is the same draft as `tiktokUploadToDraft`
-- `brandContentToggle` - Branded content toggle
-- `brandOrganicToggle` - Brand organic toggle
+- `brandContentToggle` - Branded content (paid partnership with a third-party brand). Direct posts only; TikTok does not allow it with `SELF_ONLY`. Same as `paidPartnership`, see [Paid partnerships](#paid-partnerships-and-commercial-disclosure)
+- `brandOrganicToggle` - Promoting your own business
 - `tiktokIsAdsOnly` - Only show the video in ads
 - `tiktokTtoInviteLink` - TikTok One invite link (requires branded content)
 
@@ -902,7 +902,7 @@ for those options.
 - `youtubeDefaultLanguage` - Title/description language (BCP-47)
 - `youtubeDefaultAudioLanguage` - Audio language (BCP-47)
 - `youtubeAllowedCountries` / `youtubeBlockedCountries` - Country restrictions
-- `youtubeHasPaidProductPlacement` - Paid placement flag
+- `youtubeHasPaidProductPlacement` - Paid promotion declaration (`paidProductPlacementDetails.hasPaidProductPlacement`). If YouTube does not keep it the response carries a `warnings` entry
 - `youtubeRecordingDate` - Recording date (ISO 8601)
 - `youtubeNotifySubscribers` - Notify subscribers (default true)
 - `youtubePublishAt` - RFC3339 time; video stays private until then
@@ -933,6 +933,7 @@ for those options.
 - `facebookUnpublishedContentType` - DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED (do not send SCHEDULED; use `scheduledDate`)
 - `facebookNoStory` / `facebookSecret` - Page video flags
 - `facebookCollaborators` - Page IDs to invite on Reels
+- `facebookSponsorId` - Sponsor's Page ID for the branded content tag (Page photos, `VIDEO` and text posts; not Reels or Stories)
 
 ### Pinterest
 - `pinterestBoardId` - Board ID
@@ -942,6 +943,7 @@ for those options.
 - `pinterestCoverImageKeyFrameTime` - Key frame time in seconds (values larger than the video duration are treated as milliseconds)
 - `pinterestBoardSectionId` - Board section ID
 - `pinterestAiDisclosures` - `AI_MODIFIED` and/or `SYNTHETIC_PERFORMER`
+- `pinterestSponsorId` - Sponsor's account ID for a paid partnership (Pinterest closed beta)
 - `pinterestCarouselTitles` / `pinterestCarouselDescriptions` / `pinterestCarouselLinks` / `pinterestCarouselIndex` - 2–5 photo carousel
 
 ### X (Twitter)
@@ -960,7 +962,7 @@ for those options.
 - `xThreadImageLayout` - Comma-separated image layout for thread (e.g. "4,4" or "2,3,1")
 - `xAltText` - Alt text (≤1000 chars)
 - `xSubtitles` / `xSubtitlesUrl` / `xSubtitlesLanguage` / `xSubtitlesName` - Video captions
-- `xPaidPartnership` - Paid partnership label
+- `xPaidPartnership` - Paid partnership label on the first post
 - `madeWithAi` - Disclose AI-generated media on X (`made_with_ai`; alias `isAiGenerated`)
 - `thumbnailUrl` - Custom video cover (generic field; applied by X as the post's preview image)
 - `xArticleTitle` / `xArticleBody` / `xArticleContentState` / `xArticleDraft` / `xArticleCoverMedia` - X Articles (Premium). Articles have two heading levels: `###` and `header-three` become `header-two`
@@ -1060,7 +1062,37 @@ These options work across all upload methods:
 | `addToQueue` | Add to posting queue |
 | `maxPostsPerSlot` | Max posts per queue slot (overrides profile setting) |
 | `asyncUpload` | Process asynchronously (default: true) |
+| `paidPartnership` | Mark the post as paid/sponsored on every network that has a native label (TikTok, YouTube, X). Others add a `warnings` entry. See below |
 | `idempotencyKey` | Collapses duplicate uploads within 24h. Reuse the same value when retrying. Alias: `requestId` |
+
+## Paid partnerships and commercial disclosure
+
+`paidPartnership: true` asks each network to show its own paid-partnership label. It is mapped only where the network has an API field for it, and a network-specific option always wins over it:
+
+| Network | What `paidPartnership` does | Network-specific option |
+|---------|-----------------------------|-------------------------|
+| TikTok | Branded content (`is_branded_content`). Direct posts only. With `tiktokPrivacyLevel: 'SELF_ONLY'` the API answers `400` `commercial_disclosure_privacy_conflict`; in draft mode it is skipped with a warning | `brandContentToggle`, `brandOrganicToggle` |
+| YouTube | `paidProductPlacementDetails.hasPaidProductPlacement` | `youtubeHasPaidProductPlacement` |
+| X | Paid partnership on the first post | `xPaidPartnership` |
+| Facebook | No alias: the branded content tag needs the sponsor's Page ID on Page photos, `VIDEO` and text posts (not Reels or Stories) | `facebookSponsorId` |
+| Pinterest | No alias: needs the sponsor's account ID (closed beta) | `pinterestSponsorId` |
+| Instagram and others | No native API field for these connections. The upload goes on and the response has a `warnings` entry | - |
+
+```javascript
+const result = await client.upload('video.mp4', {
+  user: 'my-profile',
+  title: 'Sponsored: our new product',
+  platforms: ['tiktok', 'youtube', 'instagram'],
+  paidPartnership: true,
+});
+// Networks without a native label are listed in result.warnings (the upload goes on)
+```
+
+Notes:
+
+- TikTok does not return the label it applied, so check the post in the TikTok app. The Music Usage Confirmation is a consent line that TikTok requires apps to show before posting; it is not an API parameter.
+- YouTube's docs do not list `paidProductPlacementDetails` among the properties you can write, so it can be ignored. When YouTube's answer to the upload shows it was dropped, the post still publishes and that platform's result in `getStatus()` carries a `warnings` entry. Read it back with YouTube's `videos.list` (`part=paidProductPlacementDetails`).
+- `paidPartnership: false` has no effect (it never removes a label); omit the field for unpaid posts.
 
 ## Google Business Profile
 

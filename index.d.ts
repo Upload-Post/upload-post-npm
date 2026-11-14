@@ -58,6 +58,10 @@ declare module 'upload-post' {
     user: string;
     /** First comment to post after publishing */
     firstComment?: string;
+    /**
+     * Mark the post as paid or sponsored. The API maps it to each network's native label: TikTok branded content (direct posts only, never with privacy SELF_ONLY), YouTube paid promotion and X paid partnership. Networks without a native label (Instagram, Threads, LinkedIn, …) ignore it and the response carries a `warnings` entry. A network-specific field (`brandContentToggle`, `youtubeHasPaidProductPlacement`, `xPaidPartnership`) always wins over it.
+     */
+    paidPartnership?: boolean;
     /** Reply to an existing post (X: tweet ID; Bluesky: post URL or AT-URI). */
     replyToId?: string;
     /** Alt text for accessibility */
@@ -326,7 +330,7 @@ declare module 'upload-post' {
     youtubeAllowedCountries?: string;
     /** Comma-separated blocked country codes */
     youtubeBlockedCountries?: string;
-    /** Paid product placement flag */
+    /** Paid promotion declaration (`paidProductPlacementDetails.hasPaidProductPlacement`). Sent on upload only when you set it. If YouTube does not keep it, the response carries a `warnings` entry; read it back with YouTube's `videos.list` (`part=paidProductPlacementDetails`). */
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
@@ -415,6 +419,8 @@ declare module 'upload-post' {
     facebookSecret?: boolean;
     /** Page IDs to invite as Reel collaborators (max 10 / 24h) */
     facebookCollaborators?: string | string[];
+    /** Branded content tag: the sponsor's numeric Page id. Page photos, Page videos (`facebookMediaType: 'VIDEO'`) and text/link posts. Reels and Stories have no sponsor field (the API ignores it and warns). The Page needs access to Meta's branded content tool. */
+    facebookSponsorId?: string;
   }
 
   export interface FacebookPhotoOptions {
@@ -430,6 +436,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Branded content tag: the sponsor's numeric Page id. Page photos, Page videos (`facebookMediaType: 'VIDEO'`) and text/link posts. Reels and Stories have no sponsor field (the API ignores it and warns). The Page needs access to Meta's branded content tool. */
+    facebookSponsorId?: string;
   }
 
   export interface FacebookTextOptions {
@@ -443,6 +451,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Branded content tag: the sponsor's numeric Page id. Page photos, Page videos (`facebookMediaType: 'VIDEO'`) and text/link posts. Reels and Stories have no sponsor field (the API ignores it and warns). The Page needs access to Meta's branded content tool. */
+    facebookSponsorId?: string;
     /** Link-post CTA, e.g. { type: 'LEARN_MORE', link: 'https://…' } */
     facebookCallToAction?: Record<string, unknown> | string;
     /** Link carousel (2–5 objects with `link`) */
@@ -470,6 +480,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Paid partnership: the sponsor's numeric account id. Pinterest keeps this to a closed beta. */
+    pinterestSponsorId?: string;
   }
 
   export interface PinterestPhotoOptions {
@@ -483,6 +495,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Paid partnership: the sponsor's numeric account id. Pinterest keeps this to a closed beta. */
+    pinterestSponsorId?: string;
     /** Per-slide titles on a 2–5 photo carousel */
     pinterestCarouselTitles?: string | string[];
     /** Per-slide descriptions on a 2–5 photo carousel */
