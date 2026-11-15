@@ -557,7 +557,9 @@ Asking a platform a question it cannot answer fails with
 ### Direct messages
 
 `sendDm()` and `getDmConversations()` cover Instagram, Facebook Messenger
-(`platform: 'facebook'`), WhatsApp and Bluesky. Options are camelCase; any other
+(`platform: 'facebook'`), WhatsApp and Bluesky. `sendDm()` also sends from your
+own Telegram bot (`platform: 'telegram'`) to people who started it; reading
+Telegram conversations is not available yet. Options are camelCase; any other
 key is sent to the API as given.
 
 ```javascript
@@ -741,6 +743,263 @@ downgrade), the last invited members are **suspended, not removed**: their
 requests fail with HTTP 403 and `error.code === 'TEAM_SEAT_SUSPENDED'` until the
 owner upgrades or removes someone. `listTeamMembers()` (owner) and
 `listSharedAccounts()` (member) show `suspended` and `suspended_reason`.
+
+### Post actions, best times, queue, Telegram, Bluesky and Google Business
+
+Editing and reposting published posts, the best time to post, the queue, and
+the management endpoints of Telegram, Bluesky and Google Business are plain
+methods that take one options object and send it to the API **without dropping
+anything**: top-level camelCase keys become the API's snake_case names
+(`locationId` → `location_id`; snake_case keys are sent as given) and nested
+objects keep their own shape, so Telegram and Google objects go through
+untouched. A file field (`file`, `photo`, `animation`, `sticker`, `avatar`,
+`banner`, `telegramMedia`...) given as a local path, stream or `Buffer` turns
+the request into `multipart/form-data`; URLs and Telegram `file_id`s stay
+strings. Each method links to its page in the API docs for the full list of
+fields.
+
+```javascript
+// Best hours to post on Instagram, and a queue that fills them by itself
+const { best_times } = await client.getBestTimes({ profileUsername: 'my-profile', platform: 'instagram', top: 3 });
+await client.updateQueueSettings({ profileUsername: 'my-profile', slots: 'auto', autoSlotsCount: 3, autoPlatforms: ['instagram', 'tiktok'] });
+
+// Telegram: pin a post, forward it to another chat, delete every message of an album
+await client.editPost({ user: 'my-profile', platform: 'telegram', postId: '42', action: 'pin' });
+await client.repostPost({ user: 'my-profile', platform: 'telegram', postId: '42', mode: 'copy', targetChatId: '@other_channel' });
+await client.unpublishPost({ user: 'my-profile', platform: 'telegram', postId: '42', deleteAllMessages: true });
+
+// Telegram chat management
+await client.createTelegramInviteLink({ user: 'my-profile', name: 'Newsletter', createsJoinRequest: true });
+await client.updateTelegramChatInfo({ user: 'my-profile', photo: './logo.jpg' });   // multipart
+
+// Bluesky: bookmark a post, read notifications, save a draft
+await client.postAction({ user: 'my-profile', platform: 'bluesky', action: 'bookmark', postId: 'at://did:plc:.../app.bsky.feed.post/3l...' });
+const { notifications } = await client.getBlueskyNotifications({ user: 'my-profile', limit: 20 });
+await client.createBlueskyDraft({ user: 'my-profile', posts: [{ text: 'Coming soon' }] });
+
+// Google Business: reviews, gallery, daily metrics, strict location edits
+const { reviews } = await client.listGoogleBusinessReviews({ user: 'my-shop', pageSize: 20 });
+await client.replyToGoogleBusinessReview({ user: 'my-shop', reviewName: reviews[0].name, comment: 'Thank you!' });
+await client.uploadGoogleBusinessMedia({ user: 'my-shop', file: './dining-room.jpg', category: 'INTERIOR' });
+await client.getGoogleBusinessPerformance({ user: 'my-shop', metrics: ['call_clicks', 'website_clicks'], startDate: '2026-10-01', endDate: '2026-10-31' });
+await client.updateGoogleBusinessLocationInfo({ user: 'my-shop', editMode: 'strict', dryRun: true, phone: '+34 900 000 000' });
+```
+
+Telegram analytics come from `getAnalytics('my-profile', { platforms: ['telegram'] })`
+(subscribers or members, reactions, boosts), and Telegram DMs from your own bot
+go through `sendDm({ platform: 'telegram', ... })`.
+
+#### Posts: edit, repost, actions
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`editPost`](https://docs.upload-post.com/api/edit-post) | `POST /api/uploadposts/posts/edit` | Edit a published post (Facebook, LinkedIn, X, Google Business, Telegram: text, buttons, pin/unpin, stop a poll, live location, replace the media). |
+| [`repostPost`](https://docs.upload-post.com/api/repost) | `POST /api/uploadposts/posts/repost` | Repost / reshare a post (LinkedIn, X, Threads; Telegram forward or copy with `mode`, `post_ids`, `all_messages`). |
+| [`postAction`](https://docs.upload-post.com/api/bluesky-post-actions) | `POST /api/uploadposts/posts/action` | Act on a published post: Telegram reactions and forward/copy; Bluesky bookmark/unbookmark, pin/unpin, reply and quote settings, detach/reattach quotes. |
+| [`savePost`](https://docs.upload-post.com/api/save-pin) | `POST /api/uploadposts/posts/save` | Save a post: a Pinterest Pin to a board, or a Bluesky bookmark (`platform: "bluesky"`). |
+
+#### Best time to post and queue
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`getBestTimes`](https://docs.upload-post.com/api/best-times) | `GET /api/uploadposts/best-times` | Best hours to publish for a connected account, with `source` and `confidence` (`timezone`, `top`, `refresh`, `page_urn`, `facebook_page_id`). |
+| [`getQueueSettings`](https://docs.upload-post.com/api/queue-system) | `GET /api/uploadposts/queue/settings` | Queue settings, including `slots_mode`, `auto_slots` and `effective_slots`. |
+| [`updateQueueSettings`](https://docs.upload-post.com/api/queue-system) | `POST /api/uploadposts/queue/settings` | Update the queue. `slots: "auto"` (or `slots_mode: "auto"`) fills the best hours automatically (`auto_slots_count`, `auto_platforms`, `refresh`); a `slots` array switches back to fixed slots. |
+| [`getQueuePreview`](https://docs.upload-post.com/api/queue-system) | `GET /api/uploadposts/queue/preview` | Upcoming queue slots and what is scheduled in each (`count`, max 50). |
+| [`getNextQueueSlot`](https://docs.upload-post.com/api/queue-system) | `GET /api/uploadposts/queue/next-slot` | Next free queue slot. |
+| [`markQueueSlotFull`](https://docs.upload-post.com/api/queue-system) | `POST /api/uploadposts/queue/slot-full` | Mark a queue slot (ISO 8601, UTC) as full. |
+| [`unmarkQueueSlotFull`](https://docs.upload-post.com/api/queue-system) | `DELETE /api/uploadposts/queue/slot-full` | Unmark a queue slot marked as full. |
+
+#### Telegram: chat, members and invite links
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`getTelegramChatInfo`](https://docs.upload-post.com/api/telegram-chat-insights) | `GET /api/uploadposts/telegram/chat-info` | Chat details, subscribers/members and administrators (`include_administrators`, `return_bots`). |
+| [`updateTelegramChatInfo`](https://docs.upload-post.com/api/telegram-chat) | `PATCH /api/uploadposts/telegram/chat-info` | Change the chat title, description, photo (file or `photo_url`), permissions, slow mode, sticker set... |
+| [`getTelegramBoosts`](https://docs.upload-post.com/api/telegram-chat-insights) | `GET /api/uploadposts/telegram/boosts` | Boosts of the chat (with `user_id`: that user's boosts). |
+| [`getTelegramMember`](https://docs.upload-post.com/api/telegram-chat) | `GET /api/uploadposts/telegram/members` | Read one member (`user_id`) or list the administrators. |
+| [`moderateTelegramMember`](https://docs.upload-post.com/api/telegram-chat) | `POST /api/uploadposts/telegram/members` | Ban, unban, restrict, promote or give a custom title to a member (`action`). |
+| [`createTelegramInviteLink`](https://docs.upload-post.com/api/telegram-chat) | `POST /api/uploadposts/telegram/invite-links` | Create an invite link (name, expiry, member limit, join requests, subscription). |
+| [`editTelegramInviteLink`](https://docs.upload-post.com/api/telegram-chat) | `PATCH /api/uploadposts/telegram/invite-links` | Edit an invite link. |
+| [`revokeTelegramInviteLink`](https://docs.upload-post.com/api/telegram-chat) | `DELETE /api/uploadposts/telegram/invite-links` | Revoke an invite link. |
+| [`createTelegramPrimaryInviteLink`](https://docs.upload-post.com/api/telegram-chat) | `POST /api/uploadposts/telegram/invite-links/primary` | Generate a new primary invite link (the previous one stops working). |
+| [`answerTelegramJoinRequest`](https://docs.upload-post.com/api/telegram-chat) | `POST /api/uploadposts/telegram/join-requests` | Approve or decline a request to join the chat. |
+| [`getTelegramTopicIcons`](https://docs.upload-post.com/api/telegram-chat) | `GET /api/uploadposts/telegram/topics/icons` | Custom emoji that can be used as forum topic icons. |
+| [`createTelegramTopic`](https://docs.upload-post.com/api/telegram-chat) | `POST /api/uploadposts/telegram/topics` | Create a forum topic. |
+| [`editTelegramTopic`](https://docs.upload-post.com/api/telegram-chat) | `PATCH /api/uploadposts/telegram/topics` | Edit, close, reopen, hide, unhide or unpin a forum topic. |
+| [`deleteTelegramTopic`](https://docs.upload-post.com/api/telegram-chat) | `DELETE /api/uploadposts/telegram/topics` | Delete a forum topic. |
+| [`unpinAllTelegramMessages`](https://docs.upload-post.com/api/telegram-chat) | `POST /api/uploadposts/telegram/unpin-all` | Unpin every message of the chat (or of a topic). |
+| [`leaveTelegramChat`](https://docs.upload-post.com/api/telegram-chat) | `POST /api/uploadposts/telegram/leave` | Make the bot leave the connected chat. |
+| [`answerTelegramSuggestedPost`](https://docs.upload-post.com/api/telegram-chat) | `POST /api/uploadposts/telegram/suggested-posts` | Approve or decline a suggested post in a channel direct messages chat. |
+| [`getTelegramUserPersonalChatMessages`](https://docs.upload-post.com/api/telegram-chat) | `GET /api/uploadposts/telegram/users/{user_id}/personal-chat-messages` | Last messages of a user's personal channel. |
+| [`getTelegramUserProfileAudios`](https://docs.upload-post.com/api/telegram-chat) | `GET /api/uploadposts/telegram/users/{user_id}/profile-audios` | Profile audios of a Telegram user. |
+| [`getTelegramShareThemeBackdrops`](https://docs.upload-post.com/api/telegram-chat) | `GET /api/uploadposts/telegram/share-theme-backdrops` | Backdrops available for the Telegram share screen theme. |
+| [`getTelegramUpdatesStatus`](https://docs.upload-post.com/api/telegram-inbox) | `GET /api/uploadposts/telegram/updates` | Whether update receiving is on for the bot. |
+
+#### Telegram: bot profile, commands and stickers
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`getTelegramBotProfile`](https://docs.upload-post.com/api/telegram-bot-profile) | `GET /api/uploadposts/telegram/bot-profile` | Bot name, descriptions, photo, menu button and default administrator rights. |
+| [`updateTelegramBotProfile`](https://docs.upload-post.com/api/telegram-bot-profile) | `PATCH /api/uploadposts/telegram/bot-profile` | Change the bot profile (`photo`/`animation` as file or URL, `menu_button`, `default_administrator_rights`...). |
+| [`getTelegramBotCommands`](https://docs.upload-post.com/api/telegram-bot-profile) | `GET /api/uploadposts/telegram/bot-commands` | Bot commands for a scope and language. |
+| [`setTelegramBotCommands`](https://docs.upload-post.com/api/telegram-bot-profile) | `POST /api/uploadposts/telegram/bot-commands` | Set the bot commands (`commands`, `scope`, `language_code`). |
+| [`deleteTelegramBotCommands`](https://docs.upload-post.com/api/telegram-bot-profile) | `DELETE /api/uploadposts/telegram/bot-commands` | Delete the bot commands of a scope and language. |
+| [`getTelegramStickerSet`](https://docs.upload-post.com/api/telegram-stickers) | `GET /api/uploadposts/telegram/sticker-sets` | Read a sticker set (`name`) or custom emoji stickers. |
+| [`createTelegramStickerSet`](https://docs.upload-post.com/api/telegram-stickers) | `POST /api/uploadposts/telegram/sticker-sets` | Create a sticker set. |
+| [`editTelegramStickerSet`](https://docs.upload-post.com/api/telegram-stickers) | `PATCH /api/uploadposts/telegram/sticker-sets` | Edit a sticker set (add, replace, reorder stickers, title, thumbnail, emoji, keywords...). |
+| [`deleteTelegramStickerSet`](https://docs.upload-post.com/api/telegram-stickers) | `DELETE /api/uploadposts/telegram/sticker-sets` | Delete a sticker set, or a sticker from it. |
+| [`uploadTelegramStickerFile`](https://docs.upload-post.com/api/telegram-stickers) | `POST /api/uploadposts/telegram/sticker-sets/upload` | Upload a sticker file (`sticker` file or `sticker_url`, `sticker_format`, `owner_user_id`); returns its `file_id`. |
+
+#### Telegram: Stars, invoices and gifts
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`getTelegramStars`](https://docs.upload-post.com/api/telegram-chat-insights) | `GET /api/uploadposts/telegram/stars` | The bot's Telegram Stars balance. |
+| [`getTelegramStarTransactions`](https://docs.upload-post.com/api/telegram-chat-insights) | `GET /api/uploadposts/telegram/stars/transactions` | The bot's Telegram Stars transactions (`offset`, `limit`). |
+| [`sendTelegramInvoice`](https://docs.upload-post.com/api/telegram-payments) | `POST /api/uploadposts/telegram/invoices` | Send an invoice to the connected chat or to `chat_id` (payments go to your bot). |
+| [`createTelegramInvoiceLink`](https://docs.upload-post.com/api/telegram-payments) | `POST /api/uploadposts/telegram/invoice-links` | Create an invoice link. |
+| [`refundTelegramStarPayment`](https://docs.upload-post.com/api/telegram-payments) | `POST /api/uploadposts/telegram/stars/refund` | Refund a Telegram Stars payment (`user_id`, `telegram_payment_charge_id`). |
+| [`editTelegramStarSubscription`](https://docs.upload-post.com/api/telegram-payments) | `POST /api/uploadposts/telegram/stars/subscription` | Cancel or re-enable a user's Stars subscription. |
+| [`getTelegramAvailableGifts`](https://docs.upload-post.com/api/telegram-payments) | `GET /api/uploadposts/telegram/gifts` | Gifts the bot can send. |
+| [`getTelegramOwnedGifts`](https://docs.upload-post.com/api/telegram-payments) | `GET /api/uploadposts/telegram/gifts/owned` | Gifts owned by a user or a chat. |
+| [`getTelegramUniqueGift`](https://docs.upload-post.com/api/telegram-payments) | `GET /api/uploadposts/telegram/gifts/unique` | A unique gift by name. |
+| [`getTelegramUnansweredPayments`](https://docs.upload-post.com/api/telegram-payments) | `GET /api/uploadposts/telegram/payments/unanswered` | Payment queries that were not answered in time. |
+
+#### Bluesky: reads
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`getPostEngagement`](https://docs.upload-post.com/api/bluesky-reads) | `GET /api/uploadposts/post-engagement` | Who liked, reposted or quoted a post (`type`: likes, reposts, quotes; `limit`, `cursor`). |
+| [`getBlueskyProfiles`](https://docs.upload-post.com/api/bluesky-reads) | `GET /api/uploadposts/bluesky/profile` | One or several Bluesky profiles (`actor`: handles or DIDs, comma separated, up to 25; without it, the connected account). |
+| [`searchBlueskyPosts`](https://docs.upload-post.com/api/bluesky-reads) | `GET /api/uploadposts/bluesky/search/posts` | Search Bluesky posts (`sort`, `since`, `until`, `author`, `lang`, `tag`, `limit`, `cursor`...). |
+| [`searchBlueskyActors`](https://docs.upload-post.com/api/bluesky-reads) | `GET /api/uploadposts/bluesky/search/actors` | Search Bluesky accounts. |
+| [`getBlueskyFollowers`](https://docs.upload-post.com/api/bluesky-reads) | `GET /api/uploadposts/bluesky/followers` | Followers of an account (`actor`, or the connected one with `user`; `known=true` for followers you follow). |
+| [`getBlueskyFollows`](https://docs.upload-post.com/api/bluesky-reads) | `GET /api/uploadposts/bluesky/follows` | Accounts an account follows. |
+| [`blueskyXrpc`](https://docs.upload-post.com/api/bluesky-reads) | `GET /api/uploadposts/bluesky/xrpc/{nsid}` | Read-only gateway to an allow-listed public Bluesky XRPC method (e.g. `app.bsky.feed.getAuthorFeed`); returns Bluesky's answer untouched. |
+| [`getBlueskyLabels`](https://docs.upload-post.com/api/bluesky-reads) | `GET /api/uploadposts/bluesky/labels` | Moderation labels on the account and its posts. |
+
+#### Bluesky: notifications
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`getBlueskyNotifications`](https://docs.upload-post.com/api/bluesky-notifications) | `GET /api/uploadposts/bluesky/notifications` | List notifications (`reasons`, `priority`, `limit`, `cursor`). |
+| [`getBlueskyUnreadCount`](https://docs.upload-post.com/api/bluesky-notifications) | `GET /api/uploadposts/bluesky/notifications/unread-count` | Unread notification count. |
+| [`markBlueskyNotificationsSeen`](https://docs.upload-post.com/api/bluesky-notifications) | `POST /api/uploadposts/bluesky/notifications/seen` | Mark notifications as seen (up to `seen_at`). |
+| [`getBlueskyNotificationPreferences`](https://docs.upload-post.com/api/bluesky-notifications) | `GET /api/uploadposts/bluesky/notification-preferences` | Notification preferences. |
+| [`updateBlueskyNotificationPreferences`](https://docs.upload-post.com/api/bluesky-notifications) | `POST /api/uploadposts/bluesky/notification-preferences` | Update notification preferences. |
+| [`getBlueskyActivitySubscriptions`](https://docs.upload-post.com/api/bluesky-notifications) | `GET /api/uploadposts/bluesky/activity-subscriptions` | Accounts whose activity you are subscribed to. |
+| [`setBlueskyActivitySubscription`](https://docs.upload-post.com/api/bluesky-notifications) | `POST /api/uploadposts/bluesky/activity-subscriptions` | Subscribe to (or stop) an account's posts and replies. |
+
+#### Bluesky: profile, settings and drafts
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`getBlueskyOwnProfile`](https://docs.upload-post.com/api/bluesky-profile) | `GET /api/uploadposts/bluesky/profile/self` | The connected account's profile record. |
+| [`updateBlueskyProfile`](https://docs.upload-post.com/api/bluesky-profile) | `POST /api/uploadposts/bluesky/profile/self` | Update the profile (display name, description, `avatar`/`banner` files, links, pinned post...). Fields not sent stay as they are. |
+| [`getBlueskyStatus`](https://docs.upload-post.com/api/bluesky-profile) | `GET /api/uploadposts/bluesky/status` | Read the live status. |
+| [`setBlueskyStatus`](https://docs.upload-post.com/api/bluesky-profile) | `POST /api/uploadposts/bluesky/status` | Set the live status. |
+| [`clearBlueskyStatus`](https://docs.upload-post.com/api/bluesky-profile) | `DELETE /api/uploadposts/bluesky/status` | Clear the live status. |
+| [`getBlueskySettings`](https://docs.upload-post.com/api/bluesky-profile) | `GET /api/uploadposts/bluesky/settings` | Chat and discovery settings. |
+| [`updateBlueskySettings`](https://docs.upload-post.com/api/bluesky-profile) | `POST /api/uploadposts/bluesky/settings` | Change chat and discovery settings. |
+| [`getBlueskyPreferences`](https://docs.upload-post.com/api/bluesky-profile) | `GET /api/uploadposts/bluesky/preferences` | App preferences (content filters, feeds, muted words...). |
+| [`updateBlueskyPreferences`](https://docs.upload-post.com/api/bluesky-profile) | `PUT /api/uploadposts/bluesky/preferences` | Replace some app preferences. |
+| [`listBlueskyDrafts`](https://docs.upload-post.com/api/bluesky-drafts) | `GET /api/uploadposts/bluesky/drafts` | List drafts. |
+| [`createBlueskyDraft`](https://docs.upload-post.com/api/bluesky-drafts) | `POST /api/uploadposts/bluesky/drafts` | Create a draft. |
+| [`updateBlueskyDraft`](https://docs.upload-post.com/api/bluesky-drafts) | `PATCH /api/uploadposts/bluesky/drafts/{draft_id}` | Replace a draft. |
+| [`deleteBlueskyDraft`](https://docs.upload-post.com/api/bluesky-drafts) | `DELETE /api/uploadposts/bluesky/drafts/{draft_id}` | Delete a draft. |
+
+#### Bluesky: chat
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`getBlueskyChatStatus`](https://docs.upload-post.com/api/bluesky-chat) | `GET /api/uploadposts/dms/bluesky/status` | Chat status of the account. |
+| [`getBlueskyChatPreferences`](https://docs.upload-post.com/api/bluesky-chat) | `GET /api/uploadposts/dms/bluesky/preferences` | DM notification settings. |
+| [`updateBlueskyChatPreferences`](https://docs.upload-post.com/api/bluesky-chat) | `POST /api/uploadposts/dms/bluesky/preferences` | Change DM notification settings. |
+| [`exportBlueskyChat`](https://docs.upload-post.com/api/bluesky-chat) | `GET /api/uploadposts/dms/bluesky/export` | Export the account's chat history. |
+
+#### Google Business: posts and reviews
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`listGoogleBusinessPosts`](https://docs.upload-post.com/api/google-business-posts) | `GET /api/uploadposts/google-business/posts` | List the location's posts (`location_id`, `page_size`, `page_token`). Edit them with editPost and delete them with unpublishPost. |
+| [`getGoogleBusinessPost`](https://docs.upload-post.com/api/google-business-posts) | `GET /api/uploadposts/google-business/posts/get` | Read one post (`post_id` or `post_name`). |
+| [`listGoogleBusinessReviews`](https://docs.upload-post.com/api/google-business-reviews) | `GET /api/uploadposts/google-business/reviews` | List reviews (`location_id`, `page_size`, `page_token`, `order_by`). |
+| [`getGoogleBusinessReview`](https://docs.upload-post.com/api/google-business-reviews) | `GET /api/uploadposts/google-business/reviews/get` | Read one review (`review_name`, or `review_id` + `location_id`). |
+| [`batchGetGoogleBusinessReviews`](https://docs.upload-post.com/api/google-business-reviews) | `GET /api/uploadposts/google-business/reviews/batch` | Reviews of several locations at once (`location_ids`). |
+| [`replyToGoogleBusinessReview`](https://docs.upload-post.com/api/google-business-reviews) | `PUT /api/uploadposts/google-business/reviews/reply` | Reply to a review, or replace the reply (`review_name`, or `review_id` + `location_id`). |
+| [`deleteGoogleBusinessReviewReply`](https://docs.upload-post.com/api/google-business-reviews) | `DELETE /api/uploadposts/google-business/reviews/reply` | Delete the reply to a review. |
+
+#### Google Business: gallery and performance
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`listGoogleBusinessMedia`](https://docs.upload-post.com/api/google-business-media) | `GET /api/uploadposts/google-business/media` | List the location's gallery. |
+| [`getGoogleBusinessMedia`](https://docs.upload-post.com/api/google-business-media) | `GET /api/uploadposts/google-business/media/get` | Read one gallery item. |
+| [`uploadGoogleBusinessMedia`](https://docs.upload-post.com/api/google-business-media) | `POST /api/uploadposts/google-business/media` | Upload a photo or video to the gallery: `file` (local path, stream or Buffer) or `source_url`, plus `category`, `description`, `media_format`. |
+| [`updateGoogleBusinessMedia`](https://docs.upload-post.com/api/google-business-media) | `PATCH /api/uploadposts/google-business/media` | Change a gallery item's category. |
+| [`deleteGoogleBusinessMedia`](https://docs.upload-post.com/api/google-business-media) | `DELETE /api/uploadposts/google-business/media` | Delete a gallery item. |
+| [`listGoogleBusinessCustomerMedia`](https://docs.upload-post.com/api/google-business-media) | `GET /api/uploadposts/google-business/media/customers` | Photos uploaded by customers. |
+| [`getGoogleBusinessCustomerMedia`](https://docs.upload-post.com/api/google-business-media) | `GET /api/uploadposts/google-business/media/customers/get` | One customer photo. |
+| [`getGoogleBusinessPerformance`](https://docs.upload-post.com/api/google-business-performance) | `GET /api/uploadposts/google-business/performance` | Daily metrics for any date range (impressions, calls, website clicks, directions...: `metrics`, `start_date`, `end_date`). |
+| [`getGoogleBusinessSearchKeywords`](https://docs.upload-post.com/api/google-business-performance) | `GET /api/uploadposts/google-business/performance/keywords` | Monthly search keywords that showed the location (`start_month`, `end_month`). |
+
+#### Google Business: location info
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`getGoogleBusinessLocationInfo`](https://docs.upload-post.com/api/google-business-info) | `GET /api/uploadposts/google-business/location-info` | Read the location's info (name, address, hours, phones, categories, service area, open status...). |
+| [`updateGoogleBusinessLocationInfo`](https://docs.upload-post.com/api/google-business-info) | `PATCH /api/uploadposts/google-business/location-info` | Edit the location's info. `edit_mode: "legacy"` (default) or `"strict"` (`dry_run`, `confirm`, `include_edit_status`); `validate_only` in both. |
+| [`getGoogleBusinessGoogleUpdates`](https://docs.upload-post.com/api/google-business-info) | `GET /api/uploadposts/google-business/location-info/google-updated` | Changes Google suggested for the location (`diff_fields`). |
+| [`answerGoogleBusinessGoogleUpdates`](https://docs.upload-post.com/api/google-business-info) | `POST /api/uploadposts/google-business/location-info/google-updates` | Accept or reject Google's suggested changes, field by field. |
+| [`getGoogleBusinessLocationInfoExtended`](https://docs.upload-post.com/api/google-business-info) | `GET /api/uploadposts/google-business/location-info/extended` | Edit status of each field (experimental). |
+| [`listGoogleBusinessLocations`](https://docs.upload-post.com/api/google-business-info) | `GET /api/uploadposts/google-business/locations/list` | List locations with filters (`account`, `filter`, `order_by`, `read_mask`, `page_size`, `page_token`). |
+| [`getGoogleBusinessPinnedLocation`](https://docs.upload-post.com/api/google-business-location) | `GET /api/uploadposts/users/google-business-location` | Locations available to a profile and the one pinned for its uploads. |
+| [`pinGoogleBusinessLocation`](https://docs.upload-post.com/api/google-business-location) | `POST /api/uploadposts/users/google-business-location` | Pin the location a profile publishes to (instead of passing gbpLocationId on every upload). |
+| [`clearGoogleBusinessLocationPin`](https://docs.upload-post.com/api/google-business-location) | `DELETE /api/uploadposts/users/google-business-location` | Clear the pinned location. |
+
+#### Google Business: catalogs, attributes, Place Actions, menus, services and lodging
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`searchGoogleBusinessCategories`](https://docs.upload-post.com/api/google-business-catalogs) | `GET /api/uploadposts/google-business/categories` | Search categories (`region_code`, `language_code`, `query`). |
+| [`batchGetGoogleBusinessCategories`](https://docs.upload-post.com/api/google-business-catalogs) | `GET /api/uploadposts/google-business/categories/batch` | Category details: service types and more-hours types (`names`). |
+| [`searchGoogleBusinessChains`](https://docs.upload-post.com/api/google-business-catalogs) | `GET /api/uploadposts/google-business/chains` | Search chains (`name`). |
+| [`getGoogleBusinessChain`](https://docs.upload-post.com/api/google-business-catalogs) | `GET /api/uploadposts/google-business/chains/get` | One chain (`chain`). |
+| [`searchGoogleBusinessGoogleLocations`](https://docs.upload-post.com/api/google-business-catalogs) | `POST /api/uploadposts/google-business/google-locations/search` | Is the business already on Google? Search Google's listings. |
+| [`getGoogleBusinessRecommendedLocations`](https://docs.upload-post.com/api/google-business-catalogs) | `GET /api/uploadposts/google-business/google-locations/recommended` | Locations Google recommends for the account. |
+| [`reportGoogleBusinessGoogleLocation`](https://docs.upload-post.com/api/google-business-catalogs) | `POST /api/uploadposts/google-business/google-locations/report` | Report a wrong listing to Google. |
+| [`getGoogleBusinessAvailableAttributes`](https://docs.upload-post.com/api/google-business-attributes) | `GET /api/uploadposts/google-business/attributes/available` | Attributes the location can use. |
+| [`getGoogleBusinessAttributes`](https://docs.upload-post.com/api/google-business-attributes) | `GET /api/uploadposts/google-business/attributes` | Current attributes of the location. |
+| [`updateGoogleBusinessAttributes`](https://docs.upload-post.com/api/google-business-attributes) | `PATCH /api/uploadposts/google-business/attributes` | Update attributes. |
+| [`getGoogleBusinessAttributesGoogleUpdated`](https://docs.upload-post.com/api/google-business-attributes) | `GET /api/uploadposts/google-business/attributes/google-updated` | Attributes as Google shows them. |
+| [`getGoogleBusinessAttributesExtended`](https://docs.upload-post.com/api/google-business-attributes) | `GET /api/uploadposts/google-business/attributes/extended` | Attributes with their edit status (experimental). |
+| [`getGoogleBusinessPlaceActionTypes`](https://docs.upload-post.com/api/google-business-place-actions) | `GET /api/uploadposts/google-business/place-actions/types` | Place Action types (booking, ordering, shopping links...) the location can use. |
+| [`listGoogleBusinessPlaceActions`](https://docs.upload-post.com/api/google-business-place-actions) | `GET /api/uploadposts/google-business/place-actions` | List Place Action links. |
+| [`getGoogleBusinessPlaceAction`](https://docs.upload-post.com/api/google-business-place-actions) | `GET /api/uploadposts/google-business/place-actions/get` | Read one Place Action link (`link`). |
+| [`createGoogleBusinessPlaceAction`](https://docs.upload-post.com/api/google-business-place-actions) | `POST /api/uploadposts/google-business/place-actions` | Create a Place Action link. |
+| [`updateGoogleBusinessPlaceAction`](https://docs.upload-post.com/api/google-business-place-actions) | `PATCH /api/uploadposts/google-business/place-actions` | Edit or switch off a Place Action link. |
+| [`deleteGoogleBusinessPlaceAction`](https://docs.upload-post.com/api/google-business-place-actions) | `DELETE /api/uploadposts/google-business/place-actions` | Delete a Place Action link. |
+| [`getGoogleBusinessFoodMenus`](https://docs.upload-post.com/api/google-business-menus-services) | `GET /api/uploadposts/google-business/food-menus` | Food menus of the location. |
+| [`updateGoogleBusinessFoodMenus`](https://docs.upload-post.com/api/google-business-menus-services) | `PUT /api/uploadposts/google-business/food-menus` | Replace the food menus. |
+| [`getGoogleBusinessServices`](https://docs.upload-post.com/api/google-business-menus-services) | `GET /api/uploadposts/google-business/services` | Services of the location. |
+| [`updateGoogleBusinessServices`](https://docs.upload-post.com/api/google-business-menus-services) | `PUT /api/uploadposts/google-business/services` | Replace the services. |
+| [`getGoogleBusinessLodging`](https://docs.upload-post.com/api/google-business-lodging) | `GET /api/uploadposts/google-business/lodging` | Lodging data of a hotel (`read_mask`). |
+| [`updateGoogleBusinessLodging`](https://docs.upload-post.com/api/google-business-lodging) | `PATCH /api/uploadposts/google-business/lodging` | Update lodging data. |
+| [`getGoogleBusinessLodgingGoogleUpdated`](https://docs.upload-post.com/api/google-business-lodging) | `GET /api/uploadposts/google-business/lodging/google-updated` | Lodging data as Google shows it. |
+
+#### Google Business: accounts and verification (reads)
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| [`listGoogleBusinessAccounts`](https://docs.upload-post.com/api/google-business-accounts) | `GET /api/uploadposts/google-business/accounts` | Google Business accounts and location groups (`type`). |
+| [`getGoogleBusinessAccount`](https://docs.upload-post.com/api/google-business-accounts) | `GET /api/uploadposts/google-business/accounts/get` | Read one account (`account`). |
+| [`createGoogleBusinessAccount`](https://docs.upload-post.com/api/google-business-accounts) | `POST /api/uploadposts/google-business/accounts` | Create a location group or user group (`type`, `account_name`, `confirm`). |
+| [`listGoogleBusinessAdmins`](https://docs.upload-post.com/api/google-business-accounts) | `GET /api/uploadposts/google-business/admins` | Admins of an account or a location (`scope`, `location_id`). |
+| [`listGoogleBusinessInvitations`](https://docs.upload-post.com/api/google-business-accounts) | `GET /api/uploadposts/google-business/invitations` | Pending invitations of an account. |
+| [`getGoogleBusinessVerificationState`](https://docs.upload-post.com/api/google-business-verification) | `GET /api/uploadposts/google-business/verification/state` | Whether the location is verified and in good standing. |
+| [`getGoogleBusinessVerificationOptions`](https://docs.upload-post.com/api/google-business-verification) | `POST /api/uploadposts/google-business/verification/options` | Verification methods available for the location. |
+| [`listGoogleBusinessVerifications`](https://docs.upload-post.com/api/google-business-verification) | `GET /api/uploadposts/google-business/verifications` | Past verifications of the location. |
 
 ## What a TikTok connection can do (`capabilities`)
 
@@ -994,6 +1253,12 @@ Reddit is currently unavailable. Uploads, OAuth and comments return HTTP 503 wit
 - `blueskyThreadgate` / `blueskyReplySettings` - Who can reply
 - `blueskyPostgate` / `blueskyQuoteSettings` - Block quotes with `disable_quotes`
 - `blueskyQuoteUri` - Quote a post (URL or `at://` URI)
+- `blueskyTags` - Up to 8 extra hashtags stored on the post, not shown in the text
+- `blueskyCreatedAt` - Date Bluesky shows the post with (ISO 8601 with timezone, not in the future)
+- `blueskyThreadOverflow` - Text over 300 characters goes on as replies instead of being cut
+- `blueskyGifAsVideo` - A single animated GIF published as a looping video
+- `blueskyCaptions` - Video subtitles: `[{ lang: 'es', url: 'https://.../es.vtt' }]` (WebVTT)
+- `blueskyVideoPresentation` - `default` or `gif`
 
 ### Discord
 - `discordThreadId` / `discordThreadName` / `discordAppliedTags` - Thread / forum
@@ -1006,6 +1271,16 @@ Reddit is currently unavailable. Uploads, OAuth and comments return HTTP 503 wit
 - `telegramDisableNotification` / `telegramProtectContent` / `telegramHasSpoiler`
 - `telegramLinkPreview` / `telegramReplyMarkup` / `telegramCaptionOverflow` (`truncate` or `split`)
 - `telegramAsDocument` / `telegramMediaUrls`
+- `telegramTitle` / `telegramFirstComment` - Telegram text and first comment
+- `telegramPoll` / `telegramLocation` / `telegramVenue` / `telegramContact` / `telegramDice` / `telegramGameShortName` - Send a poll, a (live) location, a venue, a contact or a dice instead of a plain message (Telegram's JSON shapes)
+- `telegramPin` / `telegramPinNotify` - Pin the message after sending it
+- `telegramReplyToMessageId` / `telegramReplyQuote` / `telegramReplyParameters` - Reply to a message
+- `telegramLinkPreviewOptions` / `telegramEntities` / `telegramCaptionEntities` / `telegramShowCaptionAboveMedia` - Formatting
+- `telegramFirstCommentAsReply` - The first comment as a reply to the post (default `true`)
+- `telegramDirectMessagesTopicId` / `telegramSuggestedPostParameters` / `telegramEphemeralMessageParameters` / `telegramMessageEffectId`
+- `telegramSendAs` (`animation`, `video_note`, `live_photo`, `document`, `audio`, `voice`...) with `telegramPerformer` / `telegramTitleAudio` / `telegramDuration` / `telegramLength` / `telegramEmoji` / `telegramLivePhotoPhoto`
+- `telegramPaidStarCount` / `telegramPaidPayload` - Paid media unlocked with Telegram Stars
+- `telegramCover` / `telegramThumbnail` / `telegramStartTimestamp` / `telegramSendByUrl` / `telegramDisableContentTypeDetection`
 
 ### Mastodon
 - `mastodonVisibility` - `public`, `unlisted`, `private`, `direct`
@@ -1061,6 +1336,7 @@ These options work across all upload methods:
 | `maxPostsPerSlot` | Max posts per queue slot (overrides profile setting) |
 | `asyncUpload` | Process asynchronously (default: true) |
 | `idempotencyKey` | Collapses duplicate uploads within 24h. Reuse the same value when retrying. Alias: `requestId` |
+| `paidPartnership` | Sponsored post. Mapped to each network's native label (TikTok `brand_content_toggle`, YouTube `hasPaidProductPlacement`, X `paid_partnership`); Facebook and Pinterest also need `facebookSponsorId` / `pinterestSponsorId`. Networks without a label publish without it, with a warning. A network-specific field wins. TikTok's own switch: `tiktokDiscloseCommercial` with `tiktokYourBrand` / `tiktokBrandedContent` |
 
 ## Google Business Profile
 
@@ -1091,6 +1367,8 @@ await client.uploadText({
   gbpOfferTerms: 'One per customer',
 });
 ```
+
+Recurring EVENT/OFFER posts take `gbpRecurrence` (`DAILY`, `WEEKLY`, `MONTHLY`) with `gbpRecurrenceDays`, `gbpRecurrenceDayOfMonth` or `gbpRecurrenceWeekOccurrence` and `gbpRecurrenceEnd`; `gbpScheduledTime` uses Google's own scheduling; `gbpMultiMedia: true` with an array in `gbpMediaUrl` sends several photos (max 10); `gbpAlertType` is for ALERT posts. List, read, edit and delete the posts afterwards with `listGoogleBusinessPosts()`, `getGoogleBusinessPost()`, `editPost()` and `unpublishPost()`, or pin the location a profile publishes to with `pinGoogleBusinessLocation()`.
 
 Also available: `gbpTopicType: 'EVENT'` with `gbpEventTitle` / `gbpEventStartDate` / `gbpEventStartTime` / `gbpEventEndDate` / `gbpEventEndTime`, a call-to-action via `gbpCtaType` + `gbpCtaUrl`, and `gbpMediaUrl` / `gbpMediaFormat`. `gbpLanguageCode` defaults to `en`. Offer aliases: `gbpCouponCode` → `gbpOfferCoupon`, `gbpRedeemUrl` → `gbpOfferRedeemUrl`, `gbpTerms` → `gbpOfferTerms`.
 

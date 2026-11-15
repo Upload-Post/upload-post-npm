@@ -87,6 +87,18 @@ declare module 'upload-post' {
     youtubeTitle?: string;
     pinterestTitle?: string;
     threadsTitle?: string;
+    /** Telegram text / caption (falls back to `title`) */
+    telegramTitle?: string;
+    /** Telegram first comment (falls back to `firstComment`) */
+    telegramFirstComment?: string;
+    /**
+     * Sponsored / paid-partnership post. Mapped to each network's native label
+     * (TikTok brand_content_toggle, YouTube hasPaidProductPlacement, X
+     * paid_partnership; Facebook and Pinterest also need their sponsor id).
+     * Networks without a native label publish without it and the response carries
+     * a warning. A network-specific field wins over this one.
+     */
+    paidPartnership?: boolean;
     slackTitle?: string;
     mastodonTitle?: string;
     nostrTitle?: string;
@@ -153,6 +165,16 @@ declare module 'upload-post' {
     brandContentToggle?: boolean;
     /** Brand organic toggle */
     brandOrganicToggle?: boolean;
+    /** TikTok "Disclose post content" switch; send it with tiktokYourBrand and/or tiktokBrandedContent */
+    tiktokDiscloseCommercial?: boolean;
+    /** Alias of tiktokDiscloseCommercial */
+    discloseCommercial?: boolean;
+    /** Promoting your own brand (with tiktokDiscloseCommercial) */
+    tiktokYourBrand?: boolean;
+    yourBrand?: boolean;
+    /** Branded content for a third party (with tiktokDiscloseCommercial) */
+    tiktokBrandedContent?: boolean;
+    brandedContent?: boolean;
     /** Only show the video in ads */
     tiktokIsAdsOnly?: boolean;
     /** TikTok One invite link. Requires branded content. */
@@ -226,6 +248,16 @@ declare module 'upload-post' {
     brandContentToggle?: boolean;
     /** Brand organic toggle */
     brandOrganicToggle?: boolean;
+    /** TikTok "Disclose post content" switch; send it with tiktokYourBrand and/or tiktokBrandedContent */
+    tiktokDiscloseCommercial?: boolean;
+    /** Alias of tiktokDiscloseCommercial */
+    discloseCommercial?: boolean;
+    /** Promoting your own brand (with tiktokDiscloseCommercial) */
+    tiktokYourBrand?: boolean;
+    yourBrand?: boolean;
+    /** Branded content for a third party (with tiktokDiscloseCommercial) */
+    tiktokBrandedContent?: boolean;
+    brandedContent?: boolean;
 
     // ---- Music, location, AI disclosure and draft ----
     // Photo posts accept the track id, the location pair, the AI disclosure and
@@ -405,6 +437,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Sponsor's Facebook Page id for the branded content tag (not on Reels/Stories) */
+    facebookSponsorId?: string;
     /** AI-generated disclosure on Reels */
     facebookIsAiGenerated?: boolean;
     /** Unpublished type for page video: DRAFT, INLINE_CREATED, ADS_POST, PUBLISHED. Do not send SCHEDULED — use scheduledDate. */
@@ -430,6 +464,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Sponsor's Facebook Page id for the branded content tag (not on Reels/Stories) */
+    facebookSponsorId?: string;
   }
 
   export interface FacebookTextOptions {
@@ -443,6 +479,8 @@ declare module 'upload-post' {
     facebookTargeting?: Record<string, unknown> | string;
     /** Feed targeting */
     facebookFeedTargeting?: Record<string, unknown> | string;
+    /** Sponsor's Facebook Page id for the branded content tag (not on Reels/Stories) */
+    facebookSponsorId?: string;
     /** Link-post CTA, e.g. { type: 'LEARN_MORE', link: 'https://…' } */
     facebookCallToAction?: Record<string, unknown> | string;
     /** Link carousel (2–5 objects with `link`) */
@@ -470,6 +508,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Sponsor account id for Pinterest's paid partnership label (closed beta) */
+    pinterestSponsorId?: string;
   }
 
   export interface PinterestPhotoOptions {
@@ -483,6 +523,8 @@ declare module 'upload-post' {
     pinterestBoardSectionId?: string;
     /** AI disclosures: AI_MODIFIED and/or SYNTHETIC_PERFORMER */
     pinterestAiDisclosures?: string | string[];
+    /** Sponsor account id for Pinterest's paid partnership label (closed beta) */
+    pinterestSponsorId?: string;
     /** Per-slide titles on a 2–5 photo carousel */
     pinterestCarouselTitles?: string | string[];
     /** Per-slide descriptions on a 2–5 photo carousel */
@@ -643,6 +685,18 @@ declare module 'upload-post' {
     blueskyQuoteUri?: string;
     blueskyQuoteId?: string;
     blueskyQuoteUrl?: string;
+    /** Up to 8 extra hashtags stored on the post without appearing in the text */
+    blueskyTags?: string | string[];
+    /** Date Bluesky shows and sorts the post by (ISO 8601 with timezone, not in the future) */
+    blueskyCreatedAt?: string;
+    /** Text longer than 300 characters: publish the rest as replies instead of cutting it */
+    blueskyThreadOverflow?: boolean;
+    /** Publish a single animated GIF as a looping video */
+    blueskyGifAsVideo?: boolean;
+    /** Video subtitle tracks: [{ lang, url }] or [{ lang, vtt }] (WebVTT, up to 20) */
+    blueskyCaptions?: Array<Record<string, unknown>> | string;
+    /** `default` or `gif` (looping, muted, no controls) */
+    blueskyVideoPresentation?: 'default' | 'gif';
   }
 
   export interface DiscordOptions {
@@ -671,6 +725,54 @@ declare module 'upload-post' {
     telegramCaptionOverflow?: 'truncate' | 'split';
     telegramAsDocument?: boolean;
     telegramMediaUrls?: string | string[];
+    /** Pin the message after sending it (silent unless telegramPinNotify) */
+    telegramPin?: boolean;
+    telegramPinNotify?: boolean;
+    /** Send a poll: { question, options, type, allows_multiple_answers, correct_option_id, ... } */
+    telegramPoll?: Record<string, unknown> | string;
+    /** Send a location: { latitude, longitude, live_period, ... } */
+    telegramLocation?: Record<string, unknown> | string;
+    /** Send a venue: { latitude, longitude, title, address, ... } */
+    telegramVenue?: Record<string, unknown> | string;
+    /** Send a contact: { phone_number, first_name, ... } */
+    telegramContact?: Record<string, unknown> | string;
+    /** Send a dice: emoji, or true for 🎲 */
+    telegramDice?: string | boolean;
+    telegramGameShortName?: string;
+    telegramRichMessage?: Record<string, unknown> | string;
+    /** Reply to a message of the chat (with telegramReplyQuote) */
+    telegramReplyToMessageId?: number | string;
+    telegramReplyQuote?: string;
+    telegramReplyParameters?: Record<string, unknown> | string;
+    telegramLinkPreviewOptions?: Record<string, unknown> | string;
+    telegramEntities?: Array<Record<string, unknown>> | string;
+    telegramCaptionEntities?: Array<Record<string, unknown>> | string;
+    telegramShowCaptionAboveMedia?: boolean;
+    /** first comment sent as a reply to the post (default true) */
+    telegramFirstCommentAsReply?: boolean;
+    telegramDirectMessagesTopicId?: number | string;
+    telegramSuggestedPostParameters?: Record<string, unknown> | string;
+    telegramEphemeralMessageParameters?: Record<string, unknown> | string;
+    telegramMessageEffectId?: string;
+    /** Let Telegram download the media from its URL */
+    telegramSendByUrl?: boolean;
+    /** animation, video_note, live_photo, document, audio, voice, sticker... */
+    telegramSendAs?: string;
+    /** Paid media: Stars needed to unlock it (1-25000) */
+    telegramPaidStarCount?: number;
+    telegramPaidPayload?: string;
+    /** Video cover: local path, stream, Buffer, URL or file_id */
+    telegramCover?: string | Buffer | NodeJS.ReadableStream;
+    /** Thumbnail (JPEG ≤ 200 kB): local path, stream or Buffer */
+    telegramThumbnail?: string | Buffer | NodeJS.ReadableStream;
+    telegramStartTimestamp?: number;
+    telegramDisableContentTypeDetection?: boolean;
+    telegramLivePhotoPhoto?: string | Buffer | NodeJS.ReadableStream;
+    telegramPerformer?: string;
+    telegramTitleAudio?: string;
+    telegramDuration?: number;
+    telegramLength?: number;
+    telegramEmoji?: string;
   }
 
   export interface MastodonOptions {
@@ -782,7 +884,7 @@ declare module 'upload-post' {
     /** Post type. Defaults to STANDARD. */
     gbpTopicType?: 'STANDARD' | 'EVENT' | 'OFFER';
     /** Media URL attached to the post */
-    gbpMediaUrl?: string;
+    gbpMediaUrl?: string | string[];
     /** Media format */
     gbpMediaFormat?: 'PHOTO' | 'VIDEO';
     /** Call-to-action button */
@@ -813,6 +915,24 @@ declare module 'upload-post' {
     gbpRedeemUrl?: string;
     /** Alias of gbpOfferTerms */
     gbpTerms?: string;
+    /** Alert kind for ALERT posts (Google accepts `COVID_19`) */
+    gbpAlertType?: string;
+    /** Same as gbpPostType MEDIA: upload to the gallery */
+    gbpUploadToGallery?: boolean;
+    /** Send every photo (max 10) instead of only the first one */
+    gbpMultiMedia?: boolean;
+    /** EVENT and OFFER only: DAILY, WEEKLY or MONTHLY */
+    gbpRecurrence?: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+    /** WEEKLY: comma-separated days (MONDAY,THURSDAY) */
+    gbpRecurrenceDays?: string;
+    /** MONTHLY: 1-31 */
+    gbpRecurrenceDayOfMonth?: number;
+    /** MONTHLY: FIRST, SECOND, THIRD, FOURTH or LAST */
+    gbpRecurrenceWeekOccurrence?: 'FIRST' | 'SECOND' | 'THIRD' | 'FOURTH' | 'LAST';
+    /** End of the series (YYYY-MM-DD or RFC 3339) */
+    gbpRecurrenceEnd?: string;
+    /** Google's own scheduling (RFC 3339 with time zone) */
+    gbpScheduledTime?: string;
   }
 
   export interface UploadVideoOptions extends CommonUploadOptions,
@@ -1466,7 +1586,17 @@ declare module 'upload-post' {
 
   // ==================== Direct messages ====================
 
-  export type DmPlatform = 'instagram' | 'facebook' | 'whatsapp' | 'bluesky';
+  export type DmPlatform = 'instagram' | 'facebook' | 'whatsapp' | 'bluesky' | 'telegram';
+
+  /** Any API field, by its API name (top-level camelCase keys are sent as snake_case). */
+  export interface ApiParams {
+    [key: string]: any;
+  }
+
+  export interface ApiResponse {
+    success?: boolean;
+    [key: string]: any;
+  }
 
   export interface SendDmOptions {
     platform: DmPlatform;
@@ -2171,13 +2301,884 @@ declare module 'upload-post' {
     unpublishPost(options: {
       user: string;
       /** Not available for Instagram, TikTok or Reddit (400 with the reason). */
-      platform: 'facebook' | 'youtube' | 'x' | 'linkedin' | 'threads' | 'pinterest' | 'bluesky' | 'google_business';
+      platform: 'facebook' | 'youtube' | 'x' | 'linkedin' | 'threads' | 'pinterest' | 'bluesky' | 'google_business' | 'telegram';
       postId: string;
+      /** Telegram: delete every message of the post, not only postId */
+      deleteAllMessages?: boolean;
+      [key: string]: any;
     }): Promise<{
       success: boolean;
       message?: string;
       error?: string;
     }>;
+
+    // ==================== Resource endpoints ====================
+    // Posts: edit, repost, actions
+    /**
+     * Edit a published post (Facebook, LinkedIn, X, Google Business, Telegram: text, buttons, pin/unpin, stop a poll, live location, replace the media).
+     * @see https://docs.upload-post.com/api/edit-post
+     */
+    editPost(options: { user: string; platform: string; postId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Repost / reshare a post (LinkedIn, X, Threads; Telegram forward or copy with `mode`, `post_ids`, `all_messages`).
+     * @see https://docs.upload-post.com/api/repost
+     */
+    repostPost(options: { user: string; platform: string; postId?: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Act on a published post: Telegram reactions and forward/copy; Bluesky bookmark/unbookmark, pin/unpin, reply and quote settings, detach/reattach quotes.
+     * @see https://docs.upload-post.com/api/bluesky-post-actions
+     */
+    postAction(options: { user: string; platform: string; action: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Save a post: a Pinterest Pin to a board, or a Bluesky bookmark (`platform: "bluesky"`).
+     * @see https://docs.upload-post.com/api/save-pin
+     */
+    savePost(options: { user: string; postId: string } & ApiParams): Promise<ApiResponse>;
+
+    // Best time to post and queue
+    /**
+     * Best hours to publish for a connected account, with `source` and `confidence` (`timezone`, `top`, `refresh`, `page_urn`, `facebook_page_id`).
+     * @see https://docs.upload-post.com/api/best-times
+     */
+    getBestTimes(options: { profileUsername: string; platform: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Queue settings, including `slots_mode`, `auto_slots` and `effective_slots`.
+     * @see https://docs.upload-post.com/api/queue-system
+     */
+    getQueueSettings(options: { profileUsername: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Update the queue. `slots: "auto"` (or `slots_mode: "auto"`) fills the best hours automatically (`auto_slots_count`, `auto_platforms`, `refresh`); a `slots` array switches back to fixed slots.
+     * @see https://docs.upload-post.com/api/queue-system
+     */
+    updateQueueSettings(options: { profileUsername: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Upcoming queue slots and what is scheduled in each (`count`, max 50).
+     * @see https://docs.upload-post.com/api/queue-system
+     */
+    getQueuePreview(options: { profileUsername: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Next free queue slot.
+     * @see https://docs.upload-post.com/api/queue-system
+     */
+    getNextQueueSlot(options: { profileUsername: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Mark a queue slot (ISO 8601, UTC) as full.
+     * @see https://docs.upload-post.com/api/queue-system
+     */
+    markQueueSlotFull(options: { profileUsername: string; slotDatetime: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Unmark a queue slot marked as full.
+     * @see https://docs.upload-post.com/api/queue-system
+     */
+    unmarkQueueSlotFull(options: { profileUsername: string; slotDatetime: string } & ApiParams): Promise<ApiResponse>;
+
+    // Telegram: chat, members and invite links
+    /**
+     * Chat details, subscribers/members and administrators (`include_administrators`, `return_bots`).
+     * @see https://docs.upload-post.com/api/telegram-chat-insights
+     */
+    getTelegramChatInfo(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Change the chat title, description, photo (file or `photo_url`), permissions, slow mode, sticker set...
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    updateTelegramChatInfo(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Boosts of the chat (with `user_id`: that user's boosts).
+     * @see https://docs.upload-post.com/api/telegram-chat-insights
+     */
+    getTelegramBoosts(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Read one member (`user_id`) or list the administrators.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    getTelegramMember(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Ban, unban, restrict, promote or give a custom title to a member (`action`).
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    moderateTelegramMember(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Create an invite link (name, expiry, member limit, join requests, subscription).
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    createTelegramInviteLink(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Edit an invite link.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    editTelegramInviteLink(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Revoke an invite link.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    revokeTelegramInviteLink(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Generate a new primary invite link (the previous one stops working).
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    createTelegramPrimaryInviteLink(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Approve or decline a request to join the chat.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    answerTelegramJoinRequest(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Custom emoji that can be used as forum topic icons.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    getTelegramTopicIcons(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Create a forum topic.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    createTelegramTopic(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Edit, close, reopen, hide, unhide or unpin a forum topic.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    editTelegramTopic(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete a forum topic.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    deleteTelegramTopic(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Unpin every message of the chat (or of a topic).
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    unpinAllTelegramMessages(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Make the bot leave the connected chat.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    leaveTelegramChat(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Approve or decline a suggested post in a channel direct messages chat.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    answerTelegramSuggestedPost(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Last messages of a user's personal channel.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    getTelegramUserPersonalChatMessages(options: { user: string; userId: number | string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Profile audios of a Telegram user.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    getTelegramUserProfileAudios(options: { user: string; userId: number | string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Backdrops available for the Telegram share screen theme.
+     * @see https://docs.upload-post.com/api/telegram-chat
+     */
+    getTelegramShareThemeBackdrops(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Whether update receiving is on for the bot.
+     * @see https://docs.upload-post.com/api/telegram-inbox
+     */
+    getTelegramUpdatesStatus(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    // Telegram: bot profile, commands and stickers
+    /**
+     * Bot name, descriptions, photo, menu button and default administrator rights.
+     * @see https://docs.upload-post.com/api/telegram-bot-profile
+     */
+    getTelegramBotProfile(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Change the bot profile (`photo`/`animation` as file or URL, `menu_button`, `default_administrator_rights`...).
+     * @see https://docs.upload-post.com/api/telegram-bot-profile
+     */
+    updateTelegramBotProfile(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Bot commands for a scope and language.
+     * @see https://docs.upload-post.com/api/telegram-bot-profile
+     */
+    getTelegramBotCommands(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Set the bot commands (`commands`, `scope`, `language_code`).
+     * @see https://docs.upload-post.com/api/telegram-bot-profile
+     */
+    setTelegramBotCommands(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete the bot commands of a scope and language.
+     * @see https://docs.upload-post.com/api/telegram-bot-profile
+     */
+    deleteTelegramBotCommands(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Read a sticker set (`name`) or custom emoji stickers.
+     * @see https://docs.upload-post.com/api/telegram-stickers
+     */
+    getTelegramStickerSet(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Create a sticker set.
+     * @see https://docs.upload-post.com/api/telegram-stickers
+     */
+    createTelegramStickerSet(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Edit a sticker set (add, replace, reorder stickers, title, thumbnail, emoji, keywords...).
+     * @see https://docs.upload-post.com/api/telegram-stickers
+     */
+    editTelegramStickerSet(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete a sticker set, or a sticker from it.
+     * @see https://docs.upload-post.com/api/telegram-stickers
+     */
+    deleteTelegramStickerSet(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Upload a sticker file (`sticker` file or `sticker_url`, `sticker_format`, `owner_user_id`); returns its `file_id`.
+     * @see https://docs.upload-post.com/api/telegram-stickers
+     */
+    uploadTelegramStickerFile(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    // Telegram: Stars, invoices and gifts
+    /**
+     * The bot's Telegram Stars balance.
+     * @see https://docs.upload-post.com/api/telegram-chat-insights
+     */
+    getTelegramStars(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * The bot's Telegram Stars transactions (`offset`, `limit`).
+     * @see https://docs.upload-post.com/api/telegram-chat-insights
+     */
+    getTelegramStarTransactions(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Send an invoice to the connected chat or to `chat_id` (payments go to your bot).
+     * @see https://docs.upload-post.com/api/telegram-payments
+     */
+    sendTelegramInvoice(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Create an invoice link.
+     * @see https://docs.upload-post.com/api/telegram-payments
+     */
+    createTelegramInvoiceLink(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Refund a Telegram Stars payment (`user_id`, `telegram_payment_charge_id`).
+     * @see https://docs.upload-post.com/api/telegram-payments
+     */
+    refundTelegramStarPayment(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Cancel or re-enable a user's Stars subscription.
+     * @see https://docs.upload-post.com/api/telegram-payments
+     */
+    editTelegramStarSubscription(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Gifts the bot can send.
+     * @see https://docs.upload-post.com/api/telegram-payments
+     */
+    getTelegramAvailableGifts(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Gifts owned by a user or a chat.
+     * @see https://docs.upload-post.com/api/telegram-payments
+     */
+    getTelegramOwnedGifts(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * A unique gift by name.
+     * @see https://docs.upload-post.com/api/telegram-payments
+     */
+    getTelegramUniqueGift(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Payment queries that were not answered in time.
+     * @see https://docs.upload-post.com/api/telegram-payments
+     */
+    getTelegramUnansweredPayments(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    // Bluesky: reads
+    /**
+     * Who liked, reposted or quoted a post (`type`: likes, reposts, quotes; `limit`, `cursor`).
+     * @see https://docs.upload-post.com/api/bluesky-reads
+     */
+    getPostEngagement(options: { postId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * One or several Bluesky profiles (`actor`: handles or DIDs, comma separated, up to 25; without it, the connected account).
+     * @see https://docs.upload-post.com/api/bluesky-reads
+     */
+    getBlueskyProfiles(options?: ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Search Bluesky posts (`sort`, `since`, `until`, `author`, `lang`, `tag`, `limit`, `cursor`...).
+     * @see https://docs.upload-post.com/api/bluesky-reads
+     */
+    searchBlueskyPosts(options: { user: string; q: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Search Bluesky accounts.
+     * @see https://docs.upload-post.com/api/bluesky-reads
+     */
+    searchBlueskyActors(options: { q: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Followers of an account (`actor`, or the connected one with `user`; `known=true` for followers you follow).
+     * @see https://docs.upload-post.com/api/bluesky-reads
+     */
+    getBlueskyFollowers(options?: ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Accounts an account follows.
+     * @see https://docs.upload-post.com/api/bluesky-reads
+     */
+    getBlueskyFollows(options?: ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Read-only gateway to an allow-listed public Bluesky XRPC method (e.g. `app.bsky.feed.getAuthorFeed`); returns Bluesky's answer untouched.
+     * @see https://docs.upload-post.com/api/bluesky-reads
+     */
+    blueskyXrpc(options: { nsid: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Moderation labels on the account and its posts.
+     * @see https://docs.upload-post.com/api/bluesky-reads
+     */
+    getBlueskyLabels(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    // Bluesky: notifications
+    /**
+     * List notifications (`reasons`, `priority`, `limit`, `cursor`).
+     * @see https://docs.upload-post.com/api/bluesky-notifications
+     */
+    getBlueskyNotifications(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Unread notification count.
+     * @see https://docs.upload-post.com/api/bluesky-notifications
+     */
+    getBlueskyUnreadCount(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Mark notifications as seen (up to `seen_at`).
+     * @see https://docs.upload-post.com/api/bluesky-notifications
+     */
+    markBlueskyNotificationsSeen(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Notification preferences.
+     * @see https://docs.upload-post.com/api/bluesky-notifications
+     */
+    getBlueskyNotificationPreferences(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Update notification preferences.
+     * @see https://docs.upload-post.com/api/bluesky-notifications
+     */
+    updateBlueskyNotificationPreferences(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Accounts whose activity you are subscribed to.
+     * @see https://docs.upload-post.com/api/bluesky-notifications
+     */
+    getBlueskyActivitySubscriptions(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Subscribe to (or stop) an account's posts and replies.
+     * @see https://docs.upload-post.com/api/bluesky-notifications
+     */
+    setBlueskyActivitySubscription(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    // Bluesky: profile, settings and drafts
+    /**
+     * The connected account's profile record.
+     * @see https://docs.upload-post.com/api/bluesky-profile
+     */
+    getBlueskyOwnProfile(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Update the profile (display name, description, `avatar`/`banner` files, links, pinned post...). Fields not sent stay as they are.
+     * @see https://docs.upload-post.com/api/bluesky-profile
+     */
+    updateBlueskyProfile(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Read the live status.
+     * @see https://docs.upload-post.com/api/bluesky-profile
+     */
+    getBlueskyStatus(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Set the live status.
+     * @see https://docs.upload-post.com/api/bluesky-profile
+     */
+    setBlueskyStatus(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Clear the live status.
+     * @see https://docs.upload-post.com/api/bluesky-profile
+     */
+    clearBlueskyStatus(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Chat and discovery settings.
+     * @see https://docs.upload-post.com/api/bluesky-profile
+     */
+    getBlueskySettings(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Change chat and discovery settings.
+     * @see https://docs.upload-post.com/api/bluesky-profile
+     */
+    updateBlueskySettings(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * App preferences (content filters, feeds, muted words...).
+     * @see https://docs.upload-post.com/api/bluesky-profile
+     */
+    getBlueskyPreferences(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Replace some app preferences.
+     * @see https://docs.upload-post.com/api/bluesky-profile
+     */
+    updateBlueskyPreferences(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * List drafts.
+     * @see https://docs.upload-post.com/api/bluesky-drafts
+     */
+    listBlueskyDrafts(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Create a draft.
+     * @see https://docs.upload-post.com/api/bluesky-drafts
+     */
+    createBlueskyDraft(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Replace a draft.
+     * @see https://docs.upload-post.com/api/bluesky-drafts
+     */
+    updateBlueskyDraft(options: { user: string; draftId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete a draft.
+     * @see https://docs.upload-post.com/api/bluesky-drafts
+     */
+    deleteBlueskyDraft(options: { user: string; draftId: string } & ApiParams): Promise<ApiResponse>;
+
+    // Bluesky: chat
+    /**
+     * Chat status of the account.
+     * @see https://docs.upload-post.com/api/bluesky-chat
+     */
+    getBlueskyChatStatus(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * DM notification settings.
+     * @see https://docs.upload-post.com/api/bluesky-chat
+     */
+    getBlueskyChatPreferences(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Change DM notification settings.
+     * @see https://docs.upload-post.com/api/bluesky-chat
+     */
+    updateBlueskyChatPreferences(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Export the account's chat history.
+     * @see https://docs.upload-post.com/api/bluesky-chat
+     */
+    exportBlueskyChat(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    // Google Business: posts and reviews
+    /**
+     * List the location's posts (`location_id`, `page_size`, `page_token`). Edit them with editPost and delete them with unpublishPost.
+     * @see https://docs.upload-post.com/api/google-business-posts
+     */
+    listGoogleBusinessPosts(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Read one post (`post_id` or `post_name`).
+     * @see https://docs.upload-post.com/api/google-business-posts
+     */
+    getGoogleBusinessPost(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * List reviews (`location_id`, `page_size`, `page_token`, `order_by`).
+     * @see https://docs.upload-post.com/api/google-business-reviews
+     */
+    listGoogleBusinessReviews(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Read one review (`review_name`, or `review_id` + `location_id`).
+     * @see https://docs.upload-post.com/api/google-business-reviews
+     */
+    getGoogleBusinessReview(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Reviews of several locations at once (`location_ids`).
+     * @see https://docs.upload-post.com/api/google-business-reviews
+     */
+    batchGetGoogleBusinessReviews(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Reply to a review, or replace the reply (`review_name`, or `review_id` + `location_id`).
+     * @see https://docs.upload-post.com/api/google-business-reviews
+     */
+    replyToGoogleBusinessReview(options: { user: string; comment: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete the reply to a review.
+     * @see https://docs.upload-post.com/api/google-business-reviews
+     */
+    deleteGoogleBusinessReviewReply(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    // Google Business: gallery and performance
+    /**
+     * List the location's gallery.
+     * @see https://docs.upload-post.com/api/google-business-media
+     */
+    listGoogleBusinessMedia(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Read one gallery item.
+     * @see https://docs.upload-post.com/api/google-business-media
+     */
+    getGoogleBusinessMedia(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Upload a photo or video to the gallery: `file` (local path, stream or Buffer) or `source_url`, plus `category`, `description`, `media_format`.
+     * @see https://docs.upload-post.com/api/google-business-media
+     */
+    uploadGoogleBusinessMedia(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Change a gallery item's category.
+     * @see https://docs.upload-post.com/api/google-business-media
+     */
+    updateGoogleBusinessMedia(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete a gallery item.
+     * @see https://docs.upload-post.com/api/google-business-media
+     */
+    deleteGoogleBusinessMedia(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Photos uploaded by customers.
+     * @see https://docs.upload-post.com/api/google-business-media
+     */
+    listGoogleBusinessCustomerMedia(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * One customer photo.
+     * @see https://docs.upload-post.com/api/google-business-media
+     */
+    getGoogleBusinessCustomerMedia(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Daily metrics for any date range (impressions, calls, website clicks, directions...: `metrics`, `start_date`, `end_date`).
+     * @see https://docs.upload-post.com/api/google-business-performance
+     */
+    getGoogleBusinessPerformance(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Monthly search keywords that showed the location (`start_month`, `end_month`).
+     * @see https://docs.upload-post.com/api/google-business-performance
+     */
+    getGoogleBusinessSearchKeywords(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    // Google Business: location info
+    /**
+     * Read the location's info (name, address, hours, phones, categories, service area, open status...).
+     * @see https://docs.upload-post.com/api/google-business-info
+     */
+    getGoogleBusinessLocationInfo(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Edit the location's info. `edit_mode: "legacy"` (default) or `"strict"` (`dry_run`, `confirm`, `include_edit_status`); `validate_only` in both.
+     * @see https://docs.upload-post.com/api/google-business-info
+     */
+    updateGoogleBusinessLocationInfo(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Changes Google suggested for the location (`diff_fields`).
+     * @see https://docs.upload-post.com/api/google-business-info
+     */
+    getGoogleBusinessGoogleUpdates(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Accept or reject Google's suggested changes, field by field.
+     * @see https://docs.upload-post.com/api/google-business-info
+     */
+    answerGoogleBusinessGoogleUpdates(options: { user: string; decision: string; fields: string[] } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Edit status of each field (experimental).
+     * @see https://docs.upload-post.com/api/google-business-info
+     */
+    getGoogleBusinessLocationInfoExtended(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * List locations with filters (`account`, `filter`, `order_by`, `read_mask`, `page_size`, `page_token`).
+     * @see https://docs.upload-post.com/api/google-business-info
+     */
+    listGoogleBusinessLocations(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Locations available to a profile and the one pinned for its uploads.
+     * @see https://docs.upload-post.com/api/google-business-location
+     */
+    getGoogleBusinessPinnedLocation(options: { profileUsername: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Pin the location a profile publishes to (instead of passing gbpLocationId on every upload).
+     * @see https://docs.upload-post.com/api/google-business-location
+     */
+    pinGoogleBusinessLocation(options: { profileUsername: string; gbpLocationId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Clear the pinned location.
+     * @see https://docs.upload-post.com/api/google-business-location
+     */
+    clearGoogleBusinessLocationPin(options: { profileUsername: string } & ApiParams): Promise<ApiResponse>;
+
+    // Google Business: catalogs, attributes, Place Actions, menus, services and lodging
+    /**
+     * Search categories (`region_code`, `language_code`, `query`).
+     * @see https://docs.upload-post.com/api/google-business-catalogs
+     */
+    searchGoogleBusinessCategories(options?: ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Category details: service types and more-hours types (`names`).
+     * @see https://docs.upload-post.com/api/google-business-catalogs
+     */
+    batchGetGoogleBusinessCategories(options?: ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Search chains (`name`).
+     * @see https://docs.upload-post.com/api/google-business-catalogs
+     */
+    searchGoogleBusinessChains(options?: ApiParams): Promise<ApiResponse>;
+
+    /**
+     * One chain (`chain`).
+     * @see https://docs.upload-post.com/api/google-business-catalogs
+     */
+    getGoogleBusinessChain(options?: ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Is the business already on Google? Search Google's listings.
+     * @see https://docs.upload-post.com/api/google-business-catalogs
+     */
+    searchGoogleBusinessGoogleLocations(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Locations Google recommends for the account.
+     * @see https://docs.upload-post.com/api/google-business-catalogs
+     */
+    getGoogleBusinessRecommendedLocations(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Report a wrong listing to Google.
+     * @see https://docs.upload-post.com/api/google-business-catalogs
+     */
+    reportGoogleBusinessGoogleLocation(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Attributes the location can use.
+     * @see https://docs.upload-post.com/api/google-business-attributes
+     */
+    getGoogleBusinessAvailableAttributes(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Current attributes of the location.
+     * @see https://docs.upload-post.com/api/google-business-attributes
+     */
+    getGoogleBusinessAttributes(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Update attributes.
+     * @see https://docs.upload-post.com/api/google-business-attributes
+     */
+    updateGoogleBusinessAttributes(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Attributes as Google shows them.
+     * @see https://docs.upload-post.com/api/google-business-attributes
+     */
+    getGoogleBusinessAttributesGoogleUpdated(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Attributes with their edit status (experimental).
+     * @see https://docs.upload-post.com/api/google-business-attributes
+     */
+    getGoogleBusinessAttributesExtended(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Place Action types (booking, ordering, shopping links...) the location can use.
+     * @see https://docs.upload-post.com/api/google-business-place-actions
+     */
+    getGoogleBusinessPlaceActionTypes(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * List Place Action links.
+     * @see https://docs.upload-post.com/api/google-business-place-actions
+     */
+    listGoogleBusinessPlaceActions(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Read one Place Action link (`link`).
+     * @see https://docs.upload-post.com/api/google-business-place-actions
+     */
+    getGoogleBusinessPlaceAction(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Create a Place Action link.
+     * @see https://docs.upload-post.com/api/google-business-place-actions
+     */
+    createGoogleBusinessPlaceAction(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Edit or switch off a Place Action link.
+     * @see https://docs.upload-post.com/api/google-business-place-actions
+     */
+    updateGoogleBusinessPlaceAction(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete a Place Action link.
+     * @see https://docs.upload-post.com/api/google-business-place-actions
+     */
+    deleteGoogleBusinessPlaceAction(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Food menus of the location.
+     * @see https://docs.upload-post.com/api/google-business-menus-services
+     */
+    getGoogleBusinessFoodMenus(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Replace the food menus.
+     * @see https://docs.upload-post.com/api/google-business-menus-services
+     */
+    updateGoogleBusinessFoodMenus(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Services of the location.
+     * @see https://docs.upload-post.com/api/google-business-menus-services
+     */
+    getGoogleBusinessServices(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Replace the services.
+     * @see https://docs.upload-post.com/api/google-business-menus-services
+     */
+    updateGoogleBusinessServices(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Lodging data of a hotel (`read_mask`).
+     * @see https://docs.upload-post.com/api/google-business-lodging
+     */
+    getGoogleBusinessLodging(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Update lodging data.
+     * @see https://docs.upload-post.com/api/google-business-lodging
+     */
+    updateGoogleBusinessLodging(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Lodging data as Google shows it.
+     * @see https://docs.upload-post.com/api/google-business-lodging
+     */
+    getGoogleBusinessLodgingGoogleUpdated(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    // Google Business: accounts and verification (reads)
+    /**
+     * Google Business accounts and location groups (`type`).
+     * @see https://docs.upload-post.com/api/google-business-accounts
+     */
+    listGoogleBusinessAccounts(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Read one account (`account`).
+     * @see https://docs.upload-post.com/api/google-business-accounts
+     */
+    getGoogleBusinessAccount(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Create a location group or user group (`type`, `account_name`, `confirm`).
+     * @see https://docs.upload-post.com/api/google-business-accounts
+     */
+    createGoogleBusinessAccount(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Admins of an account or a location (`scope`, `location_id`).
+     * @see https://docs.upload-post.com/api/google-business-accounts
+     */
+    listGoogleBusinessAdmins(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Pending invitations of an account.
+     * @see https://docs.upload-post.com/api/google-business-accounts
+     */
+    listGoogleBusinessInvitations(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Whether the location is verified and in good standing.
+     * @see https://docs.upload-post.com/api/google-business-verification
+     */
+    getGoogleBusinessVerificationState(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Verification methods available for the location.
+     * @see https://docs.upload-post.com/api/google-business-verification
+     */
+    getGoogleBusinessVerificationOptions(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Past verifications of the location.
+     * @see https://docs.upload-post.com/api/google-business-verification
+     */
+    listGoogleBusinessVerifications(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
 
     // Helper Endpoints
     /**

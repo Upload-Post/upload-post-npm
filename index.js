@@ -180,6 +180,11 @@ export class UploadPost {
     if (options.maxPostsPerSlot !== undefined) form.append('max_posts_per_slot', String(options.maxPostsPerSlot));
     if (options.asyncUpload !== undefined) form.append('async_upload', String(options.asyncUpload));
     // AI auto-generation of native per-platform copy from the media (fills blank fields)
+    // Sponsored / paid-partnership post, mapped by the API to each network's
+    // native label (TikTok brand_content_toggle, YouTube hasPaidProductPlacement,
+    // X paid_partnership; Facebook and Pinterest also need their sponsor id).
+    // A network-specific field wins over it.
+    this._appendField(form, 'paid_partnership', this._pick(options, 'paidPartnership', 'paid_partnership'));
 
     // Platform-specific title overrides
     if (options.blueskyTitle) form.append('bluesky_title', options.blueskyTitle);
@@ -191,6 +196,7 @@ export class UploadPost {
     if (options.youtubeTitle) form.append('youtube_title', options.youtubeTitle);
     if (options.pinterestTitle) form.append('pinterest_title', options.pinterestTitle);
     if (options.threadsTitle) form.append('threads_title', options.threadsTitle);
+    this._appendField(form, 'telegram_title', this._pick(options, 'telegramTitle', 'telegram_title'));
     // New credential-based platforms
     if (options.slackTitle) form.append('slack_title', options.slackTitle);
     if (options.mastodonTitle) form.append('mastodon_title', options.mastodonTitle);
@@ -223,6 +229,7 @@ export class UploadPost {
     // capability on the connection: without it the post still publishes and the
     // response carries a warning instead of the comment.
     if (options.tiktokFirstComment) form.append('tiktok_first_comment', options.tiktokFirstComment);
+    this._appendField(form, 'telegram_first_comment', this._pick(options, 'telegramFirstComment', 'telegram_first_comment'));
 
     if (options.firstCommentMedia) {
       const mediaItems = Array.isArray(options.firstCommentMedia) ? options.firstCommentMedia : [options.firstCommentMedia];
@@ -294,6 +301,11 @@ export class UploadPost {
       if (kind === 'flag' ? value === undefined : !value) continue;
       form.append(field, String(value));
     }
+    // TikTok's "Disclose post content" switch and its two kinds (your own brand,
+    // branded content for a third party).
+    this._appendField(form, 'disclose_commercial', this._pick(options, 'tiktokDiscloseCommercial', 'discloseCommercial', 'disclose_commercial'));
+    this._appendField(form, 'your_brand', this._pick(options, 'tiktokYourBrand', 'yourBrand', 'your_brand'));
+    this._appendField(form, 'branded_content', this._pick(options, 'tiktokBrandedContent', 'brandedContent', 'branded_content'));
 
     // Draft: postMode MEDIA_UPLOAD and tiktokUploadToDraft are the same draft.
     // Pass both through (camelCase and snake_case). Do not collapse them.
@@ -439,6 +451,8 @@ export class UploadPost {
     this._appendField(form, 'facebook_place_id', this._pick(options, 'facebookPlaceId', 'facebook_place_id'));
     this._appendField(form, 'facebook_targeting', this._pick(options, 'facebookTargeting', 'facebook_targeting'));
     this._appendField(form, 'facebook_feed_targeting', this._pick(options, 'facebookFeedTargeting', 'facebook_feed_targeting'));
+    // Branded content tag: the sponsor's Facebook Page id (not on Reels/Stories).
+    this._appendField(form, 'facebook_sponsor_id', this._pick(options, 'facebookSponsorId', 'facebook_sponsor_id'));
 
     if (isVideo) {
       if (options.facebookVideoState) form.append('video_state', options.facebookVideoState);
@@ -477,6 +491,7 @@ export class UploadPost {
     if (options.pinterestLink) form.append('pinterest_link', options.pinterestLink);
     this._appendField(form, 'pinterest_board_section_id', this._pick(options, 'pinterestBoardSectionId', 'pinterest_board_section_id'));
     this._appendField(form, 'pinterest_ai_disclosures', this._pick(options, 'pinterestAiDisclosures', 'pinterest_ai_disclosures'));
+    this._appendField(form, 'pinterest_sponsor_id', this._pick(options, 'pinterestSponsorId', 'pinterest_sponsor_id'));
 
     if (!isVideo) {
       this._appendRepeated(form, 'pinterest_carousel_titles[]', this._pick(options, 'pinterestCarouselTitles', 'pinterest_carousel_titles'));
@@ -575,7 +590,9 @@ export class UploadPost {
     if (options.gbpPostType) form.append('gbp_post_type', String(options.gbpPostType).toUpperCase());
     if (options.gbpMediaCategory) form.append('gbp_media_category', String(options.gbpMediaCategory).toUpperCase());
     if (options.gbpTopicType) form.append('gbp_topic_type', String(options.gbpTopicType).toUpperCase());
-    if (options.gbpMediaUrl) form.append('gbp_media_url', options.gbpMediaUrl);
+    // One URL, or several (photos only, with gbpMultiMedia) as gbp_media_url[].
+    if (Array.isArray(options.gbpMediaUrl)) this._appendRepeated(form, 'gbp_media_url[]', options.gbpMediaUrl);
+    else if (options.gbpMediaUrl) form.append('gbp_media_url', options.gbpMediaUrl);
     if (options.gbpMediaFormat) form.append('gbp_media_format', String(options.gbpMediaFormat).toUpperCase());
     if (options.gbpCtaType) form.append('gbp_cta_type', String(options.gbpCtaType).toUpperCase());
     if (options.gbpCtaUrl) form.append('gbp_cta_url', options.gbpCtaUrl);
@@ -591,6 +608,19 @@ export class UploadPost {
     this._appendField(form, 'gbp_coupon_code', this._pick(options, 'gbpCouponCode', 'gbp_coupon_code'));
     this._appendField(form, 'gbp_redeem_url', this._pick(options, 'gbpRedeemUrl', 'gbp_redeem_url'));
     this._appendField(form, 'gbp_terms', this._pick(options, 'gbpTerms', 'gbp_terms'));
+    for (const [field, key] of [
+      ['gbp_alert_type', 'gbpAlertType'],
+      ['gbp_upload_to_gallery', 'gbpUploadToGallery'],
+      ['gbp_multi_media', 'gbpMultiMedia'],
+      ['gbp_recurrence', 'gbpRecurrence'],
+      ['gbp_recurrence_days', 'gbpRecurrenceDays'],
+      ['gbp_recurrence_day_of_month', 'gbpRecurrenceDayOfMonth'],
+      ['gbp_recurrence_week_occurrence', 'gbpRecurrenceWeekOccurrence'],
+      ['gbp_recurrence_end', 'gbpRecurrenceEnd'],
+      ['gbp_scheduled_time', 'gbpScheduledTime'],
+    ]) {
+      this._appendField(form, field, this._pick(options, key, field));
+    }
   }
 
   /**
@@ -624,6 +654,16 @@ export class UploadPost {
     this._appendField(form, 'bluesky_threadgate', this._pick(options, 'blueskyThreadgate', 'bluesky_threadgate', 'blueskyReplySettings', 'bluesky_reply_settings'));
     this._appendField(form, 'bluesky_postgate', this._pick(options, 'blueskyPostgate', 'bluesky_postgate', 'blueskyQuoteSettings', 'bluesky_quote_settings'));
     this._appendField(form, 'bluesky_quote_uri', this._pick(options, 'blueskyQuoteUri', 'bluesky_quote_uri', 'blueskyQuoteId', 'bluesky_quote_id', 'blueskyQuoteUrl', 'bluesky_quote_url'));
+    for (const [field, key] of [
+      ['bluesky_tags', 'blueskyTags'],
+      ['bluesky_created_at', 'blueskyCreatedAt'],
+      ['bluesky_thread_overflow', 'blueskyThreadOverflow'],
+      ['bluesky_gif_as_video', 'blueskyGifAsVideo'],
+      ['bluesky_captions', 'blueskyCaptions'],
+      ['bluesky_video_presentation', 'blueskyVideoPresentation'],
+    ]) {
+      this._appendField(form, field, this._pick(options, key, field));
+    }
   }
 
   /**
@@ -660,6 +700,52 @@ export class UploadPost {
     this._appendField(form, 'telegram_caption_overflow', this._pick(options, 'telegramCaptionOverflow', 'telegram_caption_overflow'));
     this._appendField(form, 'telegram_as_document', this._pick(options, 'telegramAsDocument', 'telegram_as_document'));
     this._appendField(form, 'telegram_media_urls', this._pick(options, 'telegramMediaUrls', 'telegram_media_urls'));
+    // Bot API 10.4 options. JSON objects keep Telegram's own shape
+    // (ReplyParameters, LinkPreviewOptions, MessageEntity, InputPollOption...).
+    for (const [field, key] of [
+      ['telegram_pin', 'telegramPin'],
+      ['telegram_pin_notify', 'telegramPinNotify'],
+      ['telegram_poll', 'telegramPoll'],
+      ['telegram_location', 'telegramLocation'],
+      ['telegram_venue', 'telegramVenue'],
+      ['telegram_contact', 'telegramContact'],
+      ['telegram_dice', 'telegramDice'],
+      ['telegram_game_short_name', 'telegramGameShortName'],
+      ['telegram_rich_message', 'telegramRichMessage'],
+      ['telegram_reply_to_message_id', 'telegramReplyToMessageId'],
+      ['telegram_reply_quote', 'telegramReplyQuote'],
+      ['telegram_reply_parameters', 'telegramReplyParameters'],
+      ['telegram_link_preview_options', 'telegramLinkPreviewOptions'],
+      ['telegram_entities', 'telegramEntities'],
+      ['telegram_caption_entities', 'telegramCaptionEntities'],
+      ['telegram_show_caption_above_media', 'telegramShowCaptionAboveMedia'],
+      ['telegram_first_comment_as_reply', 'telegramFirstCommentAsReply'],
+      ['telegram_direct_messages_topic_id', 'telegramDirectMessagesTopicId'],
+      ['telegram_suggested_post_parameters', 'telegramSuggestedPostParameters'],
+      ['telegram_ephemeral_message_parameters', 'telegramEphemeralMessageParameters'],
+      ['telegram_message_effect_id', 'telegramMessageEffectId'],
+      ['telegram_send_by_url', 'telegramSendByUrl'],
+      ['telegram_send_as', 'telegramSendAs'],
+      ['telegram_paid_star_count', 'telegramPaidStarCount'],
+      ['telegram_paid_payload', 'telegramPaidPayload'],
+      ['telegram_start_timestamp', 'telegramStartTimestamp'],
+      ['telegram_disable_content_type_detection', 'telegramDisableContentTypeDetection'],
+      ['telegram_performer', 'telegramPerformer'],
+      ['telegram_title_audio', 'telegramTitleAudio'],
+      ['telegram_duration', 'telegramDuration'],
+      ['telegram_length', 'telegramLength'],
+      ['telegram_emoji', 'telegramEmoji'],
+    ]) {
+      this._appendField(form, field, this._pick(options, key, field));
+    }
+    // Files (local path, stream or Buffer) or URLs / file_ids.
+    for (const [field, key] of [
+      ['telegram_cover', 'telegramCover'],
+      ['telegram_thumbnail', 'telegramThumbnail'],
+      ['telegram_live_photo_photo', 'telegramLivePhotoPhoto'],
+    ]) {
+      this._appendFileField(form, field, this._pick(options, key, field));
+    }
   }
 
   /**
@@ -2190,11 +2276,16 @@ export class UploadPost {
    * A `504 bluesky_send_unconfirmed` (`retryable: false`) means the DM may have
    * gone out: check the conversation before sending it again.
    *
+   * Telegram (`platform: 'telegram'`) sends from your own connected bot to a
+   * person who started it (`recipientId` = their user id): text, media, buttons
+   * (`reply_markup`) and sender actions. Reading Telegram conversations needs
+   * update receiving, which is not available yet.
+   *
    * Known options are camelCase and mapped to the API names; any other key is
    * sent as given.
    *
    * @param {Object} options
-   * @param {('instagram'|'facebook'|'whatsapp'|'bluesky')} options.platform
+   * @param {('instagram'|'facebook'|'whatsapp'|'bluesky'|'telegram')} options.platform
    * @param {string} options.user - Profile username
    * @param {string} [options.recipientId] - Platform id of the person (Bluesky: handle/DID)
    * @param {string} [options.conversationId] - Bluesky: send into this conversation
@@ -2244,7 +2335,7 @@ export class UploadPost {
    * budget carry only their last message and `messages_truncated: true`.
    *
    * @param {Object} options
-   * @param {('instagram'|'facebook'|'whatsapp'|'bluesky')} options.platform
+   * @param {('instagram'|'facebook'|'whatsapp'|'bluesky'|'telegram')} options.platform
    * @param {string} options.user - Profile username
    * @param {number} [options.limit] - Conversations per page (Bluesky max 25)
    * @param {string} [options.cursor] - `pagination.next_cursor` of the previous page
@@ -2300,16 +2391,1533 @@ export class UploadPost {
    *
    * @param {Object} options - Unpublish options
    * @param {string} options.user - Profile username
-   * @param {string} options.platform - Platform (facebook, youtube, x, linkedin, threads, pinterest, bluesky, google_business)
+   * @param {string} options.platform - Platform (facebook, youtube, x, linkedin, pinterest, bluesky, google_business, telegram)
    * @param {string} options.postId - Native post ID to unpublish
+   * @param {boolean} [options.deleteAllMessages] - Telegram: delete every message of the
+   *   post (album, caption rest, first comment), not only `postId`
    * @returns {Promise<Object>} Unpublish result
    */
   async unpublishPost(options) {
-    return this._request('/uploadposts/posts/unpublish', 'POST', {
-      platform: options.platform,
-      user: options.user,
-      post_id: options.postId
+    // Extra options (e.g. Telegram `deleteAllMessages`) go through as API fields.
+    const { platform, user, postId, ...rest } = options;
+    const body = { platform, user, post_id: postId };
+    for (const [key, value] of Object.entries(rest)) {
+      if (value !== undefined) body[this._apiKey(key)] = value;
+    }
+    return this._request('/uploadposts/posts/unpublish', 'POST', body);
+  }
+
+  // ==================== Resource endpoints ====================
+  //
+  // Post actions, best times, the queue, and the Telegram, Bluesky and Google
+  // Business management endpoints all go through _call(): every option is sent
+  // to the API, nothing is dropped. Top-level camelCase keys become the API's
+  // snake_case (`locationId` -> `location_id`; snake_case keys are sent as
+  // given) and nested objects are sent untouched, so Telegram / Google objects
+  // keep their own shape. Path parameters (`draftId`, `nsid`...) are taken out
+  // of the options. A file field (`file`, `photo`, `sticker`, `avatar`,
+  // `telegramMedia`...) given as a local path, stream or Buffer turns the
+  // request into multipart/form-data; URLs and Telegram file_ids stay strings.
+
+  /** @private */
+  _apiKey(key) {
+    if (!/[A-Z]/.test(key) || UploadPost.KEEP_CAMEL_KEYS.has(key)) return key;
+    return key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+  }
+
+  /** @private */
+  _isUploadValue(value) {
+    if (Buffer.isBuffer(value)) return true;
+    if (value && typeof value === 'object' && typeof value.pipe === 'function') return true;
+    if (typeof value !== 'string' || !value) return false;
+    const lower = value.toLowerCase();
+    if (lower.startsWith('http://') || lower.startsWith('https://')) return false;
+    try {
+      return fs.statSync(value).isFile();
+    } catch {
+      return false;
+    }
+  }
+
+  /** @private */
+  async _call(method, path, options = {}, defaults = {}) {
+    const params = {};
+    for (const [key, value] of Object.entries({ ...defaults, ...(options || {}) })) {
+      if (value === undefined) continue;
+      params[this._apiKey(key)] = value;
+    }
+    const endpoint = path.replace(/\{(\w+)\}/g, (_, name) => {
+      const value = params[name];
+      delete params[name];
+      if (value === undefined || value === null || value === '') {
+        throw new Error(`Upload-Post: ${name} is required`);
+      }
+      return encodeURIComponent(String(value));
     });
+
+    if (method === 'GET') {
+      const query = {};
+      for (const [key, value] of Object.entries(params)) {
+        if (value === null) continue;
+        if (Array.isArray(value)) query[key] = value.join(',');
+        else if (typeof value === 'object') query[key] = JSON.stringify(value);
+        else if (typeof value === 'boolean') query[key] = String(value);
+        else query[key] = value;
+      }
+      return this._request(endpoint, 'GET', Object.keys(query).length ? query : null);
+    }
+
+    const fileKeys = Object.keys(params).filter(
+      (key) => UploadPost.FILE_FIELDS.has(key) && this._isUploadValue(params[key])
+    );
+    if (fileKeys.length) {
+      const form = new FormData();
+      for (const [key, value] of Object.entries(params)) {
+        if (fileKeys.includes(key)) {
+          if (typeof value === 'string') form.append(key, createReadStream(value));
+          else if (Buffer.isBuffer(value)) form.append(key, value, { filename: key });
+          else form.append(key, value);
+        } else {
+          this._appendField(form, key, value);
+        }
+      }
+      return this._request(endpoint, method, form, true);
+    }
+    return this._request(endpoint, method, params);
+  }
+
+  // ---- Posts: edit, repost, actions ----
+  /**
+   * Edit a published post (Facebook, LinkedIn, X, Google Business, Telegram: text, buttons, pin/unpin, stop a poll, live location, replace the media).
+   * @see https://docs.upload-post.com/api/edit-post
+   * @param {Object} options - `user`, `platform`, `postId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async editPost(options = {}) {
+    return this._call('POST', '/uploadposts/posts/edit', options);
+  }
+
+  /**
+   * Repost / reshare a post (LinkedIn, X, Threads; Telegram forward or copy with `mode`, `post_ids`, `all_messages`).
+   * @see https://docs.upload-post.com/api/repost
+   * @param {Object} options - `user`, `platform` and any other API field (optional: `postId`)
+   * @returns {Promise<Object>}
+   */
+  async repostPost(options = {}) {
+    return this._call('POST', '/uploadposts/posts/repost', options);
+  }
+
+  /**
+   * Act on a published post: Telegram reactions and forward/copy; Bluesky bookmark/unbookmark, pin/unpin, reply and quote settings, detach/reattach quotes.
+   * @see https://docs.upload-post.com/api/bluesky-post-actions
+   * @param {Object} options - `user`, `platform`, `action` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async postAction(options = {}) {
+    return this._call('POST', '/uploadposts/posts/action', options);
+  }
+
+  /**
+   * Save a post: a Pinterest Pin to a board, or a Bluesky bookmark (`platform: "bluesky"`).
+   * @see https://docs.upload-post.com/api/save-pin
+   * @param {Object} options - `user`, `postId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async savePost(options = {}) {
+    return this._call('POST', '/uploadposts/posts/save', options);
+  }
+
+  // ---- Best time to post and queue ----
+  /**
+   * Best hours to publish for a connected account, with `source` and `confidence` (`timezone`, `top`, `refresh`, `page_urn`, `facebook_page_id`).
+   * @see https://docs.upload-post.com/api/best-times
+   * @param {Object} options - `profileUsername`, `platform` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBestTimes(options = {}) {
+    return this._call('GET', '/uploadposts/best-times', options);
+  }
+
+  /**
+   * Queue settings, including `slots_mode`, `auto_slots` and `effective_slots`.
+   * @see https://docs.upload-post.com/api/queue-system
+   * @param {Object} options - `profileUsername` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getQueueSettings(options = {}) {
+    return this._call('GET', '/uploadposts/queue/settings', options);
+  }
+
+  /**
+   * Update the queue. `slots: "auto"` (or `slots_mode: "auto"`) fills the best hours automatically (`auto_slots_count`, `auto_platforms`, `refresh`); a `slots` array switches back to fixed slots.
+   * @see https://docs.upload-post.com/api/queue-system
+   * @param {Object} options - `profileUsername` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateQueueSettings(options = {}) {
+    return this._call('POST', '/uploadposts/queue/settings', options);
+  }
+
+  /**
+   * Upcoming queue slots and what is scheduled in each (`count`, max 50).
+   * @see https://docs.upload-post.com/api/queue-system
+   * @param {Object} options - `profileUsername` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getQueuePreview(options = {}) {
+    return this._call('GET', '/uploadposts/queue/preview', options);
+  }
+
+  /**
+   * Next free queue slot.
+   * @see https://docs.upload-post.com/api/queue-system
+   * @param {Object} options - `profileUsername` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getNextQueueSlot(options = {}) {
+    return this._call('GET', '/uploadposts/queue/next-slot', options);
+  }
+
+  /**
+   * Mark a queue slot (ISO 8601, UTC) as full.
+   * @see https://docs.upload-post.com/api/queue-system
+   * @param {Object} options - `profileUsername`, `slotDatetime` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async markQueueSlotFull(options = {}) {
+    return this._call('POST', '/uploadposts/queue/slot-full', options);
+  }
+
+  /**
+   * Unmark a queue slot marked as full.
+   * @see https://docs.upload-post.com/api/queue-system
+   * @param {Object} options - `profileUsername`, `slotDatetime` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async unmarkQueueSlotFull(options = {}) {
+    return this._call('DELETE', '/uploadposts/queue/slot-full', options);
+  }
+
+  // ---- Telegram: chat, members and invite links ----
+  /**
+   * Chat details, subscribers/members and administrators (`include_administrators`, `return_bots`).
+   * @see https://docs.upload-post.com/api/telegram-chat-insights
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramChatInfo(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/chat-info', options);
+  }
+
+  /**
+   * Change the chat title, description, photo (file or `photo_url`), permissions, slow mode, sticker set...
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateTelegramChatInfo(options = {}) {
+    return this._call('PATCH', '/uploadposts/telegram/chat-info', options);
+  }
+
+  /**
+   * Boosts of the chat (with `user_id`: that user's boosts).
+   * @see https://docs.upload-post.com/api/telegram-chat-insights
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramBoosts(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/boosts', options);
+  }
+
+  /**
+   * Read one member (`user_id`) or list the administrators.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramMember(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/members', options);
+  }
+
+  /**
+   * Ban, unban, restrict, promote or give a custom title to a member (`action`).
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async moderateTelegramMember(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/members', options);
+  }
+
+  /**
+   * Create an invite link (name, expiry, member limit, join requests, subscription).
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createTelegramInviteLink(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/invite-links', options);
+  }
+
+  /**
+   * Edit an invite link.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async editTelegramInviteLink(options = {}) {
+    return this._call('PATCH', '/uploadposts/telegram/invite-links', options);
+  }
+
+  /**
+   * Revoke an invite link.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async revokeTelegramInviteLink(options = {}) {
+    return this._call('DELETE', '/uploadposts/telegram/invite-links', options);
+  }
+
+  /**
+   * Generate a new primary invite link (the previous one stops working).
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createTelegramPrimaryInviteLink(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/invite-links/primary', options);
+  }
+
+  /**
+   * Approve or decline a request to join the chat.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async answerTelegramJoinRequest(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/join-requests', options);
+  }
+
+  /**
+   * Custom emoji that can be used as forum topic icons.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramTopicIcons(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/topics/icons', options);
+  }
+
+  /**
+   * Create a forum topic.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createTelegramTopic(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/topics', options);
+  }
+
+  /**
+   * Edit, close, reopen, hide, unhide or unpin a forum topic.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async editTelegramTopic(options = {}) {
+    return this._call('PATCH', '/uploadposts/telegram/topics', options);
+  }
+
+  /**
+   * Delete a forum topic.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteTelegramTopic(options = {}) {
+    return this._call('DELETE', '/uploadposts/telegram/topics', options);
+  }
+
+  /**
+   * Unpin every message of the chat (or of a topic).
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async unpinAllTelegramMessages(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/unpin-all', options);
+  }
+
+  /**
+   * Make the bot leave the connected chat.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async leaveTelegramChat(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/leave', options);
+  }
+
+  /**
+   * Approve or decline a suggested post in a channel direct messages chat.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async answerTelegramSuggestedPost(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/suggested-posts', options);
+  }
+
+  /**
+   * Last messages of a user's personal channel.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user`, `userId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramUserPersonalChatMessages(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/users/{user_id}/personal-chat-messages', options);
+  }
+
+  /**
+   * Profile audios of a Telegram user.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user`, `userId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramUserProfileAudios(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/users/{user_id}/profile-audios', options);
+  }
+
+  /**
+   * Backdrops available for the Telegram share screen theme.
+   * @see https://docs.upload-post.com/api/telegram-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramShareThemeBackdrops(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/share-theme-backdrops', options);
+  }
+
+  /**
+   * Whether update receiving is on for the bot.
+   * @see https://docs.upload-post.com/api/telegram-inbox
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramUpdatesStatus(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/updates', options);
+  }
+
+  // ---- Telegram: bot profile, commands and stickers ----
+  /**
+   * Bot name, descriptions, photo, menu button and default administrator rights.
+   * @see https://docs.upload-post.com/api/telegram-bot-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramBotProfile(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/bot-profile', options);
+  }
+
+  /**
+   * Change the bot profile (`photo`/`animation` as file or URL, `menu_button`, `default_administrator_rights`...).
+   * @see https://docs.upload-post.com/api/telegram-bot-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateTelegramBotProfile(options = {}) {
+    return this._call('PATCH', '/uploadposts/telegram/bot-profile', options);
+  }
+
+  /**
+   * Bot commands for a scope and language.
+   * @see https://docs.upload-post.com/api/telegram-bot-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramBotCommands(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/bot-commands', options);
+  }
+
+  /**
+   * Set the bot commands (`commands`, `scope`, `language_code`).
+   * @see https://docs.upload-post.com/api/telegram-bot-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async setTelegramBotCommands(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/bot-commands', options);
+  }
+
+  /**
+   * Delete the bot commands of a scope and language.
+   * @see https://docs.upload-post.com/api/telegram-bot-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteTelegramBotCommands(options = {}) {
+    return this._call('DELETE', '/uploadposts/telegram/bot-commands', options);
+  }
+
+  /**
+   * Read a sticker set (`name`) or custom emoji stickers.
+   * @see https://docs.upload-post.com/api/telegram-stickers
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramStickerSet(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/sticker-sets', options);
+  }
+
+  /**
+   * Create a sticker set.
+   * @see https://docs.upload-post.com/api/telegram-stickers
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createTelegramStickerSet(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/sticker-sets', options);
+  }
+
+  /**
+   * Edit a sticker set (add, replace, reorder stickers, title, thumbnail, emoji, keywords...).
+   * @see https://docs.upload-post.com/api/telegram-stickers
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async editTelegramStickerSet(options = {}) {
+    return this._call('PATCH', '/uploadposts/telegram/sticker-sets', options);
+  }
+
+  /**
+   * Delete a sticker set, or a sticker from it.
+   * @see https://docs.upload-post.com/api/telegram-stickers
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteTelegramStickerSet(options = {}) {
+    return this._call('DELETE', '/uploadposts/telegram/sticker-sets', options);
+  }
+
+  /**
+   * Upload a sticker file (`sticker` file or `sticker_url`, `sticker_format`, `owner_user_id`); returns its `file_id`.
+   * @see https://docs.upload-post.com/api/telegram-stickers
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async uploadTelegramStickerFile(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/sticker-sets/upload', options);
+  }
+
+  // ---- Telegram: Stars, invoices and gifts ----
+  /**
+   * The bot's Telegram Stars balance.
+   * @see https://docs.upload-post.com/api/telegram-chat-insights
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramStars(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/stars', options);
+  }
+
+  /**
+   * The bot's Telegram Stars transactions (`offset`, `limit`).
+   * @see https://docs.upload-post.com/api/telegram-chat-insights
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramStarTransactions(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/stars/transactions', options);
+  }
+
+  /**
+   * Send an invoice to the connected chat or to `chat_id` (payments go to your bot).
+   * @see https://docs.upload-post.com/api/telegram-payments
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async sendTelegramInvoice(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/invoices', options);
+  }
+
+  /**
+   * Create an invoice link.
+   * @see https://docs.upload-post.com/api/telegram-payments
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createTelegramInvoiceLink(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/invoice-links', options);
+  }
+
+  /**
+   * Refund a Telegram Stars payment (`user_id`, `telegram_payment_charge_id`).
+   * @see https://docs.upload-post.com/api/telegram-payments
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async refundTelegramStarPayment(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/stars/refund', options);
+  }
+
+  /**
+   * Cancel or re-enable a user's Stars subscription.
+   * @see https://docs.upload-post.com/api/telegram-payments
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async editTelegramStarSubscription(options = {}) {
+    return this._call('POST', '/uploadposts/telegram/stars/subscription', options);
+  }
+
+  /**
+   * Gifts the bot can send.
+   * @see https://docs.upload-post.com/api/telegram-payments
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramAvailableGifts(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/gifts', options);
+  }
+
+  /**
+   * Gifts owned by a user or a chat.
+   * @see https://docs.upload-post.com/api/telegram-payments
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramOwnedGifts(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/gifts/owned', options);
+  }
+
+  /**
+   * A unique gift by name.
+   * @see https://docs.upload-post.com/api/telegram-payments
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramUniqueGift(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/gifts/unique', options);
+  }
+
+  /**
+   * Payment queries that were not answered in time.
+   * @see https://docs.upload-post.com/api/telegram-payments
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getTelegramUnansweredPayments(options = {}) {
+    return this._call('GET', '/uploadposts/telegram/payments/unanswered', options);
+  }
+
+  // ---- Bluesky: reads ----
+  /**
+   * Who liked, reposted or quoted a post (`type`: likes, reposts, quotes; `limit`, `cursor`).
+   * @see https://docs.upload-post.com/api/bluesky-reads
+   * @param {Object} options - `postId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getPostEngagement(options = {}) {
+    return this._call('GET', '/uploadposts/post-engagement', options, { platform: 'bluesky' });
+  }
+
+  /**
+   * One or several Bluesky profiles (`actor`: handles or DIDs, comma separated, up to 25; without it, the connected account).
+   * @see https://docs.upload-post.com/api/bluesky-reads
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyProfiles(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/profile', options);
+  }
+
+  /**
+   * Search Bluesky posts (`sort`, `since`, `until`, `author`, `lang`, `tag`, `limit`, `cursor`...).
+   * @see https://docs.upload-post.com/api/bluesky-reads
+   * @param {Object} options - `user`, `q` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async searchBlueskyPosts(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/search/posts', options);
+  }
+
+  /**
+   * Search Bluesky accounts.
+   * @see https://docs.upload-post.com/api/bluesky-reads
+   * @param {Object} options - `q` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async searchBlueskyActors(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/search/actors', options);
+  }
+
+  /**
+   * Followers of an account (`actor`, or the connected one with `user`; `known=true` for followers you follow).
+   * @see https://docs.upload-post.com/api/bluesky-reads
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyFollowers(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/followers', options);
+  }
+
+  /**
+   * Accounts an account follows.
+   * @see https://docs.upload-post.com/api/bluesky-reads
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyFollows(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/follows', options);
+  }
+
+  /**
+   * Read-only gateway to an allow-listed public Bluesky XRPC method (e.g. `app.bsky.feed.getAuthorFeed`); returns Bluesky's answer untouched.
+   * @see https://docs.upload-post.com/api/bluesky-reads
+   * @param {Object} options - `nsid` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async blueskyXrpc(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/xrpc/{nsid}', options);
+  }
+
+  /**
+   * Moderation labels on the account and its posts.
+   * @see https://docs.upload-post.com/api/bluesky-reads
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyLabels(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/labels', options);
+  }
+
+  // ---- Bluesky: notifications ----
+  /**
+   * List notifications (`reasons`, `priority`, `limit`, `cursor`).
+   * @see https://docs.upload-post.com/api/bluesky-notifications
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyNotifications(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/notifications', options);
+  }
+
+  /**
+   * Unread notification count.
+   * @see https://docs.upload-post.com/api/bluesky-notifications
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyUnreadCount(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/notifications/unread-count', options);
+  }
+
+  /**
+   * Mark notifications as seen (up to `seen_at`).
+   * @see https://docs.upload-post.com/api/bluesky-notifications
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async markBlueskyNotificationsSeen(options = {}) {
+    return this._call('POST', '/uploadposts/bluesky/notifications/seen', options);
+  }
+
+  /**
+   * Notification preferences.
+   * @see https://docs.upload-post.com/api/bluesky-notifications
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyNotificationPreferences(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/notification-preferences', options);
+  }
+
+  /**
+   * Update notification preferences.
+   * @see https://docs.upload-post.com/api/bluesky-notifications
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateBlueskyNotificationPreferences(options = {}) {
+    return this._call('POST', '/uploadposts/bluesky/notification-preferences', options);
+  }
+
+  /**
+   * Accounts whose activity you are subscribed to.
+   * @see https://docs.upload-post.com/api/bluesky-notifications
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyActivitySubscriptions(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/activity-subscriptions', options);
+  }
+
+  /**
+   * Subscribe to (or stop) an account's posts and replies.
+   * @see https://docs.upload-post.com/api/bluesky-notifications
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async setBlueskyActivitySubscription(options = {}) {
+    return this._call('POST', '/uploadposts/bluesky/activity-subscriptions', options);
+  }
+
+  // ---- Bluesky: profile, settings and drafts ----
+  /**
+   * The connected account's profile record.
+   * @see https://docs.upload-post.com/api/bluesky-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyOwnProfile(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/profile/self', options);
+  }
+
+  /**
+   * Update the profile (display name, description, `avatar`/`banner` files, links, pinned post...). Fields not sent stay as they are.
+   * @see https://docs.upload-post.com/api/bluesky-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateBlueskyProfile(options = {}) {
+    return this._call('POST', '/uploadposts/bluesky/profile/self', options);
+  }
+
+  /**
+   * Read the live status.
+   * @see https://docs.upload-post.com/api/bluesky-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyStatus(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/status', options);
+  }
+
+  /**
+   * Set the live status.
+   * @see https://docs.upload-post.com/api/bluesky-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async setBlueskyStatus(options = {}) {
+    return this._call('POST', '/uploadposts/bluesky/status', options);
+  }
+
+  /**
+   * Clear the live status.
+   * @see https://docs.upload-post.com/api/bluesky-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async clearBlueskyStatus(options = {}) {
+    return this._call('DELETE', '/uploadposts/bluesky/status', options);
+  }
+
+  /**
+   * Chat and discovery settings.
+   * @see https://docs.upload-post.com/api/bluesky-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskySettings(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/settings', options);
+  }
+
+  /**
+   * Change chat and discovery settings.
+   * @see https://docs.upload-post.com/api/bluesky-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateBlueskySettings(options = {}) {
+    return this._call('POST', '/uploadposts/bluesky/settings', options);
+  }
+
+  /**
+   * App preferences (content filters, feeds, muted words...).
+   * @see https://docs.upload-post.com/api/bluesky-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyPreferences(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/preferences', options);
+  }
+
+  /**
+   * Replace some app preferences.
+   * @see https://docs.upload-post.com/api/bluesky-profile
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateBlueskyPreferences(options = {}) {
+    return this._call('PUT', '/uploadposts/bluesky/preferences', options);
+  }
+
+  /**
+   * List drafts.
+   * @see https://docs.upload-post.com/api/bluesky-drafts
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listBlueskyDrafts(options = {}) {
+    return this._call('GET', '/uploadposts/bluesky/drafts', options);
+  }
+
+  /**
+   * Create a draft.
+   * @see https://docs.upload-post.com/api/bluesky-drafts
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createBlueskyDraft(options = {}) {
+    return this._call('POST', '/uploadposts/bluesky/drafts', options);
+  }
+
+  /**
+   * Replace a draft.
+   * @see https://docs.upload-post.com/api/bluesky-drafts
+   * @param {Object} options - `user`, `draftId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateBlueskyDraft(options = {}) {
+    return this._call('PATCH', '/uploadposts/bluesky/drafts/{draft_id}', options);
+  }
+
+  /**
+   * Delete a draft.
+   * @see https://docs.upload-post.com/api/bluesky-drafts
+   * @param {Object} options - `user`, `draftId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteBlueskyDraft(options = {}) {
+    return this._call('DELETE', '/uploadposts/bluesky/drafts/{draft_id}', options);
+  }
+
+  // ---- Bluesky: chat ----
+  /**
+   * Chat status of the account.
+   * @see https://docs.upload-post.com/api/bluesky-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyChatStatus(options = {}) {
+    return this._call('GET', '/uploadposts/dms/bluesky/status', options);
+  }
+
+  /**
+   * DM notification settings.
+   * @see https://docs.upload-post.com/api/bluesky-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyChatPreferences(options = {}) {
+    return this._call('GET', '/uploadposts/dms/bluesky/preferences', options);
+  }
+
+  /**
+   * Change DM notification settings.
+   * @see https://docs.upload-post.com/api/bluesky-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateBlueskyChatPreferences(options = {}) {
+    return this._call('POST', '/uploadposts/dms/bluesky/preferences', options);
+  }
+
+  /**
+   * Export the account's chat history.
+   * @see https://docs.upload-post.com/api/bluesky-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async exportBlueskyChat(options = {}) {
+    return this._call('GET', '/uploadposts/dms/bluesky/export', options);
+  }
+
+  // ---- Google Business: posts and reviews ----
+  /**
+   * List the location's posts (`location_id`, `page_size`, `page_token`). Edit them with editPost and delete them with unpublishPost.
+   * @see https://docs.upload-post.com/api/google-business-posts
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listGoogleBusinessPosts(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/posts', options);
+  }
+
+  /**
+   * Read one post (`post_id` or `post_name`).
+   * @see https://docs.upload-post.com/api/google-business-posts
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessPost(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/posts/get', options);
+  }
+
+  /**
+   * List reviews (`location_id`, `page_size`, `page_token`, `order_by`).
+   * @see https://docs.upload-post.com/api/google-business-reviews
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listGoogleBusinessReviews(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/reviews', options);
+  }
+
+  /**
+   * Read one review (`review_name`, or `review_id` + `location_id`).
+   * @see https://docs.upload-post.com/api/google-business-reviews
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessReview(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/reviews/get', options);
+  }
+
+  /**
+   * Reviews of several locations at once (`location_ids`).
+   * @see https://docs.upload-post.com/api/google-business-reviews
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async batchGetGoogleBusinessReviews(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/reviews/batch', options);
+  }
+
+  /**
+   * Reply to a review, or replace the reply (`review_name`, or `review_id` + `location_id`).
+   * @see https://docs.upload-post.com/api/google-business-reviews
+   * @param {Object} options - `user`, `comment` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async replyToGoogleBusinessReview(options = {}) {
+    return this._call('PUT', '/uploadposts/google-business/reviews/reply', options);
+  }
+
+  /**
+   * Delete the reply to a review.
+   * @see https://docs.upload-post.com/api/google-business-reviews
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteGoogleBusinessReviewReply(options = {}) {
+    return this._call('DELETE', '/uploadposts/google-business/reviews/reply', options);
+  }
+
+  // ---- Google Business: gallery and performance ----
+  /**
+   * List the location's gallery.
+   * @see https://docs.upload-post.com/api/google-business-media
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listGoogleBusinessMedia(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/media', options);
+  }
+
+  /**
+   * Read one gallery item.
+   * @see https://docs.upload-post.com/api/google-business-media
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessMedia(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/media/get', options);
+  }
+
+  /**
+   * Upload a photo or video to the gallery: `file` (local path, stream or Buffer) or `source_url`, plus `category`, `description`, `media_format`.
+   * @see https://docs.upload-post.com/api/google-business-media
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async uploadGoogleBusinessMedia(options = {}) {
+    return this._call('POST', '/uploadposts/google-business/media', options);
+  }
+
+  /**
+   * Change a gallery item's category.
+   * @see https://docs.upload-post.com/api/google-business-media
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateGoogleBusinessMedia(options = {}) {
+    return this._call('PATCH', '/uploadposts/google-business/media', options);
+  }
+
+  /**
+   * Delete a gallery item.
+   * @see https://docs.upload-post.com/api/google-business-media
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteGoogleBusinessMedia(options = {}) {
+    return this._call('DELETE', '/uploadposts/google-business/media', options);
+  }
+
+  /**
+   * Photos uploaded by customers.
+   * @see https://docs.upload-post.com/api/google-business-media
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listGoogleBusinessCustomerMedia(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/media/customers', options);
+  }
+
+  /**
+   * One customer photo.
+   * @see https://docs.upload-post.com/api/google-business-media
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessCustomerMedia(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/media/customers/get', options);
+  }
+
+  /**
+   * Daily metrics for any date range (impressions, calls, website clicks, directions...: `metrics`, `start_date`, `end_date`).
+   * @see https://docs.upload-post.com/api/google-business-performance
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessPerformance(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/performance', options);
+  }
+
+  /**
+   * Monthly search keywords that showed the location (`start_month`, `end_month`).
+   * @see https://docs.upload-post.com/api/google-business-performance
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessSearchKeywords(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/performance/keywords', options);
+  }
+
+  // ---- Google Business: location info ----
+  /**
+   * Read the location's info (name, address, hours, phones, categories, service area, open status...).
+   * @see https://docs.upload-post.com/api/google-business-info
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessLocationInfo(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/location-info', options);
+  }
+
+  /**
+   * Edit the location's info. `edit_mode: "legacy"` (default) or `"strict"` (`dry_run`, `confirm`, `include_edit_status`); `validate_only` in both.
+   * @see https://docs.upload-post.com/api/google-business-info
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateGoogleBusinessLocationInfo(options = {}) {
+    return this._call('PATCH', '/uploadposts/google-business/location-info', options);
+  }
+
+  /**
+   * Changes Google suggested for the location (`diff_fields`).
+   * @see https://docs.upload-post.com/api/google-business-info
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessGoogleUpdates(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/location-info/google-updated', options);
+  }
+
+  /**
+   * Accept or reject Google's suggested changes, field by field.
+   * @see https://docs.upload-post.com/api/google-business-info
+   * @param {Object} options - `user`, `decision`, `fields` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async answerGoogleBusinessGoogleUpdates(options = {}) {
+    return this._call('POST', '/uploadposts/google-business/location-info/google-updates', options);
+  }
+
+  /**
+   * Edit status of each field (experimental).
+   * @see https://docs.upload-post.com/api/google-business-info
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessLocationInfoExtended(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/location-info/extended', options);
+  }
+
+  /**
+   * List locations with filters (`account`, `filter`, `order_by`, `read_mask`, `page_size`, `page_token`).
+   * @see https://docs.upload-post.com/api/google-business-info
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listGoogleBusinessLocations(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/locations/list', options);
+  }
+
+  /**
+   * Locations available to a profile and the one pinned for its uploads.
+   * @see https://docs.upload-post.com/api/google-business-location
+   * @param {Object} options - `profileUsername` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessPinnedLocation(options = {}) {
+    return this._call('GET', '/uploadposts/users/google-business-location', options);
+  }
+
+  /**
+   * Pin the location a profile publishes to (instead of passing gbpLocationId on every upload).
+   * @see https://docs.upload-post.com/api/google-business-location
+   * @param {Object} options - `profileUsername`, `gbpLocationId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async pinGoogleBusinessLocation(options = {}) {
+    return this._call('POST', '/uploadposts/users/google-business-location', options);
+  }
+
+  /**
+   * Clear the pinned location.
+   * @see https://docs.upload-post.com/api/google-business-location
+   * @param {Object} options - `profileUsername` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async clearGoogleBusinessLocationPin(options = {}) {
+    return this._call('DELETE', '/uploadposts/users/google-business-location', options);
+  }
+
+  // ---- Google Business: catalogs, attributes, Place Actions, menus, services and lodging ----
+  /**
+   * Search categories (`region_code`, `language_code`, `query`).
+   * @see https://docs.upload-post.com/api/google-business-catalogs
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async searchGoogleBusinessCategories(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/categories', options);
+  }
+
+  /**
+   * Category details: service types and more-hours types (`names`).
+   * @see https://docs.upload-post.com/api/google-business-catalogs
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async batchGetGoogleBusinessCategories(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/categories/batch', options);
+  }
+
+  /**
+   * Search chains (`name`).
+   * @see https://docs.upload-post.com/api/google-business-catalogs
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async searchGoogleBusinessChains(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/chains', options);
+  }
+
+  /**
+   * One chain (`chain`).
+   * @see https://docs.upload-post.com/api/google-business-catalogs
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessChain(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/chains/get', options);
+  }
+
+  /**
+   * Is the business already on Google? Search Google's listings.
+   * @see https://docs.upload-post.com/api/google-business-catalogs
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async searchGoogleBusinessGoogleLocations(options = {}) {
+    return this._call('POST', '/uploadposts/google-business/google-locations/search', options);
+  }
+
+  /**
+   * Locations Google recommends for the account.
+   * @see https://docs.upload-post.com/api/google-business-catalogs
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessRecommendedLocations(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/google-locations/recommended', options);
+  }
+
+  /**
+   * Report a wrong listing to Google.
+   * @see https://docs.upload-post.com/api/google-business-catalogs
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async reportGoogleBusinessGoogleLocation(options = {}) {
+    return this._call('POST', '/uploadposts/google-business/google-locations/report', options);
+  }
+
+  /**
+   * Attributes the location can use.
+   * @see https://docs.upload-post.com/api/google-business-attributes
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessAvailableAttributes(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/attributes/available', options);
+  }
+
+  /**
+   * Current attributes of the location.
+   * @see https://docs.upload-post.com/api/google-business-attributes
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessAttributes(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/attributes', options);
+  }
+
+  /**
+   * Update attributes.
+   * @see https://docs.upload-post.com/api/google-business-attributes
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateGoogleBusinessAttributes(options = {}) {
+    return this._call('PATCH', '/uploadposts/google-business/attributes', options);
+  }
+
+  /**
+   * Attributes as Google shows them.
+   * @see https://docs.upload-post.com/api/google-business-attributes
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessAttributesGoogleUpdated(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/attributes/google-updated', options);
+  }
+
+  /**
+   * Attributes with their edit status (experimental).
+   * @see https://docs.upload-post.com/api/google-business-attributes
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessAttributesExtended(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/attributes/extended', options);
+  }
+
+  /**
+   * Place Action types (booking, ordering, shopping links...) the location can use.
+   * @see https://docs.upload-post.com/api/google-business-place-actions
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessPlaceActionTypes(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/place-actions/types', options);
+  }
+
+  /**
+   * List Place Action links.
+   * @see https://docs.upload-post.com/api/google-business-place-actions
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listGoogleBusinessPlaceActions(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/place-actions', options);
+  }
+
+  /**
+   * Read one Place Action link (`link`).
+   * @see https://docs.upload-post.com/api/google-business-place-actions
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessPlaceAction(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/place-actions/get', options);
+  }
+
+  /**
+   * Create a Place Action link.
+   * @see https://docs.upload-post.com/api/google-business-place-actions
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createGoogleBusinessPlaceAction(options = {}) {
+    return this._call('POST', '/uploadposts/google-business/place-actions', options);
+  }
+
+  /**
+   * Edit or switch off a Place Action link.
+   * @see https://docs.upload-post.com/api/google-business-place-actions
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateGoogleBusinessPlaceAction(options = {}) {
+    return this._call('PATCH', '/uploadposts/google-business/place-actions', options);
+  }
+
+  /**
+   * Delete a Place Action link.
+   * @see https://docs.upload-post.com/api/google-business-place-actions
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteGoogleBusinessPlaceAction(options = {}) {
+    return this._call('DELETE', '/uploadposts/google-business/place-actions', options);
+  }
+
+  /**
+   * Food menus of the location.
+   * @see https://docs.upload-post.com/api/google-business-menus-services
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessFoodMenus(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/food-menus', options);
+  }
+
+  /**
+   * Replace the food menus.
+   * @see https://docs.upload-post.com/api/google-business-menus-services
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateGoogleBusinessFoodMenus(options = {}) {
+    return this._call('PUT', '/uploadposts/google-business/food-menus', options);
+  }
+
+  /**
+   * Services of the location.
+   * @see https://docs.upload-post.com/api/google-business-menus-services
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessServices(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/services', options);
+  }
+
+  /**
+   * Replace the services.
+   * @see https://docs.upload-post.com/api/google-business-menus-services
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateGoogleBusinessServices(options = {}) {
+    return this._call('PUT', '/uploadposts/google-business/services', options);
+  }
+
+  /**
+   * Lodging data of a hotel (`read_mask`).
+   * @see https://docs.upload-post.com/api/google-business-lodging
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessLodging(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/lodging', options);
+  }
+
+  /**
+   * Update lodging data.
+   * @see https://docs.upload-post.com/api/google-business-lodging
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateGoogleBusinessLodging(options = {}) {
+    return this._call('PATCH', '/uploadposts/google-business/lodging', options);
+  }
+
+  /**
+   * Lodging data as Google shows it.
+   * @see https://docs.upload-post.com/api/google-business-lodging
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessLodgingGoogleUpdated(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/lodging/google-updated', options);
+  }
+
+  // ---- Google Business: accounts and verification (reads) ----
+  /**
+   * Google Business accounts and location groups (`type`).
+   * @see https://docs.upload-post.com/api/google-business-accounts
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listGoogleBusinessAccounts(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/accounts', options);
+  }
+
+  /**
+   * Read one account (`account`).
+   * @see https://docs.upload-post.com/api/google-business-accounts
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessAccount(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/accounts/get', options);
+  }
+
+  /**
+   * Create a location group or user group (`type`, `account_name`, `confirm`).
+   * @see https://docs.upload-post.com/api/google-business-accounts
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createGoogleBusinessAccount(options = {}) {
+    return this._call('POST', '/uploadposts/google-business/accounts', options);
+  }
+
+  /**
+   * Admins of an account or a location (`scope`, `location_id`).
+   * @see https://docs.upload-post.com/api/google-business-accounts
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listGoogleBusinessAdmins(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/admins', options);
+  }
+
+  /**
+   * Pending invitations of an account.
+   * @see https://docs.upload-post.com/api/google-business-accounts
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listGoogleBusinessInvitations(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/invitations', options);
+  }
+
+  /**
+   * Whether the location is verified and in good standing.
+   * @see https://docs.upload-post.com/api/google-business-verification
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessVerificationState(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/verification/state', options);
+  }
+
+  /**
+   * Verification methods available for the location.
+   * @see https://docs.upload-post.com/api/google-business-verification
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessVerificationOptions(options = {}) {
+    return this._call('POST', '/uploadposts/google-business/verification/options', options);
+  }
+
+  /**
+   * Past verifications of the location.
+   * @see https://docs.upload-post.com/api/google-business-verification
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listGoogleBusinessVerifications(options = {}) {
+    return this._call('GET', '/uploadposts/google-business/verifications', options);
   }
 
   // ==================== Helper Endpoints ====================
@@ -2487,13 +4095,31 @@ export class UploadPost {
    * @param {string} [profile] - Profile username
    * @returns {Promise<Object>} Selection result with google_business_id and display_name
    */
-  async selectGoogleBusinessLocation() {
+  async selectGoogleBusinessLocation(locationId, profile) {
+    // The API now pins a location per profile; with both arguments this pins it.
+    if (locationId && profile) {
+      return this.pinGoogleBusinessLocation({ profileUsername: profile, gbpLocationId: locationId });
+    }
     throw new Error(
       'selectGoogleBusinessLocation is not supported: the API has no persistent location selection. ' +
-      'Pass gbpLocationId on the upload instead (list ids with getGoogleBusinessLocations).'
+      'Pass gbpLocationId on the upload, or pin one with pinGoogleBusinessLocation({ profileUsername, gbpLocationId }).'
     );
   }
 }
+
+// Option keys the API itself spells in camelCase (Google / YouTube names).
+UploadPost.KEEP_CAMEL_KEYS = new Set([
+  'ignoreRatingOnlyReviews', 'hasPaidProductPlacement', 'categoryId', 'privacyStatus',
+  'publicStatsViewable', 'selfDeclaredMadeForKids', 'containsSyntheticMedia',
+  'defaultLanguage', 'defaultAudioLanguage', 'recordingDate', 'allowedCountries',
+  'blockedCountries',
+]);
+
+// Fields that take a file (multipart) when given a local path, stream or Buffer.
+UploadPost.FILE_FIELDS = new Set([
+  'file', 'photo', 'animation', 'sticker', 'avatar', 'banner', 'thumbnail',
+  'telegram_media', 'telegram_thumbnail', 'telegram_cover', 'telegram_live_photo_photo',
+]);
 
 // Default export for CommonJS compatibility
 export default UploadPost;
