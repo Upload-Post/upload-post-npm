@@ -384,6 +384,10 @@ export class UploadPost {
     if (options.youtubeRecordingDate) form.append('recordingDate', options.youtubeRecordingDate);
     if (options.youtubeNotifySubscribers !== undefined) form.append('youtube_notify_subscribers', String(options.youtubeNotifySubscribers));
     if (options.youtubePublishAt) form.append('youtube_publish_at', options.youtubePublishAt);
+    // Translated title/description per language ({ es: { title, description } }) and the
+    // brand partner channel id (UC…) for creator-initiated brand partner access.
+    this._appendField(form, 'youtube_localizations', this._pick(options, 'youtubeLocalizations', 'youtube_localizations'));
+    this._appendField(form, 'youtube_brand_partner', this._pick(options, 'youtubeBrandPartner', 'youtube_brand_partner'));
     if (options.youtubePlaylistId) {
       const playlistIds = Array.isArray(options.youtubePlaylistId)
         ? options.youtubePlaylistId.join(',')
@@ -2489,6 +2493,10 @@ export class UploadPost {
   // ---- Posts: edit, repost, actions ----
   /**
    * Edit a published post (Facebook, LinkedIn, X, Google Business, Telegram: text, buttons, pin/unpin, stop a poll, live location, replace the media).
+   * YouTube: `title`, `description`, `tags`, `privacyStatus`, `categoryId`, `publishAt`,
+   * `hasPaidProductPlacement`, `defaultLanguage`, `embeddable`, `publicStatsViewable`,
+   * `selfDeclaredMadeForKids`, `containsSyntheticMedia`, `license`, `recordingDate`,
+   * `localizations`, `localizationsRemove`, `brandPartner` (the YouTube camelCase names are sent as they are).
    * @see https://docs.upload-post.com/api/edit-post
    * @param {Object} options - `user`, `platform`, `postId` and any other API field
    * @returns {Promise<Object>}
@@ -3920,6 +3928,725 @@ export class UploadPost {
     return this._call('GET', '/uploadposts/google-business/verifications', options);
   }
 
+  // ---- YouTube: videos, thumbnail and quota ----
+  /**
+   * Full details of videos: status, processing, statistics, translations, paid placement... (`ids`, `chart` or `my_rating`; `parts`, `include_owner_details`).
+   * @see https://docs.upload-post.com/api/youtube-videos
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeVideos(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/videos', options);
+  }
+
+  /**
+   * Your account's daily allowance for the YouTube management endpoints and what is left.
+   * @see https://docs.upload-post.com/api/youtube-videos
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeQuota(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/quota', options);
+  }
+
+  /**
+   * Set a video's thumbnail: `thumbnail` (local file, stream or Buffer) or `thumbnail_url`.
+   * @see https://docs.upload-post.com/api/youtube-thumbnail
+   * @param {Object} options - `user`, `videoId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async setYoutubeThumbnail(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/thumbnail', options);
+  }
+
+  // ---- YouTube: playlists ----
+  /**
+   * List the channel's playlists (or `ids`).
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listYoutubePlaylists(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/playlists', options);
+  }
+
+  /**
+   * Create a playlist (`title`, `description`, `privacy_status`, `default_language`, `localizations`...).
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createYoutubePlaylist(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/playlists', options);
+  }
+
+  /**
+   * Edit a playlist (only what you send changes).
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user`, `playlistId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateYoutubePlaylist(options = {}) {
+    return this._call('PATCH', '/uploadposts/youtube/playlists/{playlist_id}', options);
+  }
+
+  /**
+   * Delete a playlist (needs `confirm: true`; the videos stay).
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user`, `playlistId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteYoutubePlaylist(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/playlists/{playlist_id}', options);
+  }
+
+  /**
+   * Videos of a playlist.
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user`, `playlistId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listYoutubePlaylistItems(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/playlists/{playlist_id}/items', options);
+  }
+
+  /**
+   * Add a video to a playlist (`video_id`, `position`, `note`).
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user`, `playlistId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async addYoutubePlaylistItem(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/playlists/{playlist_id}/items', options);
+  }
+
+  /**
+   * Reorder a playlist video or change its note.
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user`, `playlistId`, `itemId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateYoutubePlaylistItem(options = {}) {
+    return this._call('PATCH', '/uploadposts/youtube/playlists/{playlist_id}/items/{item_id}', options);
+  }
+
+  /**
+   * Remove a video from a playlist (needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user`, `playlistId`, `itemId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteYoutubePlaylistItem(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/playlists/{playlist_id}/items/{item_id}', options);
+  }
+
+  /**
+   * The playlist's custom image.
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user`, `playlistId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubePlaylistImage(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/playlists/{playlist_id}/image', options);
+  }
+
+  /**
+   * Add the playlist image: `image` (local file, stream or Buffer) or `image_url`.
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user`, `playlistId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async setYoutubePlaylistImage(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/playlists/{playlist_id}/image', options);
+  }
+
+  /**
+   * Replace the playlist image (same fields, needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user`, `playlistId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async replaceYoutubePlaylistImage(options = {}) {
+    return this._call('PUT', '/uploadposts/youtube/playlists/{playlist_id}/image', options);
+  }
+
+  /**
+   * Remove the playlist image (needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-playlists
+   * @param {Object} options - `user`, `playlistId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteYoutubePlaylistImage(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/playlists/{playlist_id}/image', options);
+  }
+
+  // ---- YouTube: captions ----
+  /**
+   * Caption tracks of a video.
+   * @see https://docs.upload-post.com/api/youtube-captions
+   * @param {Object} options - `user`, `videoId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeCaptions(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/captions', options);
+  }
+
+  /**
+   * Add a caption track: `file` (local file, stream or Buffer) or `file_url`, plus `language`, `name`, `is_draft`.
+   * @see https://docs.upload-post.com/api/youtube-captions
+   * @param {Object} options - `user`, `videoId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async uploadYoutubeCaption(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/captions', options);
+  }
+
+  /**
+   * Replace a track's file and/or publish a draft (`is_draft: false`).
+   * @see https://docs.upload-post.com/api/youtube-captions
+   * @param {Object} options - `user`, `captionId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateYoutubeCaption(options = {}) {
+    return this._call('PUT', '/uploadposts/youtube/captions/{caption_id}', options);
+  }
+
+  /**
+   * Download a track (`tfmt`: srt, vtt, sbv, scc, ttml; `tlang` to translate). Returns the file's text.
+   * @see https://docs.upload-post.com/api/youtube-captions
+   * @param {Object} options - `user`, `captionId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async downloadYoutubeCaption(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/captions/{caption_id}/download', options);
+  }
+
+  /**
+   * Delete a track (needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-captions
+   * @param {Object} options - `user`, `captionId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteYoutubeCaption(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/captions/{caption_id}', options);
+  }
+
+  // ---- YouTube: comments inbox ----
+  /**
+   * Comment threads of a video (`video_id`), of the whole channel (`scope: "channel"`) or by `ids`; `moderation_status`, `order`, `search_terms`...
+   * @see https://docs.upload-post.com/api/youtube-comments
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeComments(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/comments', options);
+  }
+
+  /**
+   * Replies to a comment (`parent_id`) or comments by `ids`.
+   * @see https://docs.upload-post.com/api/youtube-comments
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeCommentReplies(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/comments/replies', options);
+  }
+
+  /**
+   * Reply to a comment (`parent_id`) or comment on a video (`video_id`); `idempotency_key` optional.
+   * @see https://docs.upload-post.com/api/youtube-comments
+   * @param {Object} options - `user`, `text` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createYoutubeComment(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/comments', options);
+  }
+
+  /**
+   * Edit your own comment (`text`).
+   * @see https://docs.upload-post.com/api/youtube-comments
+   * @param {Object} options - `user`, `commentId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateYoutubeComment(options = {}) {
+    return this._call('PATCH', '/uploadposts/youtube/comments/{comment_id}', options);
+  }
+
+  /**
+   * Delete your own comment (needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-comments
+   * @param {Object} options - `user`, `commentId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteYoutubeComment(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/comments/{comment_id}', options);
+  }
+
+  /**
+   * Approve, hold or reject comments of your channel (`rejected` needs `confirm: true`; `ban_author`).
+   * @see https://docs.upload-post.com/api/youtube-comments
+   * @param {Object} options - `user`, `commentIds`, `status` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async moderateYoutubeComments(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/comments/moderate', options);
+  }
+
+  // ---- YouTube: search and catalogs ----
+  /**
+   * Search videos, channels and playlists (`q`, `for_mine`, `channel_id`, `type`, `order`...).
+   * @see https://docs.upload-post.com/api/youtube-search-catalogs
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async searchYoutube(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/search', options);
+  }
+
+  /**
+   * Video categories of a region (`region`, `hl`, `assignable_only`).
+   * @see https://docs.upload-post.com/api/youtube-search-catalogs
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeCategories(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/categories', options);
+  }
+
+  /**
+   * Languages YouTube supports (`hl`).
+   * @see https://docs.upload-post.com/api/youtube-search-catalogs
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeLanguages(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/languages', options);
+  }
+
+  /**
+   * Regions (countries) YouTube supports (`hl`).
+   * @see https://docs.upload-post.com/api/youtube-search-catalogs
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeRegions(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/regions', options);
+  }
+
+  /**
+   * Reasons for an abuse report (`hl`).
+   * @see https://docs.upload-post.com/api/youtube-search-catalogs
+   * @param {Object} options - Any API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeAbuseReasons(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/abuse-reasons', options);
+  }
+
+  // ---- YouTube: subscriptions, ratings, reports and activity ----
+  /**
+   * Channels the connected channel subscribes to (or its subscribers).
+   * @see https://docs.upload-post.com/api/youtube-channel-actions
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeSubscriptions(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/subscriptions', options);
+  }
+
+  /**
+   * Subscribe the connected channel to a channel (`channel_id`).
+   * @see https://docs.upload-post.com/api/youtube-channel-actions
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async subscribeYoutubeChannel(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/subscriptions', options);
+  }
+
+  /**
+   * Unsubscribe.
+   * @see https://docs.upload-post.com/api/youtube-channel-actions
+   * @param {Object} options - `user`, `subscriptionId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async unsubscribeYoutubeChannel(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/subscriptions/{subscription_id}', options);
+  }
+
+  /**
+   * Like, dislike or remove the rating of a video (`rating`: like, dislike, none).
+   * @see https://docs.upload-post.com/api/youtube-channel-actions
+   * @param {Object} options - `user`, `videoId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async rateYoutubeVideo(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/videos/{video_id}/rate', options);
+  }
+
+  /**
+   * The channel's rating of up to 50 videos.
+   * @see https://docs.upload-post.com/api/youtube-channel-actions
+   * @param {Object} options - `user`, `ids` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeRating(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/videos/rating', options);
+  }
+
+  /**
+   * Report a video (needs `confirm: true`; it cannot be withdrawn).
+   * @see https://docs.upload-post.com/api/youtube-channel-actions
+   * @param {Object} options - `user`, `videoId`, `reasonId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async reportYoutubeVideoAbuse(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/videos/{video_id}/report-abuse', options);
+  }
+
+  /**
+   * Activity of the channel (uploads, likes, playlist additions...).
+   * @see https://docs.upload-post.com/api/youtube-channel-actions
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeActivities(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/activities', options);
+  }
+
+  // ---- YouTube: channel settings ----
+  /**
+   * Read the connected channel (settings, branding, translations, statistics).
+   * @see https://docs.upload-post.com/api/youtube-channel
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeChannel(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/channel', options);
+  }
+
+  /**
+   * Change the channel settings or translations (only what you send changes).
+   * @see https://docs.upload-post.com/api/youtube-channel
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateYoutubeChannel(options = {}) {
+    return this._call('PATCH', '/uploadposts/youtube/channel', options);
+  }
+
+  /**
+   * Public data of any channel (`for_handle`, `channel_id`...).
+   * @see https://docs.upload-post.com/api/youtube-channel
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async lookupYoutubeChannel(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/channel/lookup', options);
+  }
+
+  /**
+   * Upload and apply the banner: `image` (local file, stream or Buffer) or `image_url`.
+   * @see https://docs.upload-post.com/api/youtube-channel
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async setYoutubeChannelBanner(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/channel/banner', options);
+  }
+
+  /**
+   * Sections of the channel page.
+   * @see https://docs.upload-post.com/api/youtube-channel
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeChannelSections(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/channel/sections', options);
+  }
+
+  /**
+   * Create a section.
+   * @see https://docs.upload-post.com/api/youtube-channel
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createYoutubeChannelSection(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/channel/sections', options);
+  }
+
+  /**
+   * Edit or move a section.
+   * @see https://docs.upload-post.com/api/youtube-channel
+   * @param {Object} options - `user`, `sectionId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateYoutubeChannelSection(options = {}) {
+    return this._call('PATCH', '/uploadposts/youtube/channel/sections/{section_id}', options);
+  }
+
+  /**
+   * Delete a section (needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-channel
+   * @param {Object} options - `user`, `sectionId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteYoutubeChannelSection(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/channel/sections/{section_id}', options);
+  }
+
+  /**
+   * Set the watermark: `image` (local file, stream or Buffer) or `image_url`, `timing_type`, `offset_ms`, `duration_ms` (needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-channel
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async setYoutubeWatermark(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/channel/watermark', options);
+  }
+
+  /**
+   * Remove the watermark (needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-channel
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async removeYoutubeWatermark(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/channel/watermark', options);
+  }
+
+  // ---- YouTube: live broadcasts and streams ----
+  /**
+   * List live broadcasts (`status`, `ids`...).
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeBroadcasts(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/live/broadcasts', options);
+  }
+
+  /**
+   * Create a broadcast (`title`, `scheduled_start_time`, `privacy_status`...).
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createYoutubeBroadcast(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/live/broadcasts', options);
+  }
+
+  /**
+   * One broadcast.
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user`, `broadcastId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeBroadcast(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/live/broadcasts/{broadcast_id}', options);
+  }
+
+  /**
+   * Edit a broadcast.
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user`, `broadcastId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateYoutubeBroadcast(options = {}) {
+    return this._call('PATCH', '/uploadposts/youtube/live/broadcasts/{broadcast_id}', options);
+  }
+
+  /**
+   * Delete a broadcast (needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user`, `broadcastId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteYoutubeBroadcast(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/live/broadcasts/{broadcast_id}', options);
+  }
+
+  /**
+   * Bind a stream to the broadcast (`stream_id`), or unbind it.
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user`, `broadcastId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async bindYoutubeBroadcast(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/live/broadcasts/{broadcast_id}/bind', options);
+  }
+
+  /**
+   * Go `testing`, `live` or `complete` (`live` and `complete` need `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user`, `broadcastId`, `status` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async transitionYoutubeBroadcast(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/live/broadcasts/{broadcast_id}/transition', options);
+  }
+
+  /**
+   * Insert an ad break.
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user`, `broadcastId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async insertYoutubeCuepoint(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/live/broadcasts/{broadcast_id}/cuepoint', options);
+  }
+
+  /**
+   * List streams.
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeStreams(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/live/streams', options);
+  }
+
+  /**
+   * Create a stream (its key is a secret).
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async createYoutubeStream(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/live/streams', options);
+  }
+
+  /**
+   * One stream.
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user`, `streamId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeStream(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/live/streams/{stream_id}', options);
+  }
+
+  /**
+   * Edit a stream.
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user`, `streamId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async updateYoutubeStream(options = {}) {
+    return this._call('PATCH', '/uploadposts/youtube/live/streams/{stream_id}', options);
+  }
+
+  /**
+   * Delete a stream (needs `confirm: true`; encoders using its key stop).
+   * @see https://docs.upload-post.com/api/youtube-live
+   * @param {Object} options - `user`, `streamId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteYoutubeStream(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/live/streams/{stream_id}', options);
+  }
+
+  // ---- YouTube: live chat, polls and moderation ----
+  /**
+   * Read the live chat (`broadcast_id` or `live_chat_id`, `page_token`).
+   * @see https://docs.upload-post.com/api/youtube-live-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeLiveChat(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/live/chat', options);
+  }
+
+  /**
+   * Post a message or a poll in the live chat (`idempotency_key` optional).
+   * @see https://docs.upload-post.com/api/youtube-live-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async sendYoutubeLiveChatMessage(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/live/chat', options);
+  }
+
+  /**
+   * Close a poll.
+   * @see https://docs.upload-post.com/api/youtube-live-chat
+   * @param {Object} options - `user`, `messageId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async closeYoutubeLiveChatPoll(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/live/chat/polls/{message_id}/close', options);
+  }
+
+  /**
+   * Delete a chat message (needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-live-chat
+   * @param {Object} options - `user`, `messageId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async deleteYoutubeLiveChatMessage(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/live/chat/messages/{message_id}', options);
+  }
+
+  /**
+   * Moderators of the live chat.
+   * @see https://docs.upload-post.com/api/youtube-live-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeLiveModerators(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/live/moderators', options);
+  }
+
+  /**
+   * Add a moderator (`channel_id`).
+   * @see https://docs.upload-post.com/api/youtube-live-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async addYoutubeLiveModerator(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/live/moderators', options);
+  }
+
+  /**
+   * Remove a moderator (the `id` from the list; needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-live-chat
+   * @param {Object} options - `user`, `moderatorId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async removeYoutubeLiveModerator(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/live/moderators/{moderator_id}', options);
+  }
+
+  /**
+   * Ban a user from the chat (`permanent` or `temporary` with `ban_duration_seconds`; needs `confirm: true`).
+   * @see https://docs.upload-post.com/api/youtube-live-chat
+   * @param {Object} options - `user`, `channelId`, `type` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async banYoutubeLiveChatUser(options = {}) {
+    return this._call('POST', '/uploadposts/youtube/live/bans', options);
+  }
+
+  /**
+   * Lift a ban.
+   * @see https://docs.upload-post.com/api/youtube-live-chat
+   * @param {Object} options - `user`, `banId` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async unbanYoutubeLiveChatUser(options = {}) {
+    return this._call('DELETE', '/uploadposts/youtube/live/bans/{ban_id}', options);
+  }
+
+  /**
+   * Super Chats and Super Stickers received.
+   * @see https://docs.upload-post.com/api/youtube-live-chat
+   * @param {Object} options - `user` and any other API field
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeSuperChats(options = {}) {
+    return this._call('GET', '/uploadposts/youtube/live/super-chats', options);
+  }
+
   // ==================== Helper Endpoints ====================
 
   /**
@@ -4112,12 +4839,12 @@ UploadPost.KEEP_CAMEL_KEYS = new Set([
   'ignoreRatingOnlyReviews', 'hasPaidProductPlacement', 'categoryId', 'privacyStatus',
   'publicStatsViewable', 'selfDeclaredMadeForKids', 'containsSyntheticMedia',
   'defaultLanguage', 'defaultAudioLanguage', 'recordingDate', 'allowedCountries',
-  'blockedCountries',
+  'blockedCountries', 'publishAt',
 ]);
 
 // Fields that take a file (multipart) when given a local path, stream or Buffer.
 UploadPost.FILE_FIELDS = new Set([
-  'file', 'photo', 'animation', 'sticker', 'avatar', 'banner', 'thumbnail',
+  'file', 'photo', 'animation', 'sticker', 'avatar', 'banner', 'thumbnail', 'image',
   'telegram_media', 'telegram_thumbnail', 'telegram_cover', 'telegram_live_photo_photo',
 ]);
 

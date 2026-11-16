@@ -362,6 +362,10 @@ declare module 'upload-post' {
     youtubeHasPaidProductPlacement?: boolean;
     /** Recording date (ISO 8601) */
     youtubeRecordingDate?: string;
+    /** Translated title and description per language: { es: { title, description }, 'pt-BR': { title } } */
+    youtubeLocalizations?: Record<string, { title?: string; description?: string }> | string;
+    /** Brand partner channel id (UC…, 24 characters) for creator-initiated brand partner access */
+    youtubeBrandPartner?: string;
     /** Notify subscribers. Default true; send false to suppress the notification */
     youtubeNotifySubscribers?: boolean;
     /** RFC3339 time. Uploads the video as private until this instant (Studio: Scheduled) */
@@ -3179,6 +3183,441 @@ declare module 'upload-post' {
      */
     listGoogleBusinessVerifications(options: { user: string } & ApiParams): Promise<ApiResponse>;
 
+
+    // YouTube: videos, thumbnail and quota
+    /**
+     * Full details of videos: status, processing, statistics, translations, paid placement... (`ids`, `chart` or `my_rating`; `parts`, `include_owner_details`).
+     * @see https://docs.upload-post.com/api/youtube-videos
+     */
+    getYoutubeVideos(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Your account's daily allowance for the YouTube management endpoints and what is left.
+     * @see https://docs.upload-post.com/api/youtube-videos
+     */
+    getYoutubeQuota(options?: ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Set a video's thumbnail: `thumbnail` (local file, stream or Buffer) or `thumbnail_url`.
+     * @see https://docs.upload-post.com/api/youtube-thumbnail
+     */
+    setYoutubeThumbnail(options: { user: string; videoId: string } & ApiParams): Promise<ApiResponse>;
+
+    // YouTube: playlists
+    /**
+     * List the channel's playlists (or `ids`).
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    listYoutubePlaylists(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Create a playlist (`title`, `description`, `privacy_status`, `default_language`, `localizations`...).
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    createYoutubePlaylist(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Edit a playlist (only what you send changes).
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    updateYoutubePlaylist(options: { user: string; playlistId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete a playlist (needs `confirm: true`; the videos stay).
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    deleteYoutubePlaylist(options: { user: string; playlistId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Videos of a playlist.
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    listYoutubePlaylistItems(options: { user: string; playlistId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Add a video to a playlist (`video_id`, `position`, `note`).
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    addYoutubePlaylistItem(options: { user: string; playlistId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Reorder a playlist video or change its note.
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    updateYoutubePlaylistItem(options: { user: string; playlistId: string; itemId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Remove a video from a playlist (needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    deleteYoutubePlaylistItem(options: { user: string; playlistId: string; itemId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * The playlist's custom image.
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    getYoutubePlaylistImage(options: { user: string; playlistId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Add the playlist image: `image` (local file, stream or Buffer) or `image_url`.
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    setYoutubePlaylistImage(options: { user: string; playlistId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Replace the playlist image (same fields, needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    replaceYoutubePlaylistImage(options: { user: string; playlistId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Remove the playlist image (needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-playlists
+     */
+    deleteYoutubePlaylistImage(options: { user: string; playlistId: string } & ApiParams): Promise<ApiResponse>;
+
+    // YouTube: captions
+    /**
+     * Caption tracks of a video.
+     * @see https://docs.upload-post.com/api/youtube-captions
+     */
+    listYoutubeCaptions(options: { user: string; videoId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Add a caption track: `file` (local file, stream or Buffer) or `file_url`, plus `language`, `name`, `is_draft`.
+     * @see https://docs.upload-post.com/api/youtube-captions
+     */
+    uploadYoutubeCaption(options: { user: string; videoId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Replace a track's file and/or publish a draft (`is_draft: false`).
+     * @see https://docs.upload-post.com/api/youtube-captions
+     */
+    updateYoutubeCaption(options: { user: string; captionId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Download a track (`tfmt`: srt, vtt, sbv, scc, ttml; `tlang` to translate). Returns the file's text.
+     * @see https://docs.upload-post.com/api/youtube-captions
+     */
+    downloadYoutubeCaption(options: { user: string; captionId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete a track (needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-captions
+     */
+    deleteYoutubeCaption(options: { user: string; captionId: string } & ApiParams): Promise<ApiResponse>;
+
+    // YouTube: comments inbox
+    /**
+     * Comment threads of a video (`video_id`), of the whole channel (`scope: "channel"`) or by `ids`; `moderation_status`, `order`, `search_terms`...
+     * @see https://docs.upload-post.com/api/youtube-comments
+     */
+    listYoutubeComments(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Replies to a comment (`parent_id`) or comments by `ids`.
+     * @see https://docs.upload-post.com/api/youtube-comments
+     */
+    listYoutubeCommentReplies(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Reply to a comment (`parent_id`) or comment on a video (`video_id`); `idempotency_key` optional.
+     * @see https://docs.upload-post.com/api/youtube-comments
+     */
+    createYoutubeComment(options: { user: string; text: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Edit your own comment (`text`).
+     * @see https://docs.upload-post.com/api/youtube-comments
+     */
+    updateYoutubeComment(options: { user: string; commentId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete your own comment (needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-comments
+     */
+    deleteYoutubeComment(options: { user: string; commentId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Approve, hold or reject comments of your channel (`rejected` needs `confirm: true`; `ban_author`).
+     * @see https://docs.upload-post.com/api/youtube-comments
+     */
+    moderateYoutubeComments(options: { user: string; commentIds: string; status: string } & ApiParams): Promise<ApiResponse>;
+
+    // YouTube: search and catalogs
+    /**
+     * Search videos, channels and playlists (`q`, `for_mine`, `channel_id`, `type`, `order`...).
+     * @see https://docs.upload-post.com/api/youtube-search-catalogs
+     */
+    searchYoutube(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Video categories of a region (`region`, `hl`, `assignable_only`).
+     * @see https://docs.upload-post.com/api/youtube-search-catalogs
+     */
+    getYoutubeCategories(options?: ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Languages YouTube supports (`hl`).
+     * @see https://docs.upload-post.com/api/youtube-search-catalogs
+     */
+    getYoutubeLanguages(options?: ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Regions (countries) YouTube supports (`hl`).
+     * @see https://docs.upload-post.com/api/youtube-search-catalogs
+     */
+    getYoutubeRegions(options?: ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Reasons for an abuse report (`hl`).
+     * @see https://docs.upload-post.com/api/youtube-search-catalogs
+     */
+    getYoutubeAbuseReasons(options?: ApiParams): Promise<ApiResponse>;
+
+    // YouTube: subscriptions, ratings, reports and activity
+    /**
+     * Channels the connected channel subscribes to (or its subscribers).
+     * @see https://docs.upload-post.com/api/youtube-channel-actions
+     */
+    listYoutubeSubscriptions(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Subscribe the connected channel to a channel (`channel_id`).
+     * @see https://docs.upload-post.com/api/youtube-channel-actions
+     */
+    subscribeYoutubeChannel(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Unsubscribe.
+     * @see https://docs.upload-post.com/api/youtube-channel-actions
+     */
+    unsubscribeYoutubeChannel(options: { user: string; subscriptionId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Like, dislike or remove the rating of a video (`rating`: like, dislike, none).
+     * @see https://docs.upload-post.com/api/youtube-channel-actions
+     */
+    rateYoutubeVideo(options: { user: string; videoId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * The channel's rating of up to 50 videos.
+     * @see https://docs.upload-post.com/api/youtube-channel-actions
+     */
+    getYoutubeRating(options: { user: string; ids: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Report a video (needs `confirm: true`; it cannot be withdrawn).
+     * @see https://docs.upload-post.com/api/youtube-channel-actions
+     */
+    reportYoutubeVideoAbuse(options: { user: string; videoId: string; reasonId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Activity of the channel (uploads, likes, playlist additions...).
+     * @see https://docs.upload-post.com/api/youtube-channel-actions
+     */
+    getYoutubeActivities(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    // YouTube: channel settings
+    /**
+     * Read the connected channel (settings, branding, translations, statistics).
+     * @see https://docs.upload-post.com/api/youtube-channel
+     */
+    getYoutubeChannel(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Change the channel settings or translations (only what you send changes).
+     * @see https://docs.upload-post.com/api/youtube-channel
+     */
+    updateYoutubeChannel(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Public data of any channel (`for_handle`, `channel_id`...).
+     * @see https://docs.upload-post.com/api/youtube-channel
+     */
+    lookupYoutubeChannel(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Upload and apply the banner: `image` (local file, stream or Buffer) or `image_url`.
+     * @see https://docs.upload-post.com/api/youtube-channel
+     */
+    setYoutubeChannelBanner(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Sections of the channel page.
+     * @see https://docs.upload-post.com/api/youtube-channel
+     */
+    listYoutubeChannelSections(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Create a section.
+     * @see https://docs.upload-post.com/api/youtube-channel
+     */
+    createYoutubeChannelSection(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Edit or move a section.
+     * @see https://docs.upload-post.com/api/youtube-channel
+     */
+    updateYoutubeChannelSection(options: { user: string; sectionId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete a section (needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-channel
+     */
+    deleteYoutubeChannelSection(options: { user: string; sectionId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Set the watermark: `image` (local file, stream or Buffer) or `image_url`, `timing_type`, `offset_ms`, `duration_ms` (needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-channel
+     */
+    setYoutubeWatermark(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Remove the watermark (needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-channel
+     */
+    removeYoutubeWatermark(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    // YouTube: live broadcasts and streams
+    /**
+     * List live broadcasts (`status`, `ids`...).
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    listYoutubeBroadcasts(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Create a broadcast (`title`, `scheduled_start_time`, `privacy_status`...).
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    createYoutubeBroadcast(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * One broadcast.
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    getYoutubeBroadcast(options: { user: string; broadcastId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Edit a broadcast.
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    updateYoutubeBroadcast(options: { user: string; broadcastId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete a broadcast (needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    deleteYoutubeBroadcast(options: { user: string; broadcastId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Bind a stream to the broadcast (`stream_id`), or unbind it.
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    bindYoutubeBroadcast(options: { user: string; broadcastId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Go `testing`, `live` or `complete` (`live` and `complete` need `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    transitionYoutubeBroadcast(options: { user: string; broadcastId: string; status: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Insert an ad break.
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    insertYoutubeCuepoint(options: { user: string; broadcastId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * List streams.
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    listYoutubeStreams(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Create a stream (its key is a secret).
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    createYoutubeStream(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * One stream.
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    getYoutubeStream(options: { user: string; streamId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Edit a stream.
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    updateYoutubeStream(options: { user: string; streamId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete a stream (needs `confirm: true`; encoders using its key stop).
+     * @see https://docs.upload-post.com/api/youtube-live
+     */
+    deleteYoutubeStream(options: { user: string; streamId: string } & ApiParams): Promise<ApiResponse>;
+
+    // YouTube: live chat, polls and moderation
+    /**
+     * Read the live chat (`broadcast_id` or `live_chat_id`, `page_token`).
+     * @see https://docs.upload-post.com/api/youtube-live-chat
+     */
+    getYoutubeLiveChat(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Post a message or a poll in the live chat (`idempotency_key` optional).
+     * @see https://docs.upload-post.com/api/youtube-live-chat
+     */
+    sendYoutubeLiveChatMessage(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Close a poll.
+     * @see https://docs.upload-post.com/api/youtube-live-chat
+     */
+    closeYoutubeLiveChatPoll(options: { user: string; messageId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Delete a chat message (needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-live-chat
+     */
+    deleteYoutubeLiveChatMessage(options: { user: string; messageId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Moderators of the live chat.
+     * @see https://docs.upload-post.com/api/youtube-live-chat
+     */
+    listYoutubeLiveModerators(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Add a moderator (`channel_id`).
+     * @see https://docs.upload-post.com/api/youtube-live-chat
+     */
+    addYoutubeLiveModerator(options: { user: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Remove a moderator (the `id` from the list; needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-live-chat
+     */
+    removeYoutubeLiveModerator(options: { user: string; moderatorId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Ban a user from the chat (`permanent` or `temporary` with `ban_duration_seconds`; needs `confirm: true`).
+     * @see https://docs.upload-post.com/api/youtube-live-chat
+     */
+    banYoutubeLiveChatUser(options: { user: string; channelId: string; type: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Lift a ban.
+     * @see https://docs.upload-post.com/api/youtube-live-chat
+     */
+    unbanYoutubeLiveChatUser(options: { user: string; banId: string } & ApiParams): Promise<ApiResponse>;
+
+    /**
+     * Super Chats and Super Stickers received.
+     * @see https://docs.upload-post.com/api/youtube-live-chat
+     */
+    listYoutubeSuperChats(options: { user: string } & ApiParams): Promise<ApiResponse>;
 
     // Helper Endpoints
     /**
