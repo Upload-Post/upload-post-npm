@@ -1481,7 +1481,7 @@ export class UploadPost {
    *
    * @param {string} user - Profile username
    * @param {Object} [options] - Query options
-   * @param {string} [options.platform] - Filter by platform (instagram, tiktok, youtube, facebook, linkedin, threads, pinterest, reddit)
+   * @param {string} [options.platform] - Filter by platform (instagram, tiktok, youtube, facebook, linkedin, x, threads, pinterest, reddit, bluesky)
    * @param {number} [options.limit=50] - Posts per page (max 200)
    * @param {string} [options.cursor] - Opaque cursor from a previous response's next_cursor
    * @param {string} [options.since] - Start date in YYYY-MM-DD format (defaults to 30 days ago)

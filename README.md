@@ -299,7 +299,7 @@ Posts published with Upload-Post carry `request_id`, `post_title` and `caption_p
 let cursor;
 do {
   const page = await client.getCachedPostAnalytics('my-profile', {
-    platform: 'youtube',   // optional: instagram, tiktok, youtube, facebook, linkedin, threads, pinterest, reddit
+    platform: 'youtube',   // optional: instagram, tiktok, youtube, facebook, linkedin, x, threads, pinterest, reddit, bluesky
     limit: 50,             // default 50, max 200
     since: '2026-06-01',   // defaults to 30 days ago
     until: '2026-07-01',   // defaults to today

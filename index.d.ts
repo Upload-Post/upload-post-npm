@@ -1899,7 +1899,7 @@ declare module 'upload-post' {
      * @param options - Query options
      */
     getCachedPostAnalytics(user: string, options?: {
-      platform?: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'linkedin' | 'threads' | 'pinterest' | 'reddit';
+      platform?: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'linkedin' | 'x' | 'threads' | 'pinterest' | 'reddit' | 'bluesky';
       /** Posts per page. Default 50, max 200. */
       limit?: number;
       /** Opaque cursor from a previous response's next_cursor. */
