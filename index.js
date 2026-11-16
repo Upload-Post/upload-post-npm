@@ -31,7 +31,7 @@ export class UploadPost {
    * Make an API request
    * @private
    */
-  async _request(endpoint, method = 'GET', data = null, isFormData = false, extraHeaders = {}) {
+  async _request(endpoint, method = 'GET', data = null, isFormData = false, extraHeaders = {}, requestConfig = {}) {
     const config = {
       method,
       url: `${this.baseUrl}${endpoint}`,
@@ -57,11 +57,20 @@ export class UploadPost {
       }
     }
 
+    // Query string on a request with a body, and file answers (generated methods).
+    if (requestConfig.params) config.params = { ...(config.params || {}), ...requestConfig.params };
+    if (requestConfig.responseType) config.responseType = requestConfig.responseType;
+
     try {
       const response = await axios(config);
       return response.data;
     } catch (error) {
-      const data = error.response?.data;
+      let data = error.response?.data;
+      // A file request (responseType arraybuffer) gets its JSON error as bytes.
+      if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
+        const text = Buffer.from(data).toString('utf8');
+        try { data = JSON.parse(text); } catch { data = text; }
+      }
       const apiError = typeof data?.error === 'string' ? data.error : undefined;
       const message = data?.message || data?.detail || apiError || error.message;
       const err = new Error(`Upload-Post API error: ${message}`);
@@ -73,6 +82,7 @@ export class UploadPost {
       err.code = (data && (data.code || data.error_code)) || (error.response ? undefined : error.code);
       err.errorCode = data?.error_code;
       err.reason = data?.reason;
+      err.errorType = data?.error_type;
       const retryAfter = error.response?.headers?.['retry-after'];
       if (retryAfter !== undefined) err.retryAfter = Number(retryAfter);
       err.response = data;
@@ -374,6 +384,13 @@ export class UploadPost {
     if (options.youtubeLicense) form.append('license', options.youtubeLicense);
     if (options.youtubePublicStatsViewable !== undefined) form.append('publicStatsViewable', String(options.youtubePublicStatsViewable));
     if (options.youtubeThumbnailUrl) form.append('thumbnail_url', options.youtubeThumbnailUrl);
+    // Custom thumbnail as a file (local path, stream or Buffer); youtubeThumbnailUrl takes a URL.
+    const thumbnail = this._pick(options, 'youtubeThumbnail', 'thumbnail');
+    if (thumbnail && this._isUploadValue(thumbnail)) {
+      if (typeof thumbnail === 'string') form.append('thumbnail', createReadStream(thumbnail));
+      else if (Buffer.isBuffer(thumbnail)) form.append('thumbnail', thumbnail, { filename: 'thumbnail.jpg' });
+      else form.append('thumbnail', thumbnail);
+    }
     if (options.youtubeSelfDeclaredMadeForKids !== undefined) form.append('selfDeclaredMadeForKids', String(options.youtubeSelfDeclaredMadeForKids));
     if (options.youtubeContainsSyntheticMedia !== undefined) form.append('containsSyntheticMedia', String(options.youtubeContainsSyntheticMedia));
     if (options.youtubeDefaultLanguage) form.append('defaultLanguage', options.youtubeDefaultLanguage);
@@ -527,6 +544,10 @@ export class UploadPost {
     if (options.xDirectMessageDeepLink) form.append('direct_message_deep_link', options.xDirectMessageDeepLink);
     if (options.xLongTextAsPost !== undefined) form.append('x_long_text_as_post', String(options.xLongTextAsPost));
     this._appendField(form, 'x_paid_partnership', this._pick(options, 'xPaidPartnership', 'x_paid_partnership'));
+    // Users who may not reply (with replyToId): an array, or comma-separated.
+    const excludeReply = this._pick(options, 'xExcludeReplyUserIds', 'excludeReplyUserIds', 'exclude_reply_user_ids');
+    if (Array.isArray(excludeReply)) excludeReply.forEach((id) => form.append('exclude_reply_user_ids[]', String(id)));
+    else this._appendField(form, 'exclude_reply_user_ids', excludeReply);
 
     if (!isText) {
       if (options.xTaggedUserIds) {
@@ -642,6 +663,7 @@ export class UploadPost {
     this._appendField(form, 'reddit_resubmit', this._pick(options, 'redditResubmit', 'reddit_resubmit'));
     this._appendField(form, 'reddit_send_replies', this._pick(options, 'redditSendReplies', 'reddit_send_replies'));
     this._appendField(form, 'reddit_flair_text', this._pick(options, 'redditFlairText', 'reddit_flair_text'));
+    this._appendField(form, 'reddit_title', this._pick(options, 'redditTitle', 'reddit_title'));
     this._appendField(form, 'reddit_gallery_captions', this._pick(options, 'redditGalleryCaptions', 'reddit_gallery_captions'));
     this._appendField(form, 'reddit_gallery_urls', this._pick(options, 'redditGalleryUrls', 'reddit_gallery_urls'));
   }
@@ -739,6 +761,8 @@ export class UploadPost {
       ['telegram_duration', 'telegramDuration'],
       ['telegram_length', 'telegramLength'],
       ['telegram_emoji', 'telegramEmoji'],
+      ['telegram_allow_paid_broadcast', 'telegramAllowPaidBroadcast'],
+      ['telegram_send_title', 'telegramSendTitle'],
     ]) {
       this._appendField(form, field, this._pick(options, key, field));
     }
@@ -1225,6 +1249,8 @@ export class UploadPost {
    * @param {boolean} [options.asyncUpload=true] - Process upload asynchronously
    * @param {string} [options.firstComment] - Comment posted under the document right after publishing
    * @param {string} [options.linkedinFirstComment] - Same, LinkedIn-specific name (used when firstComment is not set)
+   * @param {string[]} [options.platforms] - `['linkedin']` (default), `['telegram']` or both: Telegram takes any
+   *   file up to 50 MB, with the same `telegram*` options as the other uploads
    * 
    * @returns {Promise<Object>} API response
    */
@@ -1241,10 +1267,13 @@ export class UploadPost {
       form.append('document', createReadStream(documentPathOrUrl));
     }
 
-    // Force linkedin platform
+    // LinkedIn by default; `platforms: ['telegram']` (or both) sends the file to
+    // Telegram too. Other platforms do not take documents.
     form.append('user', options.user);
     form.append('title', options.title);
-    form.append('platform[]', 'linkedin');
+    const requested = options.platforms === undefined ? [] : [].concat(options.platforms);
+    const docPlatforms = requested.filter((p) => p === 'linkedin' || p === 'telegram');
+    (docPlatforms.length ? docPlatforms : ['linkedin']).forEach((p) => form.append('platform[]', p));
 
     if (options.description) form.append('description', options.description);
     if (options.scheduledDate) form.append('scheduled_date', options.scheduledDate);
@@ -1259,6 +1288,10 @@ export class UploadPost {
     // AI auto-generation of native per-platform copy from the media (fills blank fields)
 
     this._addLinkedinParams(form, options);
+    if (docPlatforms.includes('telegram')) {
+      this._addTelegramParams(form, options);
+      this._appendField(form, 'telegram_first_comment', this._pick(options, 'telegramFirstComment', 'telegram_first_comment'));
+    }
 
     return this._request('/upload_document', 'POST', form, true, this._idempotencyHeaders(options));
   }
@@ -2488,6 +2521,80 @@ export class UploadPost {
       return this._request(endpoint, method, form, true);
     }
     return this._request(endpoint, method, params);
+  }
+
+  /**
+   * Run one operation of the OpenAPI spec. Behind every generated method (see
+   * UploadPost.OPENAPI_OPERATIONS): option keys are camelCase or the API's own
+   * names, path parameters go in the URL, query parameters in the query string
+   * and the rest in the JSON body. A file field given as a local path, stream or
+   * Buffer turns the body into multipart/form-data.
+   * @private
+   */
+  async _op(name, options = {}) {
+    const [method, route, meta = {}] = UploadPost.OPENAPI_OPERATIONS[name];
+    const opts = { ...(options || {}) };
+    const headers = {};
+    if (meta.bearer) {
+      const { token } = opts;
+      delete opts.token;
+      if (!token) throw new Error('Upload-Post: token (the profile JWT) is required');
+      headers.Authorization = `Bearer ${token}`;
+    }
+    const known = new Set([...(meta.q || []), ...(meta.b || []), ...(route.match(/\{(\w+)\}/g) || []).map((p) => p.slice(1, -1))]);
+    const params = {};
+    for (const [key, value] of Object.entries(opts)) {
+      if (value === undefined) continue;
+      params[known.has(key) ? key : this._apiKey(key)] = value;
+    }
+    const endpoint = route.replace(/\{(\w+)\}/g, (_, pathName) => {
+      const value = params[pathName];
+      delete params[pathName];
+      if (value === undefined || value === null || value === '') {
+        throw new Error(`Upload-Post: ${pathName} is required`);
+      }
+      return encodeURIComponent(String(value));
+    });
+
+    const query = {};
+    const body = {};
+    for (const [key, value] of Object.entries(params)) {
+      const inQuery = method === 'GET' || (meta.q || []).includes(key) || (method === 'DELETE' && !meta.b);
+      if (!inQuery) {
+        body[key] = value;
+      } else if (value !== null) {
+        if (Array.isArray(value)) query[key] = value.join(',');
+        else if (typeof value === 'object') query[key] = JSON.stringify(value);
+        else if (typeof value === 'boolean') query[key] = String(value);
+        else query[key] = value;
+      }
+    }
+    const config = {};
+    if (meta.raw) config.responseType = meta.raw === 'binary' ? 'arraybuffer' : 'text';
+    if (method === 'GET' || (method === 'DELETE' && !meta.b && !Object.keys(body).length)) {
+      return this._request(endpoint, method, Object.keys(query).length ? query : null, false, headers, config);
+    }
+    if (Object.keys(query).length) config.params = query;
+
+    const fileFields = new Set(meta.f || []);
+    const isFile = (key, value) => (fileFields.has(key) || UploadPost.FILE_FIELDS.has(key))
+      && (Array.isArray(value) ? value.length > 0 && value.every((v) => this._isUploadValue(v)) : this._isUploadValue(value));
+    const fileKeys = Object.keys(body).filter((key) => isFile(key, body[key]));
+    if (fileKeys.length || meta.mp) {
+      const form = new FormData();
+      const appendFile = (key, value) => {
+        if (typeof value === 'string') form.append(key, createReadStream(value));
+        else if (Buffer.isBuffer(value)) form.append(key, value, { filename: key.replace(/\[\]$/, '') });
+        else form.append(key, value);
+      };
+      for (const [key, value] of Object.entries(body)) {
+        if (!fileKeys.includes(key)) this._appendField(form, key, value);
+        else if (Array.isArray(value)) value.forEach((v) => appendFile(key, v));
+        else appendFile(key, value);
+      }
+      return this._request(endpoint, method, form, true, headers, config);
+    }
+    return this._request(endpoint, method, body, false, headers, config);
   }
 
   // ---- Posts: edit, repost, actions ----
@@ -4832,6 +4939,2375 @@ export class UploadPost {
       'Pass gbpLocationId on the upload, or pin one with pinGoogleBusinessLocation({ profileUsername, gbpLocationId }).'
     );
   }
+
+  // ==================== Generated from the OpenAPI spec ====================
+  //
+  // One method per API operation that has no hand-written method above. Written
+  // by codegen/generate.py from codegen/openapi.json: do not edit by hand, edit the
+  // spec (or codegen/sdk-map.json) and run `python3 codegen/generate.py`.
+  // <openapi:methods>
+  // ---- Telegram ----
+  /**
+   * Send a gift from the bot's Stars.
+   *
+   * sendGift. Spends the bot's Stars. Requires confirm=true and max_star_count (checked against the current price).
+   *
+   * `POST /api/uploadposts/telegram/gifts`
+   * @param {SendTelegramGiftOptions} options
+   * @returns {Promise<Object>}
+   */
+  async sendTelegramGift(options = {}) {
+    return this._op('sendTelegramGift', options);
+  }
+
+  /**
+   * Gift Telegram Premium from the bot's Stars.
+   *
+   * Spends the bot's Stars.
+   *
+   * `POST /api/uploadposts/telegram/gifts/premium`
+   * @param {GiftTelegramPremiumOptions} options
+   * @returns {Promise<Object>}
+   */
+  async giftTelegramPremium(options = {}) {
+    return this._op('giftTelegramPremium', options);
+  }
+
+  /**
+   * Automatic pre-checkout rules.
+   *
+   * **The automatic answers need the bot's updates turned on (POST /api/uploadposts/telegram/updates).**
+   *
+   * `GET /api/uploadposts/telegram/payments/settings`
+   * @param {GetTelegramPaymentSettingsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getTelegramPaymentSettings(options = {}) {
+    return this._op('getTelegramPaymentSettings', options);
+  }
+
+  /**
+   * Set automatic pre-checkout rules.
+   *
+   * **The automatic answers need the bot's updates turned on (POST /api/uploadposts/telegram/updates).**
+   *
+   * `PUT /api/uploadposts/telegram/payments/settings`
+   * @param {UpdateTelegramPaymentSettingsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateTelegramPaymentSettings(options = {}) {
+    return this._op('updateTelegramPaymentSettings', options);
+  }
+
+  /**
+   * Turn Telegram updates on or off.
+   *
+   * Opt-in per bot. A webhook that is not Upload-Post's is never replaced without replace_existing_webhook=true (409 telegram_webhook_in_use otherwise). With no webhook, the answer warns that a getUpdates integration stops receiving.
+   *
+   * `POST /api/uploadposts/telegram/updates`
+   * @param {SetTelegramUpdatesOptions} options
+   * @returns {Promise<Object>}
+   */
+  async setTelegramUpdates(options = {}) {
+    return this._op('setTelegramUpdates', options);
+  }
+
+  /**
+   * Answer a Telegram query.
+   *
+   * Answer a callback_query, inline_query, join request, guest/widget query, shipping or pre-checkout query received as a telegram_update event. 410 telegram_query_expired when Telegram's time is up.
+   *
+   * `POST /api/uploadposts/telegram/answer`
+   * @param {AnswerTelegramQueryOptions} options
+   * @returns {Promise<Object>}
+   */
+  async answerTelegramQuery(options = {}) {
+    return this._op('answerTelegramQuery', options);
+  }
+
+  /**
+   * Telegram Business connections.
+   *
+   * Connections of the bot with Telegram Business accounts (rights, enabled).
+   *
+   * `GET /api/uploadposts/telegram/business-connections`
+   * @param {GetTelegramBusinessConnectionsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getTelegramBusinessConnections(options = {}) {
+    return this._op('getTelegramBusinessConnections', options);
+  }
+
+  /**
+   * Telegram Business account.
+   *
+   * The connected account.
+   *
+   * `GET /api/uploadposts/telegram/business-profile`
+   * @param {GetTelegramBusinessProfileOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getTelegramBusinessProfile(options = {}) {
+    return this._op('getTelegramBusinessProfile', options);
+  }
+
+  /**
+   * Update the Telegram Business profile.
+   *
+   * first_name/last_name, username, bio, photo (multipart or media_url, is_public), remove_photo, gift_settings.
+   *
+   * `PATCH /api/uploadposts/telegram/business-profile`
+   * @param {UpdateTelegramBusinessProfileOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateTelegramBusinessProfile(options = {}) {
+    return this._op('updateTelegramBusinessProfile', options);
+  }
+
+  /**
+   * Post a Telegram story.
+   *
+   * postStory on behalf of the Business account. Photos 1080x1920 up to 10 MB; videos 720x1280 H.265 up to 30 MB, 60 s.
+   *
+   * `POST /api/uploadposts/telegram/business-stories`
+   * @param {PostTelegramStoryOptions} options
+   * @returns {Promise<Object>}
+   */
+  async postTelegramStory(options = {}) {
+    return this._op('postTelegramStory', options);
+  }
+
+  /**
+   * Edit a Telegram story.
+   *
+   * editStory.
+   *
+   * `PATCH /api/uploadposts/telegram/business-stories`
+   * @param {EditTelegramStoryOptions} options
+   * @returns {Promise<Object>}
+   */
+  async editTelegramStory(options = {}) {
+    return this._op('editTelegramStory', options);
+  }
+
+  /**
+   * Delete a Telegram story.
+   *
+   * deleteStory.
+   *
+   * `DELETE /api/uploadposts/telegram/business-stories`
+   * @param {DeleteTelegramStoryOptions} options
+   * @returns {Promise<Object>}
+   */
+  async deleteTelegramStory(options = {}) {
+    return this._op('deleteTelegramStory', options);
+  }
+
+  /**
+   * Repost a Telegram story.
+   *
+   * repostStory from another Business account of the same bot.
+   *
+   * `POST /api/uploadposts/telegram/business-stories/repost`
+   * @param {RepostTelegramStoryOptions} options
+   * @returns {Promise<Object>}
+   */
+  async repostTelegramStory(options = {}) {
+    return this._op('repostTelegramStory', options);
+  }
+
+  /**
+   * Telegram Business gifts.
+   *
+   * getBusinessAccountGifts with Telegram's filters.
+   *
+   * `GET /api/uploadposts/telegram/business-gifts`
+   * @param {GetTelegramBusinessGiftsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getTelegramBusinessGifts(options = {}) {
+    return this._op('getTelegramBusinessGifts', options);
+  }
+
+  /**
+   * Convert, upgrade, transfer or delete a gift.
+   *
+   * Irreversible: requires confirm=true and an idempotency_key (a repeat with the same key returns the first answer).
+   *
+   * `POST /api/uploadposts/telegram/business-gifts`
+   * @param {ManageTelegramBusinessGiftOptions} options
+   * @returns {Promise<Object>}
+   */
+  async manageTelegramBusinessGift(options = {}) {
+    return this._op('manageTelegramBusinessGift', options);
+  }
+
+  /**
+   * Telegram Business Stars balance.
+   *
+   * getBusinessAccountStarBalance.
+   *
+   * `GET /api/uploadposts/telegram/business-stars`
+   * @param {GetTelegramBusinessStarsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getTelegramBusinessStars(options = {}) {
+    return this._op('getTelegramBusinessStars', options);
+  }
+
+  /**
+   * Move Stars to the bot.
+   *
+   * transferBusinessAccountStars (1-10000). Requires confirm=true and an idempotency_key.
+   *
+   * `POST /api/uploadposts/telegram/business-stars/transfer`
+   * @param {TransferTelegramBusinessStarsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async transferTelegramBusinessStars(options = {}) {
+    return this._op('transferTelegramBusinessStars', options);
+  }
+
+  // ---- Content Upload ----
+  /**
+   * AI titles and captions for a short video.
+   *
+   * Watches the video and writes a title/description (YouTube) and captions (Instagram, TikTok, Facebook). Counts against the monthly AI Shorts quota (a failed analysis is not counted).
+   *
+   * `POST /api/uploadposts/analyze-shorts`
+   * @param {AnalyzeShortsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async analyzeShorts(options = {}) {
+    return this._op('analyzeShorts', options);
+  }
+
+  /**
+   * Translate or rewrite captions with AI.
+   *
+   * Rewrites texts with the same shape analyze-shorts returns into another language. Uses the AI Shorts quota.
+   *
+   * `POST /api/uploadposts/rewrite-captions`
+   * @param {RewriteCaptionsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async rewriteCaptions(options = {}) {
+    return this._op('rewriteCaptions', options);
+  }
+
+  /**
+   * Get a signed URL to upload a file.
+   *
+   * For clients that cannot send large files in a multipart request (AI agents, the MCP server): create the upload, PUT the bytes to upload_url with the returned headers, call /complete, then pass media_url to the upload endpoints. Files expire after staging_ttl_hours. Per-file size, files in progress and monthly files/bytes depend on the plan.
+   *
+   * `POST /api/uploadposts/media-uploads`
+   * @param {CreateMediaUploadOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createMediaUpload(options = {}) {
+    return this._op('createMediaUpload', options);
+  }
+
+  /**
+   * Confirm a signed upload.
+   *
+   * Checks the uploaded object (size, type) and returns media_url.
+   *
+   * `POST /api/uploadposts/media-uploads/{upload_id}/complete`
+   * @param {CompleteMediaUploadOptions} options
+   * @returns {Promise<Object>}
+   */
+  async completeMediaUpload(options = {}) {
+    return this._op('completeMediaUpload', options);
+  }
+
+  /**
+   * Get a signed upload.
+   *
+   * `GET /api/uploadposts/media-uploads/{upload_id}`
+   * @param {GetMediaUploadOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getMediaUpload(options = {}) {
+    return this._op('getMediaUpload', options);
+  }
+
+  /**
+   * Delete a signed upload.
+   *
+   * `DELETE /api/uploadposts/media-uploads/{upload_id}`
+   * @param {DeleteMediaUploadOptions} options
+   * @returns {Promise<Object>}
+   */
+  async deleteMediaUpload(options = {}) {
+    return this._op('deleteMediaUpload', options);
+  }
+
+  // ---- Upload Management ----
+  /**
+   * Get a scheduled post.
+   *
+   * The options a scheduled post was scheduled with (limited to what PATCH can change), signed media URLs and whether it can still be edited.
+   *
+   * `GET /api/uploadposts/schedule/{job_id}`
+   * @param {GetScheduledPostOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getScheduledPost(options = {}) {
+    return this._op('getScheduledPost', options);
+  }
+
+  /**
+   * Get a scheduled post's thumbnail.
+   *
+   * Signed URL of a small JPEG of the post's video or first image. A post without one gets it built once and kept. Call it only for posts you display; the list already carries most thumbnails.
+   *
+   * `GET /api/uploadposts/schedule/{job_id}/thumbnail`
+   * @param {GetScheduledPostThumbnailOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getScheduledPostThumbnail(options = {}) {
+    return this._op('getScheduledPostThumbnail', options);
+  }
+
+  /**
+   * Preview URLs of a scheduled post.
+   *
+   * Signed, short-lived URLs of the media, cover and thumbnail of one scheduled job (the listing only says has_preview).
+   *
+   * `GET /api/uploadposts/schedule/{job_id}/preview`
+   * @param {GetScheduledPostPreviewOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getScheduledPostPreview(options = {}) {
+    return this._op('getScheduledPostPreview', options);
+  }
+
+  // ---- Platform Integration ----
+  /**
+   * Create a Pinterest board.
+   *
+   * `POST /api/uploadposts/pinterest/boards`
+   * @param {CreatePinterestBoardOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createPinterestBoard(options = {}) {
+    return this._op('createPinterestBoard', options);
+  }
+
+  /**
+   * Run a YouTube Analytics channel report.
+   *
+   * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. reports.query for the profile's channel with any dimensions, metrics, filters and sort of YouTube's channel reports. Validated against the official report tables before it reaches YouTube (invalid combinations: 400 youtube_analytics_unsupported_query with hints, nothing spent). Revenue and ad metrics are not available. Answers are cached (12 h; 7 days for ranges that ended more than 5 days ago). Each uncached call counts 1 request of the account's daily Analytics allowance. Data has a 48-72 h delay.
+   *
+   * `GET /api/uploadposts/youtube/analytics/query`
+   * @param {QueryYoutubeAnalyticsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async queryYoutubeAnalytics(options = {}) {
+    return this._op('queryYoutubeAnalytics', options);
+  }
+
+  /**
+   * YouTube Analytics report catalog.
+   *
+   * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. The 47 YouTube channel reports with their dimensions, metrics, filters, sort options and row limits. Does not call YouTube.
+   *
+   * `GET /api/uploadposts/youtube/analytics/reports`
+   * @param {ListYoutubeAnalyticsReportsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeAnalyticsReports(options = {}) {
+    return this._op('listYoutubeAnalyticsReports', options);
+  }
+
+  /**
+   * List YouTube Analytics groups.
+   *
+   * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. groups.list of the channel (mine=true, or ids). Cached 30 minutes; 1 request of the Analytics allowance per uncached call.
+   *
+   * `GET /api/uploadposts/youtube/analytics/groups`
+   * @param {ListYoutubeAnalyticsGroupsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeAnalyticsGroups(options = {}) {
+    return this._op('listYoutubeAnalyticsGroups', options);
+  }
+
+  /**
+   * List the items of a YouTube Analytics group.
+   *
+   * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. groupItems.list. Cached 30 minutes.
+   *
+   * `GET /api/uploadposts/youtube/analytics/groups/{group_id}/items`
+   * @param {ListYoutubeAnalyticsGroupItemsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeAnalyticsGroupItems(options = {}) {
+    return this._op('listYoutubeAnalyticsGroupItems', options);
+  }
+
+  /**
+   * Daily allowance of YouTube Analytics and bulk reports.
+   *
+   * The caller's own usage today of the Analytics and bulk reports allowances. While Analytics and bulk reports are not generally available yet, each service shows enabled: false.
+   *
+   * `GET /api/uploadposts/youtube/analytics/usage`
+   * @param {GetYoutubeAnalyticsUsageOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeAnalyticsUsage(options = {}) {
+    return this._op('getYoutubeAnalyticsUsage', options);
+  }
+
+  /**
+   * List YouTube bulk report types.
+   *
+   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. reportTypes.list for the channel (one page, cached 24 h). can_create_job marks the channel/playlist types that can be scheduled.
+   *
+   * `GET /api/uploadposts/youtube/reporting/report-types`
+   * @param {ListYoutubeReportTypesOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeReportTypes(options = {}) {
+    return this._op('listYoutubeReportTypes', options);
+  }
+
+  /**
+   * List YouTube reporting jobs.
+   *
+   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.list of the channel (one page). used_by_upload_post marks the job behind Upload-Post's thumbnail impressions.
+   *
+   * `GET /api/uploadposts/youtube/reporting/jobs`
+   * @param {ListYoutubeReportingJobsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeReportingJobs(options = {}) {
+    return this._op('listYoutubeReportingJobs', options);
+  }
+
+  /**
+   * Create a YouTube reporting job.
+   *
+   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.create: YouTube then generates one CSV per day (first ones within ~48 h, covering the previous 30 days). One job per report type and up to 20 per channel.
+   *
+   * `POST /api/uploadposts/youtube/reporting/jobs`
+   * @param {CreateYoutubeReportingJobOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createYoutubeReportingJob(options = {}) {
+    return this._op('createYoutubeReportingJob', options);
+  }
+
+  /**
+   * Get a YouTube reporting job.
+   *
+   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.get.
+   *
+   * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}`
+   * @param {GetYoutubeReportingJobOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeReportingJob(options = {}) {
+    return this._op('getYoutubeReportingJob', options);
+  }
+
+  /**
+   * Delete a YouTube reporting job.
+   *
+   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.delete: stops the daily reports. Requires confirm: true. A channel_reach_basic_a1 job (used by Upload-Post for thumbnail impressions) cannot be deleted (409 youtube_reporting_job_in_use). 502 youtube_write_outcome_unknown: list the jobs to check.
+   *
+   * `DELETE /api/uploadposts/youtube/reporting/jobs/{job_id}`
+   * @param {DeleteYoutubeReportingJobOptions} options
+   * @returns {Promise<Object>}
+   */
+  async deleteYoutubeReportingJob(options = {}) {
+    return this._op('deleteYoutubeReportingJob', options);
+  }
+
+  /**
+   * List the reports of a YouTube reporting job.
+   *
+   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.list (one page). Each item has download_path.
+   *
+   * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports`
+   * @param {ListYoutubeReportsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listYoutubeReports(options = {}) {
+    return this._op('listYoutubeReports', options);
+  }
+
+  /**
+   * Get a YouTube report.
+   *
+   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.get (metadata).
+   *
+   * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}`
+   * @param {GetYoutubeReportOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getYoutubeReport(options = {}) {
+    return this._op('getYoutubeReport', options);
+  }
+
+  /**
+   * Download a YouTube report (CSV).
+   *
+   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. The report's CSV file, streamed. Up to 100 MB; up to 2 downloads at a time per account. Counts 2 requests of the bulk reports allowance.
+   *
+   * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}/download`
+   * @param {DownloadYoutubeReportOptions} options
+   * @returns {Promise<string>} The file
+   */
+  async downloadYoutubeReport(options = {}) {
+    return this._op('downloadYoutubeReport', options);
+  }
+
+  /**
+   * YouTube new video notifications status.
+   *
+   * Not generally available yet: answers 503 youtube_feature_disabled until it is enabled. State of the push subscription of the profile's channel (null when off). No YouTube quota.
+   *
+   * `GET /api/uploadposts/youtube/push`
+   * @param {GetYoutubePushOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getYoutubePush(options = {}) {
+    return this._op('getYoutubePush', options);
+  }
+
+  /**
+   * Turn on YouTube new video notifications.
+   *
+   * Not generally available yet: answers 503 youtube_feature_disabled until it is enabled. Requires a webhook listing youtube_video_published and/or youtube_video_updated. No YouTube quota.
+   *
+   * `POST /api/uploadposts/youtube/push`
+   * @param {EnableYoutubePushOptions} options
+   * @returns {Promise<Object>}
+   */
+  async enableYoutubePush(options = {}) {
+    return this._op('enableYoutubePush', options);
+  }
+
+  /**
+   * Turn off YouTube new video notifications.
+   *
+   * Not generally available yet: answers 503 youtube_feature_disabled until it is enabled. No YouTube quota.
+   *
+   * `DELETE /api/uploadposts/youtube/push`
+   * @param {DisableYoutubePushOptions} options
+   * @returns {Promise<Object>}
+   */
+  async disableYoutubePush(options = {}) {
+    return this._op('disableYoutubePush', options);
+  }
+
+  /**
+   * Instagram publishing quota.
+   *
+   * Instagram content publishing usage of the connected account (Instagram allows a limited number of posts per 24 h). Cached; refresh=true skips the cache.
+   *
+   * `GET /api/uploadposts/instagram/publishing_limit`
+   * @param {GetInstagramPublishingLimitOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getInstagramPublishingLimit(options = {}) {
+    return this._op('getInstagramPublishingLimit', options);
+  }
+
+  /**
+   * Threads publishing quota.
+   *
+   * `GET /api/uploadposts/threads/publishing_limit`
+   * @param {GetThreadsPublishingLimitOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getThreadsPublishingLimit(options = {}) {
+    return this._op('getThreadsPublishingLimit', options);
+  }
+
+  /**
+   * List the sections of a Pinterest board.
+   *
+   * `GET /api/uploadposts/pinterest/boards/{board_id}/sections`
+   * @param {ListPinterestBoardSectionsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listPinterestBoardSections(options = {}) {
+    return this._op('listPinterestBoardSections', options);
+  }
+
+  /**
+   * Create a section in a Pinterest board.
+   *
+   * `POST /api/uploadposts/pinterest/boards/{board_id}/sections`
+   * @param {CreatePinterestBoardSectionOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createPinterestBoardSection(options = {}) {
+    return this._op('createPinterestBoardSection', options);
+  }
+
+  /**
+   * Read a Facebook Page's public info.
+   *
+   * `GET /api/uploadposts/facebook/page-info`
+   * @param {GetFacebookPageInfoOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getFacebookPageInfo(options = {}) {
+    return this._op('getFacebookPageInfo', options);
+  }
+
+  /**
+   * Update a Facebook Page's public info.
+   *
+   * Only the fields sent change. validate_only: true checks without writing. Needs Meta's pages_manage_metadata permission (pending App Review: 403 facebook_permission_missing until then). POST is accepted as an alias.
+   *
+   * `PATCH /api/uploadposts/facebook/page-info`
+   * @param {UpdateFacebookPageInfoOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateFacebookPageInfo(options = {}) {
+    return this._op('updateFacebookPageInfo', options);
+  }
+
+  /**
+   * Subreddits the Reddit account belongs to.
+   *
+   * `GET /api/uploadposts/reddit/subreddits`
+   * @param {ListRedditSubredditsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listRedditSubreddits(options = {}) {
+    return this._op('listRedditSubreddits', options);
+  }
+
+  /**
+   * Post types a subreddit allows.
+   *
+   * `GET /api/uploadposts/reddit/post-types`
+   * @param {GetRedditPostTypesOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getRedditPostTypes(options = {}) {
+    return this._op('getRedditPostTypes', options);
+  }
+
+  /**
+   * Post flairs of a subreddit.
+   *
+   * Pass the id as reddit_flair_id when publishing; editable flairs take reddit_flair_text.
+   *
+   * `GET /api/uploadposts/reddit/flairs`
+   * @param {ListRedditFlairsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listRedditFlairs(options = {}) {
+    return this._op('listRedditFlairs', options);
+  }
+
+  // ---- User Management ----
+  /**
+   * Get a specific user profile.
+   *
+   * Retrieve information for a single user profile by username.
+   *
+   * `GET /api/uploadposts/users/{username}`
+   * @param {GetUserProfileOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getUserProfile(options = {}) {
+    return this._op('getUserProfile', options);
+  }
+
+  /**
+   * Rename a user profile.
+   *
+   * Set the profile's display_name, the label shown in the dashboard. The username does not change: it stays the `user` value of every API call, so history, scheduled posts, analytics and existing integrations keep working. An empty string or null removes the display name. display_name is the only editable field; any other field returns 400 FIELD_NOT_EDITABLE.
+   *
+   * `PATCH /api/uploadposts/users/{username}`
+   * @param {RenameUserProfileOptions} options
+   * @returns {Promise<Object>}
+   */
+  async renameUserProfile(options = {}) {
+    return this._op('renameUserProfile', options);
+  }
+
+  /**
+   * Disconnect a social account from a profile.
+   *
+   * Unlink one social platform from a user profile. Other platforms connected to the same profile are not touched. The stored credentials are deleted only if no other profile of your account still uses that social account. Fires the `social_account_disconnected` webhook with `reason: "manual_disconnect"`. Disconnecting a platform that is already disconnected returns 200.
+   *
+   * `DELETE /api/uploadposts/users/social`
+   * @param {DisconnectSocialAccountOptions} options
+   * @returns {Promise<Object>}
+   */
+  async disconnectSocialAccount(options = {}) {
+    return this._op('disconnectSocialAccount', options);
+  }
+
+  /**
+   * Connect Discord with credentials.
+   *
+   * Discord channel incoming webhook (no OAuth). No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+   *
+   * `POST /api/uploadposts/users/discord/credentials`
+   * @param {ConnectDiscordCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectDiscordCredentials(options = {}) {
+    return this._op('connectDiscordCredentials', options);
+  }
+
+  /**
+   * Connect Telegram with credentials.
+   *
+   * Telegram bot token + target chat. Upload-Post validates both (getMe, getChat) and stores the token encrypted. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+   *
+   * `POST /api/uploadposts/users/telegram/credentials`
+   * @param {ConnectTelegramCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectTelegramCredentials(options = {}) {
+    return this._op('connectTelegramCredentials', options);
+  }
+
+  /**
+   * Connect Slack with credentials.
+   *
+   * Slack channel Incoming Webhook URL (text only). No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+   *
+   * `POST /api/uploadposts/users/slack/credentials`
+   * @param {ConnectSlackCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectSlackCredentials(options = {}) {
+    return this._op('connectSlackCredentials', options);
+  }
+
+  /**
+   * Connect Mastodon with credentials.
+   *
+   * Mastodon instance access token. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+   *
+   * `POST /api/uploadposts/users/mastodon/credentials`
+   * @param {ConnectMastodonCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectMastodonCredentials(options = {}) {
+    return this._op('connectMastodonCredentials', options);
+  }
+
+  /**
+   * Connect Nostr with credentials.
+   *
+   * Nostr private key (nsec or hex) and optional relays. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+   *
+   * `POST /api/uploadposts/users/nostr/credentials`
+   * @param {ConnectNostrCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectNostrCredentials(options = {}) {
+    return this._op('connectNostrCredentials', options);
+  }
+
+  /**
+   * Connect Lemmy with credentials.
+   *
+   * Lemmy instance, login and target community. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+   *
+   * `POST /api/uploadposts/users/lemmy/credentials`
+   * @param {ConnectLemmyCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectLemmyCredentials(options = {}) {
+    return this._op('connectLemmyCredentials', options);
+  }
+
+  /**
+   * Connect Dev.to with credentials.
+   *
+   * Dev.to API key. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+   *
+   * `POST /api/uploadposts/users/devto/credentials`
+   * @param {ConnectDevtoCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectDevtoCredentials(options = {}) {
+    return this._op('connectDevtoCredentials', options);
+  }
+
+  /**
+   * Connect Hashnode with credentials.
+   *
+   * Hashnode Personal Access Token and publication id. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+   *
+   * `POST /api/uploadposts/users/hashnode/credentials`
+   * @param {ConnectHashnodeCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectHashnodeCredentials(options = {}) {
+    return this._op('connectHashnodeCredentials', options);
+  }
+
+  /**
+   * Connect WordPress with credentials.
+   *
+   * Self-hosted WordPress site, username and Application Password. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+   *
+   * `POST /api/uploadposts/users/wordpress/credentials`
+   * @param {ConnectWordpressCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectWordpressCredentials(options = {}) {
+    return this._op('connectWordpressCredentials', options);
+  }
+
+  /**
+   * Connect Whop with credentials.
+   *
+   * Whop API key (forum:post:create) and experience id. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+   *
+   * `POST /api/uploadposts/users/whop/credentials`
+   * @param {ConnectWhopCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectWhopCredentials(options = {}) {
+    return this._op('connectWhopCredentials', options);
+  }
+
+  /**
+   * Connect Listmonk with credentials.
+   *
+   * Listmonk instance, login and list id (each post sends a campaign). No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+   *
+   * `POST /api/uploadposts/users/listmonk/credentials`
+   * @param {ConnectListmonkCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectListmonkCredentials(options = {}) {
+    return this._op('connectListmonkCredentials', options);
+  }
+
+  /**
+   * List the Facebook Pages a profile can publish to.
+   *
+   * Every Facebook Page of the profile's connected account and the one selected for publishing.
+   *
+   * `GET /api/uploadposts/users/facebook-page`
+   * @param {ListFacebookPageChoicesOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listFacebookPageChoices(options = {}) {
+    return this._op('listFacebookPageChoices', options);
+  }
+
+  /**
+   * Select the Facebook Page used when publishing.
+   *
+   * `POST /api/uploadposts/users/facebook-page`
+   * @param {SetFacebookPageOptions} options
+   * @returns {Promise<Object>}
+   */
+  async setFacebookPage(options = {}) {
+    return this._op('setFacebookPage', options);
+  }
+
+  /**
+   * Clear the selected Facebook Page.
+   *
+   * Back to the default (the first one of the account).
+   *
+   * `DELETE /api/uploadposts/users/facebook-page`
+   * @param {ClearFacebookPageOptions} options
+   * @returns {Promise<Object>}
+   */
+  async clearFacebookPage(options = {}) {
+    return this._op('clearFacebookPage', options);
+  }
+
+  /**
+   * List the LinkedIn Pages a profile can publish to.
+   *
+   * Every LinkedIn Page of the profile's connected account and the one selected for publishing.
+   *
+   * `GET /api/uploadposts/users/linkedin-page`
+   * @param {ListLinkedinPageChoicesOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listLinkedinPageChoices(options = {}) {
+    return this._op('listLinkedinPageChoices', options);
+  }
+
+  /**
+   * Select the LinkedIn Page used when publishing.
+   *
+   * `POST /api/uploadposts/users/linkedin-page`
+   * @param {SetLinkedinPageOptions} options
+   * @returns {Promise<Object>}
+   */
+  async setLinkedinPage(options = {}) {
+    return this._op('setLinkedinPage', options);
+  }
+
+  /**
+   * Clear the selected LinkedIn Page.
+   *
+   * Back to the default (the first one of the account).
+   *
+   * `DELETE /api/uploadposts/users/linkedin-page`
+   * @param {ClearLinkedinPageOptions} options
+   * @returns {Promise<Object>}
+   */
+  async clearLinkedinPage(options = {}) {
+    return this._op('clearLinkedinPage', options);
+  }
+
+  /**
+   * Connect Bluesky with an app password.
+   *
+   * Logs in to Bluesky with the handle and an app password, stores the password encrypted and links the account to the profile. Also accepted with the profile JWT of the connect page.
+   *
+   * `POST /api/uploadposts/users/bluesky/credentials`
+   * @param {ConnectBlueskyCredentialsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectBlueskyCredentials(options = {}) {
+    return this._op('connectBlueskyCredentials', options);
+  }
+
+  /**
+   * Use your own Google OAuth client for a profile's YouTube.
+   *
+   * Stores (encrypted) the client_id and client_secret of your own Google Cloud OAuth client; that profile then authorizes YouTube against it (its own API quota).
+   *
+   * `POST /api/uploadposts/users/youtube/credentials`
+   * @param {SetYoutubeOauthClientOptions} options
+   * @returns {Promise<Object>}
+   */
+  async setYoutubeOauthClient(options = {}) {
+    return this._op('setYoutubeOauthClient', options);
+  }
+
+  // ---- Authentication ----
+  /**
+   * Get current user.
+   *
+   * Verify the validity of your API key and retrieve basic account information including email and subscription plan.
+   *
+   * `GET /api/uploadposts/me`
+   * @param {GetCurrentUserOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async getCurrentUser(options = {}) {
+    return this._op('getCurrentUser', options);
+  }
+
+  /**
+   * Connect API: start connecting a social account.
+   *
+   * Build your own connect page: returns the platform's authorize_url for a profile. Send the user there; Upload-Post finishes the OAuth and sends them back to redirect_url. Authenticate with the API key (then `profile` is required) or with the profile JWT of POST /uploadposts/users/generate-jwt (profile taken from the token). The state is single-use: a retry needs a new start.
+   *
+   * `POST /api/uploadposts/oauth/{platform}/start`
+   * @param {StartOauthConnectionOptions} options
+   * @returns {Promise<Object>}
+   */
+  async startOauthConnection(options = {}) {
+    return this._op('startOauthConnection', options);
+  }
+
+  // ---- FFmpeg Editor ----
+  /**
+   * Create FFmpeg job.
+   *
+   * Submit a media processing job using an FFmpeg command template. Supports single or multiple input files via multipart upload or JSON with URLs. Jobs are asynchronous — poll the status endpoint until finished.
+   *
+   * `POST /api/uploadposts/ffmpeg/jobs/upload`
+   * @param {CreateFfmpegJobOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createFfmpegJob(options = {}) {
+    return this._op('createFfmpegJob', options);
+  }
+
+  /**
+   * Get FFmpeg job status.
+   *
+   * Poll the status of an FFmpeg processing job. Statuses: PENDING, PROCESSING, FINISHED, ERROR.
+   *
+   * `GET /api/uploadposts/ffmpeg/jobs/{job_id}`
+   * @param {GetFfmpegJobStatusOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getFfmpegJobStatus(options = {}) {
+    return this._op('getFfmpegJobStatus', options);
+  }
+
+  /**
+   * Download FFmpeg result.
+   *
+   * Download the processed file when job status is FINISHED. Returns binary media with appropriate Content-Type and Content-Disposition headers.
+   *
+   * `GET /api/uploadposts/ffmpeg/jobs/{job_id}/download`
+   * @param {DownloadFfmpegResultOptions} options
+   * @returns {Promise<Buffer>} The file
+   */
+  async downloadFfmpegResult(options = {}) {
+    return this._op('downloadFfmpegResult', options);
+  }
+
+  /**
+   * Get FFmpeg consumption.
+   *
+   * Check your current FFmpeg usage, remaining quota, and processing history for the current month.
+   *
+   * `GET /api/uploadposts/ffmpeg/consumption`
+   * @param {GetFfmpegConsumptionOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async getFfmpegConsumption(options = {}) {
+    return this._op('getFfmpegConsumption', options);
+  }
+
+  // ---- Webhooks ----
+  /**
+   * List webhook subscriptions.
+   *
+   * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
+   *
+   * Newest first, active and disabled. An n8n trigger checks whether its subscription exists with `?url=<its url>&status=active`.
+   *
+   * `GET /api/uploadposts/webhooks/subscriptions`
+   * @param {ListWebhookSubscriptionsOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async listWebhookSubscriptions(options = {}) {
+    return this._op('listWebhookSubscriptions', options);
+  }
+
+  /**
+   * Create a webhook subscription.
+   *
+   * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
+   *
+   * Adds a destination that receives the listed events, besides the account webhook. Idempotent: the same url + events + profile_username returns the existing subscription (200, `created: false`) and reactivates it if it was disabled (`reactivated: true`); `name` and `source` are updated when sent. At most 10 active subscriptions per account. Team members (X-Act-As-User) cannot create them.
+   *
+   * `POST /api/uploadposts/webhooks/subscriptions`
+   * @param {CreateWebhookSubscriptionOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createWebhookSubscription(options = {}) {
+    return this._op('createWebhookSubscription', options);
+  }
+
+  /**
+   * Get a webhook subscription.
+   *
+   * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
+   *
+   * `GET /api/uploadposts/webhooks/subscriptions/{subscription_id}`
+   * @param {GetWebhookSubscriptionOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getWebhookSubscription(options = {}) {
+    return this._op('getWebhookSubscription', options);
+  }
+
+  /**
+   * Delete a webhook subscription.
+   *
+   * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
+   *
+   * Stops sending to it right away. A second DELETE answers 404 (an integration can treat 404 as already deleted).
+   *
+   * `DELETE /api/uploadposts/webhooks/subscriptions/{subscription_id}`
+   * @param {DeleteWebhookSubscriptionOptions} options
+   * @returns {Promise<Object>}
+   */
+  async deleteWebhookSubscription(options = {}) {
+    return this._op('deleteWebhookSubscription', options);
+  }
+
+  /**
+   * Send a test event to a subscription.
+   *
+   * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
+   *
+   * Sends one signed sample now, with the keys of the real event and `test: true`. Logged as a test delivery: never retried and never counted towards disabling the subscription. `ok` tells whether the destination answered 2xx.
+   *
+   * `POST /api/uploadposts/webhooks/subscriptions/{subscription_id}/test`
+   * @param {TestWebhookSubscriptionOptions} options
+   * @returns {Promise<Object>}
+   */
+  async testWebhookSubscription(options = {}) {
+    return this._op('testWebhookSubscription', options);
+  }
+
+  // ---- Instagram Interactions ----
+  /**
+   * Delete a comment (POST alias).
+   *
+   * POST alias of DELETE /uploadposts/comments/delete, for clients that cannot send a body with DELETE. Same body and behavior.
+   *
+   * `POST /api/uploadposts/comments/delete`
+   * @param {DeleteCommentPostOptions} options
+   * @returns {Promise<Object>}
+   */
+  async deleteCommentPost(options = {}) {
+    return this._op('deleteCommentPost', options);
+  }
+
+  /**
+   * Delete the Bluesky chat account.
+   *
+   * **Not generally available yet: answers `403` `bluesky_chat_delete_disabled`.**
+   *
+   * `POST /api/uploadposts/dms/bluesky/account/delete`
+   * @param {DeleteBlueskyChatAccountOptions} options
+   * @returns {Promise<Object>}
+   */
+  async deleteBlueskyChatAccount(options = {}) {
+    return this._op('deleteBlueskyChatAccount', options);
+  }
+
+  /**
+   * Bluesky groups shared with someone.
+   *
+   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   *
+   * `GET /api/uploadposts/dms/bluesky/groups`
+   * @param {ListBlueskyMutualGroupsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listBlueskyMutualGroups(options = {}) {
+    return this._op('listBlueskyMutualGroups', options);
+  }
+
+  /**
+   * Create a Bluesky group chat.
+   *
+   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   *
+   * `POST /api/uploadposts/dms/bluesky/groups`
+   * @param {CreateBlueskyGroupOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createBlueskyGroup(options = {}) {
+    return this._op('createBlueskyGroup', options);
+  }
+
+  /**
+   * Rename, lock or unlock a Bluesky group.
+   *
+   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   *
+   * `PATCH /api/uploadposts/dms/bluesky/groups/{conversation_id}`
+   * @param {EditBlueskyGroupOptions} options
+   * @returns {Promise<Object>}
+   */
+  async editBlueskyGroup(options = {}) {
+    return this._op('editBlueskyGroup', options);
+  }
+
+  /**
+   * Bluesky group members.
+   *
+   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   *
+   * `GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
+   * @param {ListBlueskyGroupMembersOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listBlueskyGroupMembers(options = {}) {
+    return this._op('listBlueskyGroupMembers', options);
+  }
+
+  /**
+   * Add members to a Bluesky group.
+   *
+   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   *
+   * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
+   * @param {AddBlueskyGroupMembersOptions} options
+   * @returns {Promise<Object>}
+   */
+  async addBlueskyGroupMembers(options = {}) {
+    return this._op('addBlueskyGroupMembers', options);
+  }
+
+  /**
+   * Remove members from a Bluesky group.
+   *
+   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   *
+   * `DELETE /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
+   * @param {RemoveBlueskyGroupMembersOptions} options
+   * @returns {Promise<Object>}
+   */
+  async removeBlueskyGroupMembers(options = {}) {
+    return this._op('removeBlueskyGroupMembers', options);
+  }
+
+  /**
+   * Manage a Bluesky group join link.
+   *
+   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   *
+   * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-link`
+   * @param {ManageBlueskyJoinLinkOptions} options
+   * @returns {Promise<Object>}
+   */
+  async manageBlueskyJoinLink(options = {}) {
+    return this._op('manageBlueskyJoinLink', options);
+  }
+
+  /**
+   * Pending requests to join a Bluesky group.
+   *
+   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   *
+   * `GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests`
+   * @param {ListBlueskyJoinRequestsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listBlueskyJoinRequests(options = {}) {
+    return this._op('listBlueskyJoinRequests', options);
+  }
+
+  /**
+   * Answer or withdraw a Bluesky join request.
+   *
+   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   *
+   * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests`
+   * @param {AnswerBlueskyJoinRequestOptions} options
+   * @returns {Promise<Object>}
+   */
+  async answerBlueskyJoinRequest(options = {}) {
+    return this._op('answerBlueskyJoinRequest', options);
+  }
+
+  /**
+   * Preview Bluesky join links.
+   *
+   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   *
+   * `GET /api/uploadposts/dms/bluesky/join-links`
+   * @param {PreviewBlueskyJoinLinksOptions} options
+   * @returns {Promise<Object>}
+   */
+  async previewBlueskyJoinLinks(options = {}) {
+    return this._op('previewBlueskyJoinLinks', options);
+  }
+
+  /**
+   * Ask to join a Bluesky group.
+   *
+   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   *
+   * `POST /api/uploadposts/dms/bluesky/join-links`
+   * @param {JoinBlueskyGroupOptions} options
+   * @returns {Promise<Object>}
+   */
+  async joinBlueskyGroup(options = {}) {
+    return this._op('joinBlueskyGroup', options);
+  }
+
+  /**
+   * Download a DM attachment.
+   *
+   * Returns the file of an attachment received in a DM (the media_id in dm_received). Telegram: bots download up to 20 MB.
+   *
+   * `GET /api/uploadposts/dms/media`
+   * @param {DownloadDmMediaOptions} options
+   * @returns {Promise<Buffer>} The file
+   */
+  async downloadDmMedia(options = {}) {
+    return this._op('downloadDmMedia', options);
+  }
+
+  // ---- Bluesky ----
+  /**
+   * Follow, block or mute (one target per call).
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `POST /api/uploadposts/bluesky/graph`
+   * @param {BlueskyGraphActionOptions} options
+   * @returns {Promise<Object>}
+   */
+  async blueskyGraphAction(options = {}) {
+    return this._op('blueskyGraphAction', options);
+  }
+
+  /**
+   * The account's lists.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `GET /api/uploadposts/bluesky/lists`
+   * @param {ListBlueskyListsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listBlueskyLists(options = {}) {
+    return this._op('listBlueskyLists', options);
+  }
+
+  /**
+   * Create a list.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `POST /api/uploadposts/bluesky/lists`
+   * @param {CreateBlueskyListOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createBlueskyList(options = {}) {
+    return this._op('createBlueskyList', options);
+  }
+
+  /**
+   * A list and its members.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `GET /api/uploadposts/bluesky/lists/{list_id}`
+   * @param {GetBlueskyListOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyList(options = {}) {
+    return this._op('getBlueskyList', options);
+  }
+
+  /**
+   * Update a list.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `PATCH /api/uploadposts/bluesky/lists/{list_id}`
+   * @param {UpdateBlueskyListOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateBlueskyList(options = {}) {
+    return this._op('updateBlueskyList', options);
+  }
+
+  /**
+   * Delete a list and its members.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `DELETE /api/uploadposts/bluesky/lists/{list_id}`
+   * @param {DeleteBlueskyListOptions} options
+   * @returns {Promise<Object>}
+   */
+  async deleteBlueskyList(options = {}) {
+    return this._op('deleteBlueskyList', options);
+  }
+
+  /**
+   * List members.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `GET /api/uploadposts/bluesky/lists/{list_id}/members`
+   * @param {ListBlueskyListMembersOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listBlueskyListMembers(options = {}) {
+    return this._op('listBlueskyListMembers', options);
+  }
+
+  /**
+   * Add a member.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `POST /api/uploadposts/bluesky/lists/{list_id}/members`
+   * @param {AddBlueskyListMemberOptions} options
+   * @returns {Promise<Object>}
+   */
+  async addBlueskyListMember(options = {}) {
+    return this._op('addBlueskyListMember', options);
+  }
+
+  /**
+   * Remove a member.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `DELETE /api/uploadposts/bluesky/lists/{list_id}/members`
+   * @param {RemoveBlueskyListMemberOptions} options
+   * @returns {Promise<Object>}
+   */
+  async removeBlueskyListMember(options = {}) {
+    return this._op('removeBlueskyListMember', options);
+  }
+
+  /**
+   * Ask not to appear in a reference list.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `POST /api/uploadposts/bluesky/lists/opt-out`
+   * @param {OptOutBlueskyListOptions} options
+   * @returns {Promise<Object>}
+   */
+  async optOutBlueskyList(options = {}) {
+    return this._op('optOutBlueskyList', options);
+  }
+
+  /**
+   * Withdraw the opt-out.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `DELETE /api/uploadposts/bluesky/lists/opt-out`
+   * @param {RemoveOptOutBlueskyListOptions} options
+   * @returns {Promise<Object>}
+   */
+  async removeOptOutBlueskyList(options = {}) {
+    return this._op('removeOptOutBlueskyList', options);
+  }
+
+  /**
+   * The account's starter packs.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `GET /api/uploadposts/bluesky/starter-packs`
+   * @param {ListBlueskyStarterPacksOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listBlueskyStarterPacks(options = {}) {
+    return this._op('listBlueskyStarterPacks', options);
+  }
+
+  /**
+   * Create a starter pack.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `POST /api/uploadposts/bluesky/starter-packs`
+   * @param {CreateBlueskyStarterPackOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createBlueskyStarterPack(options = {}) {
+    return this._op('createBlueskyStarterPack', options);
+  }
+
+  /**
+   * A starter pack.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `GET /api/uploadposts/bluesky/starter-packs/{pack_id}`
+   * @param {GetBlueskyStarterPackOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getBlueskyStarterPack(options = {}) {
+    return this._op('getBlueskyStarterPack', options);
+  }
+
+  /**
+   * Update a starter pack.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `PATCH /api/uploadposts/bluesky/starter-packs/{pack_id}`
+   * @param {UpdateBlueskyStarterPackOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateBlueskyStarterPack(options = {}) {
+    return this._op('updateBlueskyStarterPack', options);
+  }
+
+  /**
+   * Delete a starter pack.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `DELETE /api/uploadposts/bluesky/starter-packs/{pack_id}`
+   * @param {DeleteBlueskyStarterPackOptions} options
+   * @returns {Promise<Object>}
+   */
+  async deleteBlueskyStarterPack(options = {}) {
+    return this._op('deleteBlueskyStarterPack', options);
+  }
+
+  /**
+   * Feeds declared by the account.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `GET /api/uploadposts/bluesky/feeds`
+   * @param {ListBlueskyFeedsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listBlueskyFeeds(options = {}) {
+    return this._op('listBlueskyFeeds', options);
+  }
+
+  /**
+   * Declare a custom feed.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `POST /api/uploadposts/bluesky/feeds`
+   * @param {CreateBlueskyFeedOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createBlueskyFeed(options = {}) {
+    return this._op('createBlueskyFeed', options);
+  }
+
+  /**
+   * Update a feed declaration.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `PATCH /api/uploadposts/bluesky/feeds/{rkey}`
+   * @param {UpdateBlueskyFeedOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateBlueskyFeed(options = {}) {
+    return this._op('updateBlueskyFeed', options);
+  }
+
+  /**
+   * Delete a feed declaration.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `DELETE /api/uploadposts/bluesky/feeds/{rkey}`
+   * @param {DeleteBlueskyFeedOptions} options
+   * @returns {Promise<Object>}
+   */
+  async deleteBlueskyFeed(options = {}) {
+    return this._op('deleteBlueskyFeed', options);
+  }
+
+  /**
+   * Report a post or account to Bluesky moderation.
+   *
+   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   *
+   * `POST /api/uploadposts/bluesky/report`
+   * @param {ReportOnBlueskyOptions} options
+   * @returns {Promise<Object>}
+   */
+  async reportOnBluesky(options = {}) {
+    return this._op('reportOnBluesky', options);
+  }
+
+  // ---- Teams and Approvals ----
+  /**
+   * List posts awaiting approval.
+   *
+   * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+   *
+   * Open items by default (pending_approval and draft). Editors and Contributors only see their own; members limited to some profiles only see those. Page with `before` = the previous `next_before`.
+   *
+   * `GET /api/uploadposts/approvals`
+   * @param {ListPostApprovalsOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async listPostApprovals(options = {}) {
+    return this._op('listPostApprovals', options);
+  }
+
+  /**
+   * Get a post awaiting approval.
+   *
+   * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+   *
+   * The author or a reviewer (owner or Admin). Adds fields, preview_url, thumbnail_url and destinations_effective.
+   *
+   * `GET /api/uploadposts/approvals/{approval_id}`
+   * @param {GetPostApprovalOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getPostApproval(options = {}) {
+    return this._op('getPostApproval', options);
+  }
+
+  /**
+   * Edit a post awaiting approval.
+   *
+   * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+   *
+   * The author or a reviewer, while it is open. Same body and validations as `PATCH /uploadposts/schedule/{job_id}`. Every edit raises `version` by one.
+   *
+   * `PATCH /api/uploadposts/approvals/{approval_id}`
+   * @param {EditPostApprovalOptions} options
+   * @returns {Promise<Object>}
+   */
+  async editPostApproval(options = {}) {
+    return this._op('editPostApproval', options);
+  }
+
+  /**
+   * Withdraw or discard a post awaiting approval.
+   *
+   * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+   *
+   * The author withdraws it or a reviewer discards it: status withdrawn; its media is deleted.
+   *
+   * `DELETE /api/uploadposts/approvals/{approval_id}`
+   * @param {WithdrawPostApprovalOptions} options
+   * @returns {Promise<Object>}
+   */
+  async withdrawPostApproval(options = {}) {
+    return this._op('withdrawPostApproval', options);
+  }
+
+  /**
+   * Approve a post.
+   *
+   * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+   *
+   * Reviewer only (owner or Admin). `version` is required: the `item.version` you reviewed. Date used: the one in the body; else now (immediate posts or `publish_now`); else the next free queue slot (posts sent with add_to_queue); else the post's own date if it is more than 60 s away. Monthly credits are reserved now; if creating the job fails the item reopens and the credits come back (500 approval_failed).
+   *
+   * `POST /api/uploadposts/approvals/{approval_id}/approve`
+   * @param {ApprovePostApprovalOptions} options
+   * @returns {Promise<Object>}
+   */
+  async approvePostApproval(options = {}) {
+    return this._op('approvePostApproval', options);
+  }
+
+  /**
+   * Reject a post.
+   *
+   * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+   *
+   * Reviewer only. `comment` is required (max 2000 characters) and is shown to the author.
+   *
+   * `POST /api/uploadposts/approvals/{approval_id}/reject`
+   * @param {RejectPostApprovalOptions} options
+   * @returns {Promise<Object>}
+   */
+  async rejectPostApproval(options = {}) {
+    return this._op('rejectPostApproval', options);
+  }
+
+  /**
+   * End client: list posts to approve.
+   *
+   * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+   *
+   * Called with the **profile JWT** of the white-label connect page (`Authorization: Bearer <access_url token>`), generated with `client_approval: true` (`POST /uploadposts/users/generate-jwt`). Only the `pending_approval` posts of that profile; the end client cannot change the date. The account owner turns it off by generating the JWT again with `client_approval: false`. Items come without author or internal ids.
+   *
+   * `GET /api/uploadposts/approvals/client`
+   * Authenticated with the profile JWT (`token`), not the API key.
+   * @param {ListClientPostApprovalsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listClientPostApprovals(options = {}) {
+    return this._op('listClientPostApprovals', options);
+  }
+
+  /**
+   * End client: approve a post.
+   *
+   * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+   *
+   * Called with the **profile JWT** of the white-label connect page (`Authorization: Bearer <access_url token>`), generated with `client_approval: true` (`POST /uploadposts/users/generate-jwt`). Only the `pending_approval` posts of that profile; the end client cannot change the date. The account owner turns it off by generating the JWT again with `client_approval: false`. `version` is required, as for reviewers. Recorded as decided_by `client:<profile>`, decided_by_role `client`.
+   *
+   * `POST /api/uploadposts/approvals/client/{approval_id}/approve`
+   * Authenticated with the profile JWT (`token`), not the API key.
+   * @param {ApproveClientPostApprovalOptions} options
+   * @returns {Promise<Object>}
+   */
+  async approveClientPostApproval(options = {}) {
+    return this._op('approveClientPostApproval', options);
+  }
+
+  /**
+   * End client: reject a post.
+   *
+   * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+   *
+   * Called with the **profile JWT** of the white-label connect page (`Authorization: Bearer <access_url token>`), generated with `client_approval: true` (`POST /uploadposts/users/generate-jwt`). Only the `pending_approval` posts of that profile; the end client cannot change the date. The account owner turns it off by generating the JWT again with `client_approval: false`. `comment` is required.
+   *
+   * `POST /api/uploadposts/approvals/client/{approval_id}/reject`
+   * Authenticated with the profile JWT (`token`), not the API key.
+   * @param {RejectClientPostApprovalOptions} options
+   * @returns {Promise<Object>}
+   */
+  async rejectClientPostApproval(options = {}) {
+    return this._op('rejectClientPostApproval', options);
+  }
+
+  /**
+   * Team roles and your role.
+   *
+   * The role matrix and the caller's role. `enabled: false` while team roles are not available: then every member is treated as Admin with every profile. Roles and profile lists are changed by the account owner from the dashboard.
+   *
+   * `GET /api/uploadposts/teams/roles`
+   * @param {GetTeamRolesOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async getTeamRoles(options = {}) {
+    return this._op('getTeamRoles', options);
+  }
+
+  /**
+   * Team activity log.
+   *
+   * What team members did on the account (posts created, published, edited or cancelled, approvals and decisions, access changes), newest first. Owner and Admin members only. Rows are kept `retention_days` days.
+   *
+   * `GET /api/uploadposts/teams/audit`
+   * @param {ListTeamAuditOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async listTeamAudit(options = {}) {
+    return this._op('listTeamAudit', options);
+  }
+
+  // ---- Feedback ----
+  /**
+   * Send feedback to the Upload-Post team.
+   *
+   * For AI agents and developers. Never include credentials or personal data (they are redacted anyway). A repeated report returns duplicate: true.
+   *
+   * `POST /api/uploadposts/feedback`
+   * @param {SendFeedbackOptions} options
+   * @returns {Promise<Object>}
+   */
+  async sendFeedback(options = {}) {
+    return this._op('sendFeedback', options);
+  }
+
+  // ---- Google Business ----
+  /**
+   * Rename a Google Business account.
+   *
+   * Renames a business account (only the name). With `validate_only: true` Google checks the request without changing anything (no `confirm` needed); that mode works today. A real rename is not generally available yet: 403 `ownership_changes_disabled`. `account` must be the account connected to the profile or the owner of one of its saved locations (404 `account_not_found` otherwise).
+   *
+   * `PATCH /api/uploadposts/google-business/accounts`
+   * @param {UpdateGoogleBusinessAccountOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateGoogleBusinessAccount(options = {}) {
+    return this._op('updateGoogleBusinessAccount', options);
+  }
+
+  /**
+   * Invite an admin.
+   *
+   * Google emails the invitation; the person gets access once they accept. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+   *
+   * `POST /api/uploadposts/google-business/admins`
+   * @param {CreateGoogleBusinessAdminOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createGoogleBusinessAdmin(options = {}) {
+    return this._op('createGoogleBusinessAdmin', options);
+  }
+
+  /**
+   * Change an admin's role.
+   *
+   * Changes the role of an admin (`admin_name` from GET /admins). If the role is already that one, the answer has `unchanged: true` and nothing is sent. Refused with 409 `last_owner` if it would demote the last owner and 409 `connected_identity` if it would demote the Google account connected to Upload-Post. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+   *
+   * `PATCH /api/uploadposts/google-business/admins`
+   * @param {UpdateGoogleBusinessAdminOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateGoogleBusinessAdmin(options = {}) {
+    return this._op('updateGoogleBusinessAdmin', options);
+  }
+
+  /**
+   * Remove an admin.
+   *
+   * Removes an admin at once (they would have to be invited again). Refused with 409 `last_owner` / `connected_identity` like the role change. JSON body. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+   *
+   * `DELETE /api/uploadposts/google-business/admins`
+   * @param {DeleteGoogleBusinessAdminOptions} options
+   * @returns {Promise<Object>}
+   */
+  async deleteGoogleBusinessAdmin(options = {}) {
+    return this._op('deleteGoogleBusinessAdmin', options);
+  }
+
+  /**
+   * Accept an invitation.
+   *
+   * Accepts a pending invitation (404 `invitation_not_found` otherwise). Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+   *
+   * `POST /api/uploadposts/google-business/invitations/accept`
+   * @param {AcceptGoogleBusinessInvitationOptions} options
+   * @returns {Promise<Object>}
+   */
+  async acceptGoogleBusinessInvitation(options = {}) {
+    return this._op('acceptGoogleBusinessInvitation', options);
+  }
+
+  /**
+   * Decline an invitation.
+   *
+   * Declines a pending invitation (404 `invitation_not_found` otherwise). Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+   *
+   * `POST /api/uploadposts/google-business/invitations/decline`
+   * @param {DeclineGoogleBusinessInvitationOptions} options
+   * @returns {Promise<Object>}
+   */
+  async declineGoogleBusinessInvitation(options = {}) {
+    return this._op('declineGoogleBusinessInvitation', options);
+  }
+
+  /**
+   * Transfer a location to another account.
+   *
+   * Moves a location to another Google account. Google only allows it when the connected user owns the location and manages the destination account. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+   *
+   * `POST /api/uploadposts/google-business/locations/transfer`
+   * @param {TransferGoogleBusinessLocationOptions} options
+   * @returns {Promise<Object>}
+   */
+  async transferGoogleBusinessLocation(options = {}) {
+    return this._op('transferGoogleBusinessLocation', options);
+  }
+
+  /**
+   * Create a location.
+   *
+   * Not generally available yet: answers 503 `gbp_feature_disabled` before anything else is checked. Send `location` (a Google Location object) or the friendly fields of location info, plus `language_code`. `title`, `primary_category` and `language_code` are required. Needs `confirm: true` (not with `dry_run`). `request_id` comes back in every answer: on 502 `google_result_unknown` repeat with the same `request_id` and Google never creates it twice. Search first with google-locations/search. Daily creation limits: 429 `daily_limit_reached` / `google_daily_quota_exhausted`.
+   *
+   * `POST /api/uploadposts/google-business/locations/create`
+   * @param {CreateGoogleBusinessLocationOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createGoogleBusinessLocation(options = {}) {
+    return this._op('createGoogleBusinessLocation', options);
+  }
+
+  /**
+   * Delete a location.
+   *
+   * Not generally available yet: answers 503 `gbp_feature_disabled` before anything else is checked. Irreversible. Needs `confirm: true`. If Google does not allow deleting it through the API: 409 `location_cannot_be_deleted` (delete it from business.google.com).
+   *
+   * `DELETE /api/uploadposts/google-business/locations/delete`
+   * @param {DeleteGoogleBusinessLocationOptions} options
+   * @returns {Promise<Object>}
+   */
+  async deleteGoogleBusinessLocation(options = {}) {
+    return this._op('deleteGoogleBusinessLocation', options);
+  }
+
+  /**
+   * Get real-time notification settings.
+   *
+   * Not generally available yet: answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Google keeps one notification setting per Google account; when another tool owns it, `other_tool_configured` is `true`.
+   *
+   * `GET /api/uploadposts/google-business/notifications`
+   * @param {GetGoogleBusinessNotificationSettingsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getGoogleBusinessNotificationSettings(options = {}) {
+    return this._op('getGoogleBusinessNotificationSettings', options);
+  }
+
+  /**
+   * Turn real-time notifications on or off.
+   *
+   * Not generally available yet: answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Turns notifications on or off for the Google account; webhooks must also list the events (`review_received`, `review_updated`, `customer_media_received`, `listing_google_update`, `listing_duplicate`, `listing_control_changed`) in `webhook_events`. Needs `confirm: true`. If Google does not confirm the change (`outcome_unknown: true`), read the setting before retrying.
+   *
+   * `PUT /api/uploadposts/google-business/notifications`
+   * @param {UpdateGoogleBusinessNotificationSettingsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateGoogleBusinessNotificationSettings(options = {}) {
+    return this._op('updateGoogleBusinessNotificationSettings', options);
+  }
+
+  /**
+   * Turn real-time notifications on or off (PATCH).
+   *
+   * Not generally available yet: answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Turns notifications on or off for the Google account; webhooks must also list the events (`review_received`, `review_updated`, `customer_media_received`, `listing_google_update`, `listing_duplicate`, `listing_control_changed`) in `webhook_events`. Needs `confirm: true`. If Google does not confirm the change (`outcome_unknown: true`), read the setting before retrying. Same as PUT.
+   *
+   * `PATCH /api/uploadposts/google-business/notifications`
+   * @param {UpdateGoogleBusinessNotificationSettingsPatchOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateGoogleBusinessNotificationSettingsPatch(options = {}) {
+    return this._op('updateGoogleBusinessNotificationSettingsPatch', options);
+  }
+
+  /**
+   * Batch get reviews (JSON body).
+   *
+   * Reviews of several locations in one call (`locations:batchGetReviews`). Locations of several Google accounts are fetched with one call per account; `nextPageToken` (starting with `up1:`) carries every account's cursor: pass it back unchanged. Google's own errors keep Google's HTTP status (e.g. 409, 412, 500, 503) with details in `google_error`. Some validation errors carry only `error`, without `error_code`. Same as GET, with a JSON body.
+   *
+   * `POST /api/uploadposts/google-business/reviews/batch`
+   * @param {BatchGetGoogleBusinessReviewsPostOptions} options
+   * @returns {Promise<Object>}
+   */
+  async batchGetGoogleBusinessReviewsPost(options = {}) {
+    return this._op('batchGetGoogleBusinessReviewsPost', options);
+  }
+
+  /**
+   * Start a verification.
+   *
+   * Not generally available yet: answers 503 `gbp_feature_disabled`. Google contacts the business (postcard, SMS, call or email), so `confirm: true` is required. 3 verifications a day per location (429 `daily_limit_reached`, `scope: location`). `AUTO` verifications are `COMPLETED` at once; the others wait for the code. On 502 `google_result_unknown`, check the list before trying again.
+   *
+   * `POST /api/uploadposts/google-business/verification/start`
+   * @param {StartGoogleBusinessVerificationOptions} options
+   * @returns {Promise<Object>}
+   */
+  async startGoogleBusinessVerification(options = {}) {
+    return this._op('startGoogleBusinessVerification', options);
+  }
+
+  /**
+   * Enter the verification code.
+   *
+   * Not generally available yet: answers 503 `gbp_feature_disabled`. Sends the code Google sent. 10 attempts a day per account and location (429 `daily_limit_reached`); only codes Google actually checked count. `state: COMPLETED` when Google accepts it.
+   *
+   * `POST /api/uploadposts/google-business/verification/complete`
+   * @param {CompleteGoogleBusinessVerificationOptions} options
+   * @returns {Promise<Object>}
+   */
+  async completeGoogleBusinessVerification(options = {}) {
+    return this._op('completeGoogleBusinessVerification', options);
+  }
+
+  /**
+   * Get an instant verification token.
+   *
+   * Not generally available yet: answers 503 `gbp_feature_disabled`. Asks Google for an instant verification token. When Google reserves it to its vetted partners, 403 `partner_only`: use verification/start instead.
+   *
+   * `POST /api/uploadposts/google-business/verification/token`
+   * @param {GenerateGoogleBusinessVerificationTokenOptions} options
+   * @returns {Promise<Object>}
+   */
+  async generateGoogleBusinessVerificationToken(options = {}) {
+    return this._op('generateGoogleBusinessVerificationToken', options);
+  }
+
+  // ---- ChatGPT Ads ----
+  /**
+   * Connect a ChatGPT Ads account.
+   *
+   * Stores an OpenAI Ads API key after validating it live against OpenAI. Each key is scoped to one ad account. The key is encrypted at rest and never returned. Posting the same account again replaces the stored key (key rotation). The first account connected becomes the default. Spend runs on your own OpenAI billing.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/connect`
+   * @param {ConnectChatgptAdsAccountOptions} options
+   * @returns {Promise<Object>}
+   */
+  async connectChatgptAdsAccount(options = {}) {
+    return this._op('connectChatgptAdsAccount', options);
+  }
+
+  /**
+   * List connected ChatGPT Ads accounts.
+   *
+   * Connected ad accounts (never the credentials), default first, each with the `profiles` it is linked to.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/accounts`
+   * @param {ListChatgptAdsAccountsOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async listChatgptAdsAccounts(options = {}) {
+    return this._op('listChatgptAdsAccounts', options);
+  }
+
+  /**
+   * Disconnect a ChatGPT Ads account.
+   *
+   * Without `profile_username`: forgets the stored key and unlinks every profile (if it was the default, another connected account becomes the default). With `profile_username`: only unlinks that profile and keeps the key for the others. Campaigns keep running in Ads Manager either way.
+   *
+   * `DELETE /api/uploadposts/ads/chatgpt/accounts/{ad_account_id}`
+   * @param {DisconnectChatgptAdsAccountOptions} options
+   * @returns {Promise<Object>}
+   */
+  async disconnectChatgptAdsAccount(options = {}) {
+    return this._op('disconnectChatgptAdsAccount', options);
+  }
+
+  /**
+   * Get live ad account metadata.
+   *
+   * The selected ad account's metadata, read live from OpenAI. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/account`
+   * @param {GetChatgptAdsAccountOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async getChatgptAdsAccount(options = {}) {
+    return this._op('getChatgptAdsAccount', options);
+  }
+
+  /**
+   * List campaigns.
+   *
+   * Campaigns of the ad account. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/campaigns`
+   * @param {ListChatgptAdsCampaignsOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async listChatgptAdsCampaigns(options = {}) {
+    return this._op('listChatgptAdsCampaigns', options);
+  }
+
+  /**
+   * Create a campaign.
+   *
+   * Creates a campaign (budget, schedule, location and audience targeting). One of `budget` / `budget_micros` is required. Created `paused` unless `status: active` is sent. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/campaigns`
+   * @param {CreateChatgptAdsCampaignOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createChatgptAdsCampaign(options = {}) {
+    return this._op('createChatgptAdsCampaign', options);
+  }
+
+  /**
+   * Get a campaign.
+   *
+   * One campaign. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}`
+   * @param {GetChatgptAdsCampaignOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getChatgptAdsCampaign(options = {}) {
+    return this._op('getChatgptAdsCampaign', options);
+  }
+
+  /**
+   * Update a campaign.
+   *
+   * Updates a campaign. Every field is optional; at least one is required (400 `No updatable fields supplied`). Archiving is irreversible. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}`
+   * @param {UpdateChatgptAdsCampaignOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateChatgptAdsCampaign(options = {}) {
+    return this._op('updateChatgptAdsCampaign', options);
+  }
+
+  /**
+   * Activate a campaign.
+   *
+   * Sets the campaign `active`. An ad only serves when its campaign, ad group and ad are all active and the ad passed OpenAI's review. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/activate`
+   * @param {ActivateChatgptAdsCampaignOptions} options
+   * @returns {Promise<Object>}
+   */
+  async activateChatgptAdsCampaign(options = {}) {
+    return this._op('activateChatgptAdsCampaign', options);
+  }
+
+  /**
+   * Pause a campaign.
+   *
+   * Sets the campaign `paused`. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/pause`
+   * @param {PauseChatgptAdsCampaignOptions} options
+   * @returns {Promise<Object>}
+   */
+  async pauseChatgptAdsCampaign(options = {}) {
+    return this._op('pauseChatgptAdsCampaign', options);
+  }
+
+  /**
+   * Archive a campaign.
+   *
+   * Archives the campaign. Irreversible. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/archive`
+   * @param {ArchiveChatgptAdsCampaignOptions} options
+   * @returns {Promise<Object>}
+   */
+  async archiveChatgptAdsCampaign(options = {}) {
+    return this._op('archiveChatgptAdsCampaign', options);
+  }
+
+  /**
+   * Get campaign insights.
+   *
+   * Performance of one campaign; rows per `aggregation_level` inside it. Repeatable parameters accept `key` or `key[]` and are forwarded to OpenAI. Page forward with `after=<last_id>`. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/insights`
+   * @param {GetChatgptAdsCampaignInsightsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getChatgptAdsCampaignInsights(options = {}) {
+    return this._op('getChatgptAdsCampaignInsights', options);
+  }
+
+  /**
+   * List ad groups.
+   *
+   * Ad groups of a campaign. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/adgroups`
+   * @param {ListChatgptAdsAdGroupsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listChatgptAdsAdGroups(options = {}) {
+    return this._op('listChatgptAdsAdGroups', options);
+  }
+
+  /**
+   * Create an ad group.
+   *
+   * Creates an ad group (the bid) under a campaign. One of `max_bid` / `max_bid_micros` is required unless `bidding_config` is sent. Created `paused` unless `status: active` is sent. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/adgroups`
+   * @param {CreateChatgptAdsAdGroupOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createChatgptAdsAdGroup(options = {}) {
+    return this._op('createChatgptAdsAdGroup', options);
+  }
+
+  /**
+   * Get an ad group.
+   *
+   * One ad group. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}`
+   * @param {GetChatgptAdsAdGroupOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getChatgptAdsAdGroup(options = {}) {
+    return this._op('getChatgptAdsAdGroup', options);
+  }
+
+  /**
+   * Update an ad group.
+   *
+   * Updates an ad group. Every field is optional; at least one is required (400 `No updatable fields supplied`). Archiving is irreversible. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}`
+   * @param {UpdateChatgptAdsAdGroupOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateChatgptAdsAdGroup(options = {}) {
+    return this._op('updateChatgptAdsAdGroup', options);
+  }
+
+  /**
+   * Activate an ad group.
+   *
+   * Sets the ad group `active`. An ad only serves when its campaign, ad group and ad are all active and the ad passed OpenAI's review. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/activate`
+   * @param {ActivateChatgptAdsAdGroupOptions} options
+   * @returns {Promise<Object>}
+   */
+  async activateChatgptAdsAdGroup(options = {}) {
+    return this._op('activateChatgptAdsAdGroup', options);
+  }
+
+  /**
+   * Pause an ad group.
+   *
+   * Sets the ad group `paused`. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/pause`
+   * @param {PauseChatgptAdsAdGroupOptions} options
+   * @returns {Promise<Object>}
+   */
+  async pauseChatgptAdsAdGroup(options = {}) {
+    return this._op('pauseChatgptAdsAdGroup', options);
+  }
+
+  /**
+   * Archive an ad group.
+   *
+   * Archives the ad group. Irreversible. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/archive`
+   * @param {ArchiveChatgptAdsAdGroupOptions} options
+   * @returns {Promise<Object>}
+   */
+  async archiveChatgptAdsAdGroup(options = {}) {
+    return this._op('archiveChatgptAdsAdGroup', options);
+  }
+
+  /**
+   * Get ad group insights.
+   *
+   * Performance of one ad group; rows per `aggregation_level` inside it. Repeatable parameters accept `key` or `key[]` and are forwarded to OpenAI. Page forward with `after=<last_id>`. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/insights`
+   * @param {GetChatgptAdsAdGroupInsightsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getChatgptAdsAdGroupInsights(options = {}) {
+    return this._op('getChatgptAdsAdGroupInsights', options);
+  }
+
+  /**
+   * List ads.
+   *
+   * Ads of an ad group. `review_status` is `in_review`, `approved` or `rejected`. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/ads`
+   * @param {ListChatgptAdsAdsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async listChatgptAdsAds(options = {}) {
+    return this._op('listChatgptAdsAds', options);
+  }
+
+  /**
+   * Create an ad.
+   *
+   * Creates an ad (the creative) under an ad group: send `title`, `body`, `target_url` and `file_id` at the top level, or a full `creative` object (needed for `product_ad_template`). It starts serving after OpenAI's review (`review_status: approved`). Created `paused` unless `status: active` is sent. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/ads`
+   * @param {CreateChatgptAdsAdOptions} options
+   * @returns {Promise<Object>}
+   */
+  async createChatgptAdsAd(options = {}) {
+    return this._op('createChatgptAdsAd', options);
+  }
+
+  /**
+   * Get an ad.
+   *
+   * One ad. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/ads/{ad_id}`
+   * @param {GetChatgptAdsAdOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getChatgptAdsAd(options = {}) {
+    return this._op('getChatgptAdsAd', options);
+  }
+
+  /**
+   * Update an ad.
+   *
+   * Updates an ad. Only `name`, `status` and `creative` are read; an edited ad goes back into review. Every field is optional; at least one is required (400 `No updatable fields supplied`). Archiving is irreversible. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}`
+   * @param {UpdateChatgptAdsAdOptions} options
+   * @returns {Promise<Object>}
+   */
+  async updateChatgptAdsAd(options = {}) {
+    return this._op('updateChatgptAdsAd', options);
+  }
+
+  /**
+   * Activate an ad.
+   *
+   * Sets the ad `active`. An ad only serves when its campaign, ad group and ad are all active and the ad passed OpenAI's review. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/activate`
+   * @param {ActivateChatgptAdsAdOptions} options
+   * @returns {Promise<Object>}
+   */
+  async activateChatgptAdsAd(options = {}) {
+    return this._op('activateChatgptAdsAd', options);
+  }
+
+  /**
+   * Pause an ad.
+   *
+   * Sets the ad `paused`. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/pause`
+   * @param {PauseChatgptAdsAdOptions} options
+   * @returns {Promise<Object>}
+   */
+  async pauseChatgptAdsAd(options = {}) {
+    return this._op('pauseChatgptAdsAd', options);
+  }
+
+  /**
+   * Archive an ad.
+   *
+   * Archives the ad. Irreversible. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/archive`
+   * @param {ArchiveChatgptAdsAdOptions} options
+   * @returns {Promise<Object>}
+   */
+  async archiveChatgptAdsAd(options = {}) {
+    return this._op('archiveChatgptAdsAd', options);
+  }
+
+  /**
+   * Get ad insights.
+   *
+   * Performance of one ad; rows per `aggregation_level` inside it. Repeatable parameters accept `key` or `key[]` and are forwarded to OpenAI. Page forward with `after=<last_id>`. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/ads/{ad_id}/insights`
+   * @param {GetChatgptAdsAdInsightsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async getChatgptAdsAdInsights(options = {}) {
+    return this._op('getChatgptAdsAdInsights', options);
+  }
+
+  /**
+   * Preview an ad.
+   *
+   * A temporary iframe preview of the ad (expires in 24 h). No body. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/preview`
+   * @param {PreviewChatgptAdsAdOptions} options
+   * @returns {Promise<Object>}
+   */
+  async previewChatgptAdsAd(options = {}) {
+    return this._op('previewChatgptAdsAd', options);
+  }
+
+  /**
+   * Upload a creative image.
+   *
+   * Uploads the image an ad uses; reuse the returned `file_id`. JSON with `image_url` (OpenAI fetches it) or multipart with a binary `file` (up to 10 MB). A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/creatives`
+   * @param {UploadChatgptAdsCreativeOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async uploadChatgptAdsCreative(options = {}) {
+    return this._op('uploadChatgptAdsCreative', options);
+  }
+
+  /**
+   * Get ad account insights.
+   *
+   * Performance of the whole ad account; rows per `aggregation_level`. Repeatable parameters accept `key` or `key[]` and are forwarded to OpenAI. Page forward with `after=<last_id>`. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `GET /api/uploadposts/ads/chatgpt/insights`
+   * @param {GetChatgptAdsAccountInsightsOptions} [options]
+   * @returns {Promise<Object>}
+   */
+  async getChatgptAdsAccountInsights(options = {}) {
+    return this._op('getChatgptAdsAccountInsights', options);
+  }
+
+  /**
+   * Launch an ad in one call.
+   *
+   * Creates the campaign, ad group and ad, and uploads the creative from `image_url` (or reuses `file_id`), in one request. Every payload is validated before the first write; everything is created paused and only activated (`status: active`) once all three exist. If a later step fails, the error carries `details.created` with the ids already created so you can finish or archive them. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+   *
+   * `POST /api/uploadposts/ads/chatgpt/promote`
+   * @param {PromoteChatgptAdsOptions} options
+   * @returns {Promise<Object>}
+   */
+  async promoteChatgptAds(options = {}) {
+    return this._op('promoteChatgptAds', options);
+  }
+
+  // </openapi:methods>
 }
 
 // Option keys the API itself spells in camelCase (Google / YouTube names).
@@ -4847,6 +7323,195 @@ UploadPost.FILE_FIELDS = new Set([
   'file', 'photo', 'animation', 'sticker', 'avatar', 'banner', 'thumbnail', 'image',
   'telegram_media', 'telegram_thumbnail', 'telegram_cover', 'telegram_live_photo_photo',
 ]);
+
+// Operations behind the generated methods: [HTTP method, path, details]. Details:
+// q = query parameters, b = body fields, f = file fields, mp = multipart only,
+// bearer = profile JWT instead of the API key, raw = the answer is a file,
+// na = not generally available yet (HTTP 503 until switched on).
+// <openapi:operations>
+UploadPost.OPENAPI_OPERATIONS = {
+  sendTelegramGift: ["POST", "/uploadposts/telegram/gifts", {"b": ["user", "user_id", "chat_id", "gift_id", "max_star_count", "pay_for_upgrade", "text", "text_parse_mode", "text_entities", "confirm", "idempotency_key"]}],
+  giftTelegramPremium: ["POST", "/uploadposts/telegram/gifts/premium", {"b": ["user", "user_id", "month_count", "star_count", "text", "confirm", "idempotency_key"]}],
+  getTelegramPaymentSettings: ["GET", "/uploadposts/telegram/payments/settings", {"q": ["user"]}],
+  updateTelegramPaymentSettings: ["PUT", "/uploadposts/telegram/payments/settings", {"b": ["user", "pre_checkout", "max_total_amount", "allowed_payload_prefixes", "error_message", "shipping", "shipping_options", "shipping_countries", "only_upload_post_invoices", "confirm"]}],
+  setTelegramUpdates: ["POST", "/uploadposts/telegram/updates", {"b": ["user", "enabled", "replace_existing_webhook", "forward_url", "business_chats", "auto_answer_callbacks", "extra_updates"]}],
+  answerTelegramQuery: ["POST", "/uploadposts/telegram/answer", {"b": ["user", "type", "query_id", "text", "show_alert", "url", "cache_time", "results", "is_personal", "next_offset", "button", "result", "web_app_url", "data", "ok", "shipping_options", "error_message"]}],
+  getTelegramBusinessConnections: ["GET", "/uploadposts/telegram/business-connections", {"q": ["user", "business_connection_id"]}],
+  getTelegramBusinessProfile: ["GET", "/uploadposts/telegram/business-profile", {"q": ["user", "business_connection_id"]}],
+  updateTelegramBusinessProfile: ["PATCH", "/uploadposts/telegram/business-profile", {"b": ["user", "business_connection_id", "first_name", "last_name", "username", "bio", "media_url", "is_public", "remove_photo", "gift_settings"]}],
+  postTelegramStory: ["POST", "/uploadposts/telegram/business-stories", {"b": ["user", "business_connection_id", "media_url", "active_period", "caption", "parse_mode", "caption_entities", "areas", "post_to_chat_page", "protect_content", "story_id"]}],
+  editTelegramStory: ["PATCH", "/uploadposts/telegram/business-stories", {"b": ["user", "business_connection_id", "media_url", "active_period", "caption", "parse_mode", "caption_entities", "areas", "post_to_chat_page", "protect_content", "story_id"]}],
+  deleteTelegramStory: ["DELETE", "/uploadposts/telegram/business-stories", {"b": ["user", "business_connection_id", "media_url", "active_period", "caption", "parse_mode", "caption_entities", "areas", "post_to_chat_page", "protect_content", "story_id"]}],
+  repostTelegramStory: ["POST", "/uploadposts/telegram/business-stories/repost", {"b": ["user", "business_connection_id", "from_chat_id", "from_story_id", "active_period", "post_to_chat_page", "protect_content"]}],
+  getTelegramBusinessGifts: ["GET", "/uploadposts/telegram/business-gifts", {"q": ["user", "business_connection_id"]}],
+  manageTelegramBusinessGift: ["POST", "/uploadposts/telegram/business-gifts", {"b": ["user", "business_connection_id", "action", "owned_gift_id", "confirm", "keep_original_details", "star_count", "idempotency_key", "new_owner_chat_id"]}],
+  getTelegramBusinessStars: ["GET", "/uploadposts/telegram/business-stars", {"q": ["user", "business_connection_id"]}],
+  transferTelegramBusinessStars: ["POST", "/uploadposts/telegram/business-stars/transfer", {"b": ["user", "business_connection_id", "star_count", "idempotency_key", "confirm"]}],
+  analyzeShorts: ["POST", "/uploadposts/analyze-shorts", {"b": ["video", "platforms", "language"], "f": ["video"], "mp": 1}],
+  rewriteCaptions: ["POST", "/uploadposts/rewrite-captions", {"b": ["content", "language", "platforms"]}],
+  createMediaUpload: ["POST", "/uploadposts/media-uploads", {"b": ["media_type", "filename", "content_type", "content_length", "source"]}],
+  completeMediaUpload: ["POST", "/uploadposts/media-uploads/{upload_id}/complete", {}],
+  getMediaUpload: ["GET", "/uploadposts/media-uploads/{upload_id}", {"q": ["include_url"]}],
+  deleteMediaUpload: ["DELETE", "/uploadposts/media-uploads/{upload_id}", {}],
+  getScheduledPost: ["GET", "/uploadposts/schedule/{job_id}", {}],
+  getScheduledPostThumbnail: ["GET", "/uploadposts/schedule/{job_id}/thumbnail", {}],
+  getScheduledPostPreview: ["GET", "/uploadposts/schedule/{job_id}/preview", {}],
+  createPinterestBoard: ["POST", "/uploadposts/pinterest/boards", {"b": ["user", "name", "description", "privacy"]}],
+  queryYoutubeAnalytics: ["GET", "/uploadposts/youtube/analytics/query", {"q": ["user", "start_date", "end_date", "metrics", "dimensions", "filters", "sort", "max_results", "start_index", "report"]}],
+  listYoutubeAnalyticsReports: ["GET", "/uploadposts/youtube/analytics/reports", {"q": ["user"]}],
+  listYoutubeAnalyticsGroups: ["GET", "/uploadposts/youtube/analytics/groups", {"q": ["user", "ids", "page_token"]}],
+  listYoutubeAnalyticsGroupItems: ["GET", "/uploadposts/youtube/analytics/groups/{group_id}/items", {"q": ["user"]}],
+  getYoutubeAnalyticsUsage: ["GET", "/uploadposts/youtube/analytics/usage", {}],
+  listYoutubeReportTypes: ["GET", "/uploadposts/youtube/reporting/report-types", {"q": ["user", "page_token", "page_size"]}],
+  listYoutubeReportingJobs: ["GET", "/uploadposts/youtube/reporting/jobs", {"q": ["user", "page_token", "page_size"]}],
+  createYoutubeReportingJob: ["POST", "/uploadposts/youtube/reporting/jobs", {"b": ["user", "report_type_id", "name"]}],
+  getYoutubeReportingJob: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}", {"q": ["user"]}],
+  deleteYoutubeReportingJob: ["DELETE", "/uploadposts/youtube/reporting/jobs/{job_id}", {"b": ["user", "confirm"]}],
+  listYoutubeReports: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}/reports", {"q": ["user", "created_after", "start_time_at_or_after", "start_time_before", "page_token", "page_size"]}],
+  getYoutubeReport: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}", {"q": ["user"]}],
+  downloadYoutubeReport: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}/download", {"q": ["user"], "raw": "text"}],
+  getYoutubePush: ["GET", "/uploadposts/youtube/push", {"q": ["user"]}],
+  enableYoutubePush: ["POST", "/uploadposts/youtube/push", {"b": ["user"]}],
+  disableYoutubePush: ["DELETE", "/uploadposts/youtube/push", {"b": ["user"]}],
+  getInstagramPublishingLimit: ["GET", "/uploadposts/instagram/publishing_limit", {"q": ["profile", "refresh"]}],
+  getThreadsPublishingLimit: ["GET", "/uploadposts/threads/publishing_limit", {"q": ["user", "refresh"]}],
+  listPinterestBoardSections: ["GET", "/uploadposts/pinterest/boards/{board_id}/sections", {"q": ["profile"]}],
+  createPinterestBoardSection: ["POST", "/uploadposts/pinterest/boards/{board_id}/sections", {"b": ["user", "name"]}],
+  getFacebookPageInfo: ["GET", "/uploadposts/facebook/page-info", {"q": ["user", "page_id"]}],
+  updateFacebookPageInfo: ["PATCH", "/uploadposts/facebook/page-info", {"b": ["user", "page_id", "validate_only", "about", "description", "website", "phone", "emails", "hours", "picture_url", "cover_url"]}],
+  listRedditSubreddits: ["GET", "/uploadposts/reddit/subreddits", {"q": ["profile"]}],
+  getRedditPostTypes: ["GET", "/uploadposts/reddit/post-types", {"q": ["profile", "subreddit"]}],
+  listRedditFlairs: ["GET", "/uploadposts/reddit/flairs", {"q": ["profile", "subreddit"]}],
+  getUserProfile: ["GET", "/uploadposts/users/{username}", {}],
+  renameUserProfile: ["PATCH", "/uploadposts/users/{username}", {"b": ["display_name"]}],
+  disconnectSocialAccount: ["DELETE", "/uploadposts/users/social", {"b": ["profile_username", "social_platform"]}],
+  connectDiscordCredentials: ["POST", "/uploadposts/users/discord/credentials", {"b": ["profile_username", "webhook_url", "name"]}],
+  connectTelegramCredentials: ["POST", "/uploadposts/users/telegram/credentials", {"b": ["profile_username", "bot_token", "chat_id", "receive_updates", "replace_existing_webhook", "forward_url", "auto_answer_callbacks", "extra_updates", "name"]}],
+  connectSlackCredentials: ["POST", "/uploadposts/users/slack/credentials", {"b": ["profile_username", "webhook_url", "name"]}],
+  connectMastodonCredentials: ["POST", "/uploadposts/users/mastodon/credentials", {"b": ["profile_username", "instance_url", "access_token", "name"]}],
+  connectNostrCredentials: ["POST", "/uploadposts/users/nostr/credentials", {"b": ["profile_username", "private_key", "relays", "name"]}],
+  connectLemmyCredentials: ["POST", "/uploadposts/users/lemmy/credentials", {"b": ["profile_username", "instance_url", "username", "password", "community", "name"]}],
+  connectDevtoCredentials: ["POST", "/uploadposts/users/devto/credentials", {"b": ["profile_username", "api_key", "name"]}],
+  connectHashnodeCredentials: ["POST", "/uploadposts/users/hashnode/credentials", {"b": ["profile_username", "pat", "publication_id", "name"]}],
+  connectWordpressCredentials: ["POST", "/uploadposts/users/wordpress/credentials", {"b": ["profile_username", "site_url", "username", "application_password", "name"]}],
+  connectWhopCredentials: ["POST", "/uploadposts/users/whop/credentials", {"b": ["profile_username", "api_key", "experience_id", "name"]}],
+  connectListmonkCredentials: ["POST", "/uploadposts/users/listmonk/credentials", {"b": ["profile_username", "instance_url", "username", "password", "list_id", "name"]}],
+  listFacebookPageChoices: ["GET", "/uploadposts/users/facebook-page", {"q": ["profile_username"]}],
+  setFacebookPage: ["POST", "/uploadposts/users/facebook-page", {"b": ["profile_username", "facebook_page_id"]}],
+  clearFacebookPage: ["DELETE", "/uploadposts/users/facebook-page", {"b": ["profile_username"]}],
+  listLinkedinPageChoices: ["GET", "/uploadposts/users/linkedin-page", {"q": ["profile_username"]}],
+  setLinkedinPage: ["POST", "/uploadposts/users/linkedin-page", {"b": ["profile_username", "linkedin_page_id"]}],
+  clearLinkedinPage: ["DELETE", "/uploadposts/users/linkedin-page", {"b": ["profile_username"]}],
+  connectBlueskyCredentials: ["POST", "/uploadposts/users/bluesky/credentials", {"b": ["profile_username", "handle", "password"]}],
+  setYoutubeOauthClient: ["POST", "/uploadposts/users/youtube/credentials", {"b": ["profile_username", "client_id", "client_secret"]}],
+  getCurrentUser: ["GET", "/uploadposts/me", {}],
+  startOauthConnection: ["POST", "/uploadposts/oauth/{platform}/start", {"b": ["profile", "redirect_url"]}],
+  createFfmpegJob: ["POST", "/uploadposts/ffmpeg/jobs/upload", {"b": ["files", "full_command", "output_extension", "publish", "file", "file1", "file2"], "f": ["file", "file1", "file2"]}],
+  getFfmpegJobStatus: ["GET", "/uploadposts/ffmpeg/jobs/{job_id}", {}],
+  downloadFfmpegResult: ["GET", "/uploadposts/ffmpeg/jobs/{job_id}/download", {"raw": "binary"}],
+  getFfmpegConsumption: ["GET", "/uploadposts/ffmpeg/consumption", {}],
+  listWebhookSubscriptions: ["GET", "/uploadposts/webhooks/subscriptions", {"q": ["status", "source", "url"], "na": 1}],
+  createWebhookSubscription: ["POST", "/uploadposts/webhooks/subscriptions", {"b": ["url", "events", "profile_username", "source", "name"], "na": 1}],
+  getWebhookSubscription: ["GET", "/uploadposts/webhooks/subscriptions/{subscription_id}", {"na": 1}],
+  deleteWebhookSubscription: ["DELETE", "/uploadposts/webhooks/subscriptions/{subscription_id}", {"na": 1}],
+  testWebhookSubscription: ["POST", "/uploadposts/webhooks/subscriptions/{subscription_id}/test", {"b": ["event"], "na": 1}],
+  deleteCommentPost: ["POST", "/uploadposts/comments/delete", {"b": ["platform", "user", "comment_id", "post_id"]}],
+  deleteBlueskyChatAccount: ["POST", "/uploadposts/dms/bluesky/account/delete", {"b": ["user", "confirm", "confirm_handle"]}],
+  listBlueskyMutualGroups: ["GET", "/uploadposts/dms/bluesky/groups", {"q": ["user", "subject", "limit", "cursor"]}],
+  createBlueskyGroup: ["POST", "/uploadposts/dms/bluesky/groups", {"b": ["user", "name", "members", "idempotency_key"]}],
+  editBlueskyGroup: ["PATCH", "/uploadposts/dms/bluesky/groups/{conversation_id}", {"b": ["user", "name", "locked"]}],
+  listBlueskyGroupMembers: ["GET", "/uploadposts/dms/bluesky/groups/{conversation_id}/members", {"q": ["user"]}],
+  addBlueskyGroupMembers: ["POST", "/uploadposts/dms/bluesky/groups/{conversation_id}/members", {"b": ["user", "members"]}],
+  removeBlueskyGroupMembers: ["DELETE", "/uploadposts/dms/bluesky/groups/{conversation_id}/members", {"b": ["user", "members"]}],
+  manageBlueskyJoinLink: ["POST", "/uploadposts/dms/bluesky/groups/{conversation_id}/join-link", {"b": ["user", "action", "require_approval", "join_rule"]}],
+  listBlueskyJoinRequests: ["GET", "/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests", {"q": ["user"]}],
+  answerBlueskyJoinRequest: ["POST", "/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests", {"b": ["user", "action", "member"]}],
+  previewBlueskyJoinLinks: ["GET", "/uploadposts/dms/bluesky/join-links", {"q": ["user", "codes"]}],
+  joinBlueskyGroup: ["POST", "/uploadposts/dms/bluesky/join-links", {"b": ["user", "code"]}],
+  downloadDmMedia: ["GET", "/uploadposts/dms/media", {"q": ["platform", "user", "media_id"], "raw": "binary"}],
+  blueskyGraphAction: ["POST", "/uploadposts/bluesky/graph", {"b": ["user", "action", "actor", "list", "post_id", "only_reposts", "only_quoteposts"]}],
+  listBlueskyLists: ["GET", "/uploadposts/bluesky/lists", {"q": ["user", "purposes", "cursor"]}],
+  createBlueskyList: ["POST", "/uploadposts/bluesky/lists", {"b": ["user", "name", "purpose", "description", "avatar", "avatar_url", "remove_avatar"], "f": ["avatar"]}],
+  getBlueskyList: ["GET", "/uploadposts/bluesky/lists/{list_id}", {"q": ["user"]}],
+  updateBlueskyList: ["PATCH", "/uploadposts/bluesky/lists/{list_id}", {"b": ["user", "name", "purpose", "description", "avatar", "avatar_url", "remove_avatar"], "f": ["avatar"]}],
+  deleteBlueskyList: ["DELETE", "/uploadposts/bluesky/lists/{list_id}", {"b": ["user", "confirm"]}],
+  listBlueskyListMembers: ["GET", "/uploadposts/bluesky/lists/{list_id}/members", {"q": ["user"]}],
+  addBlueskyListMember: ["POST", "/uploadposts/bluesky/lists/{list_id}/members", {"b": ["user", "actor"]}],
+  removeBlueskyListMember: ["DELETE", "/uploadposts/bluesky/lists/{list_id}/members", {"b": ["user", "actor"]}],
+  optOutBlueskyList: ["POST", "/uploadposts/bluesky/lists/opt-out", {"b": ["user", "list"]}],
+  removeOptOutBlueskyList: ["DELETE", "/uploadposts/bluesky/lists/opt-out", {"b": ["user", "list"]}],
+  listBlueskyStarterPacks: ["GET", "/uploadposts/bluesky/starter-packs", {"q": ["user"]}],
+  createBlueskyStarterPack: ["POST", "/uploadposts/bluesky/starter-packs", {"b": ["user", "name", "description", "feeds", "list", "members"]}],
+  getBlueskyStarterPack: ["GET", "/uploadposts/bluesky/starter-packs/{pack_id}", {"q": ["user"]}],
+  updateBlueskyStarterPack: ["PATCH", "/uploadposts/bluesky/starter-packs/{pack_id}", {"b": ["user", "name", "description", "feeds", "list", "members"]}],
+  deleteBlueskyStarterPack: ["DELETE", "/uploadposts/bluesky/starter-packs/{pack_id}", {"b": ["user", "confirm", "delete_list"]}],
+  listBlueskyFeeds: ["GET", "/uploadposts/bluesky/feeds", {"q": ["user"]}],
+  createBlueskyFeed: ["POST", "/uploadposts/bluesky/feeds", {"b": ["user", "rkey", "did", "display_name", "description", "avatar", "accepts_interactions", "content_mode"], "f": ["avatar"]}],
+  updateBlueskyFeed: ["PATCH", "/uploadposts/bluesky/feeds/{rkey}", {"b": ["user", "did", "display_name", "description", "avatar", "accepts_interactions", "content_mode"], "f": ["avatar"]}],
+  deleteBlueskyFeed: ["DELETE", "/uploadposts/bluesky/feeds/{rkey}", {"b": ["user", "confirm"]}],
+  reportOnBluesky: ["POST", "/uploadposts/bluesky/report", {"b": ["user", "post_id", "actor", "reason_type", "reason", "confirm"]}],
+  listPostApprovals: ["GET", "/uploadposts/approvals", {"q": ["status", "profile_username", "author", "limit", "before"], "na": 1}],
+  getPostApproval: ["GET", "/uploadposts/approvals/{approval_id}", {"na": 1}],
+  editPostApproval: ["PATCH", "/uploadposts/approvals/{approval_id}", {"b": ["title", "caption", "description", "platform_content", "fields", "scheduled_date", "timezone", "cover_image_base64", "remove_cover"], "na": 1}],
+  withdrawPostApproval: ["DELETE", "/uploadposts/approvals/{approval_id}", {"na": 1}],
+  approvePostApproval: ["POST", "/uploadposts/approvals/{approval_id}/approve", {"b": ["version", "comment", "scheduled_date", "timezone", "publish_now"], "na": 1}],
+  rejectPostApproval: ["POST", "/uploadposts/approvals/{approval_id}/reject", {"b": ["comment"], "na": 1}],
+  listClientPostApprovals: ["GET", "/uploadposts/approvals/client", {"bearer": 1, "na": 1}],
+  approveClientPostApproval: ["POST", "/uploadposts/approvals/client/{approval_id}/approve", {"b": ["version", "comment"], "bearer": 1, "na": 1}],
+  rejectClientPostApproval: ["POST", "/uploadposts/approvals/client/{approval_id}/reject", {"b": ["comment"], "bearer": 1, "na": 1}],
+  getTeamRoles: ["GET", "/uploadposts/teams/roles", {}],
+  listTeamAudit: ["GET", "/uploadposts/teams/audit", {"q": ["actor", "action", "profile_username", "target_id", "since", "until", "limit", "cursor"]}],
+  sendFeedback: ["POST", "/uploadposts/feedback", {"b": ["message", "category", "endpoint", "request_id", "agent"]}],
+  updateGoogleBusinessAccount: ["PATCH", "/uploadposts/google-business/accounts", {"b": ["user", "account", "account_name", "validate_only", "confirm"]}],
+  createGoogleBusinessAdmin: ["POST", "/uploadposts/google-business/admins", {"b": ["user", "scope", "account", "location_id", "admin", "admin_account", "role", "confirm"]}],
+  updateGoogleBusinessAdmin: ["PATCH", "/uploadposts/google-business/admins", {"b": ["user", "admin_name", "role", "confirm"]}],
+  deleteGoogleBusinessAdmin: ["DELETE", "/uploadposts/google-business/admins", {"b": ["user", "admin_name", "confirm"]}],
+  acceptGoogleBusinessInvitation: ["POST", "/uploadposts/google-business/invitations/accept", {"b": ["user", "invitation", "confirm"]}],
+  declineGoogleBusinessInvitation: ["POST", "/uploadposts/google-business/invitations/decline", {"b": ["user", "invitation", "confirm"]}],
+  transferGoogleBusinessLocation: ["POST", "/uploadposts/google-business/locations/transfer", {"b": ["user", "location_id", "destination_account", "confirm"]}],
+  createGoogleBusinessLocation: ["POST", "/uploadposts/google-business/locations/create", {"b": ["user", "account", "location", "language_code", "title", "primary_category", "request_id", "dry_run", "confirm"]}],
+  deleteGoogleBusinessLocation: ["DELETE", "/uploadposts/google-business/locations/delete", {"b": ["user", "location_id", "confirm"]}],
+  getGoogleBusinessNotificationSettings: ["GET", "/uploadposts/google-business/notifications", {"q": ["user", "account"]}],
+  updateGoogleBusinessNotificationSettings: ["PUT", "/uploadposts/google-business/notifications", {"b": ["user", "account", "enabled", "types", "confirm", "force", "confirm_other_tool"]}],
+  updateGoogleBusinessNotificationSettingsPatch: ["PATCH", "/uploadposts/google-business/notifications", {"b": ["user", "account", "enabled", "types", "confirm", "force", "confirm_other_tool"]}],
+  batchGetGoogleBusinessReviewsPost: ["POST", "/uploadposts/google-business/reviews/batch", {"b": ["user", "location_ids", "page_size", "page_token", "order_by", "ignoreRatingOnlyReviews"]}],
+  startGoogleBusinessVerification: ["POST", "/uploadposts/google-business/verification/start", {"b": ["user", "location_id", "method", "phone_number", "email_address", "mailer_contact", "trusted_partner_token", "token", "language_code", "context", "confirm"]}],
+  completeGoogleBusinessVerification: ["POST", "/uploadposts/google-business/verification/complete", {"b": ["user", "location_id", "verification_name", "verification_id", "pin"]}],
+  generateGoogleBusinessVerificationToken: ["POST", "/uploadposts/google-business/verification/token", {"b": ["user", "location_id"]}],
+  connectChatgptAdsAccount: ["POST", "/uploadposts/ads/chatgpt/connect", {"b": ["api_key", "profile_username", "name", "default"]}],
+  listChatgptAdsAccounts: ["GET", "/uploadposts/ads/chatgpt/accounts", {}],
+  disconnectChatgptAdsAccount: ["DELETE", "/uploadposts/ads/chatgpt/accounts/{ad_account_id}", {"q": ["profile_username"]}],
+  getChatgptAdsAccount: ["GET", "/uploadposts/ads/chatgpt/account", {"q": ["ad_account_id", "profile_username"]}],
+  listChatgptAdsCampaigns: ["GET", "/uploadposts/ads/chatgpt/campaigns", {"q": ["limit", "after", "before", "order", "ad_account_id", "profile_username"]}],
+  createChatgptAdsCampaign: ["POST", "/uploadposts/ads/chatgpt/campaigns", {"q": ["ad_account_id", "profile_username"], "b": ["name", "budget", "budget_micros", "status", "description", "start_time", "end_time", "bidding_type", "conversion_event_setting_ids", "mode", "product_feed_id", "locations", "custom_audience_ids", "excluded_custom_audience_ids", "targeting", "ad_account_id", "profile_username"]}],
+  getChatgptAdsCampaign: ["GET", "/uploadposts/ads/chatgpt/campaigns/{campaign_id}", {"q": ["ad_account_id", "profile_username"]}],
+  updateChatgptAdsCampaign: ["POST", "/uploadposts/ads/chatgpt/campaigns/{campaign_id}", {"q": ["ad_account_id", "profile_username"], "b": ["name", "budget", "budget_micros", "status", "description", "start_time", "end_time", "locations", "custom_audience_ids", "excluded_custom_audience_ids", "targeting", "ad_account_id", "profile_username"]}],
+  activateChatgptAdsCampaign: ["POST", "/uploadposts/ads/chatgpt/campaigns/{campaign_id}/activate", {"q": ["ad_account_id", "profile_username"]}],
+  pauseChatgptAdsCampaign: ["POST", "/uploadposts/ads/chatgpt/campaigns/{campaign_id}/pause", {"q": ["ad_account_id", "profile_username"]}],
+  archiveChatgptAdsCampaign: ["POST", "/uploadposts/ads/chatgpt/campaigns/{campaign_id}/archive", {"q": ["ad_account_id", "profile_username"]}],
+  getChatgptAdsCampaignInsights: ["GET", "/uploadposts/ads/chatgpt/campaigns/{campaign_id}/insights", {"q": ["since", "until", "time_granularity", "aggregation_level", "fields", "segments", "filters", "sort", "time_ranges", "limit", "after", "before", "ad_account_id", "profile_username"]}],
+  listChatgptAdsAdGroups: ["GET", "/uploadposts/ads/chatgpt/adgroups", {"q": ["campaign_id", "limit", "after", "before", "order", "ad_account_id", "profile_username"]}],
+  createChatgptAdsAdGroup: ["POST", "/uploadposts/ads/chatgpt/adgroups", {"q": ["ad_account_id", "profile_username"], "b": ["campaign_id", "name", "max_bid", "max_bid_micros", "billing_event_type", "bidding_config", "status", "description", "context_hints", "product_set", "ad_account_id", "profile_username"]}],
+  getChatgptAdsAdGroup: ["GET", "/uploadposts/ads/chatgpt/adgroups/{ad_group_id}", {"q": ["ad_account_id", "profile_username"]}],
+  updateChatgptAdsAdGroup: ["POST", "/uploadposts/ads/chatgpt/adgroups/{ad_group_id}", {"q": ["ad_account_id", "profile_username"], "b": ["name", "max_bid", "max_bid_micros", "billing_event_type", "bidding_config", "status", "description", "context_hints", "product_set", "ad_account_id", "profile_username"]}],
+  activateChatgptAdsAdGroup: ["POST", "/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/activate", {"q": ["ad_account_id", "profile_username"]}],
+  pauseChatgptAdsAdGroup: ["POST", "/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/pause", {"q": ["ad_account_id", "profile_username"]}],
+  archiveChatgptAdsAdGroup: ["POST", "/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/archive", {"q": ["ad_account_id", "profile_username"]}],
+  getChatgptAdsAdGroupInsights: ["GET", "/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/insights", {"q": ["since", "until", "time_granularity", "aggregation_level", "fields", "segments", "filters", "sort", "time_ranges", "limit", "after", "before", "ad_account_id", "profile_username"]}],
+  listChatgptAdsAds: ["GET", "/uploadposts/ads/chatgpt/ads", {"q": ["ad_group_id", "limit", "after", "before", "order", "ad_account_id", "profile_username"]}],
+  createChatgptAdsAd: ["POST", "/uploadposts/ads/chatgpt/ads", {"q": ["ad_account_id", "profile_username"], "b": ["ad_group_id", "name", "title", "body", "target_url", "file_id", "price", "type", "status", "creative", "ad_account_id", "profile_username"]}],
+  getChatgptAdsAd: ["GET", "/uploadposts/ads/chatgpt/ads/{ad_id}", {"q": ["ad_account_id", "profile_username"]}],
+  updateChatgptAdsAd: ["POST", "/uploadposts/ads/chatgpt/ads/{ad_id}", {"q": ["ad_account_id", "profile_username"], "b": ["name", "status", "creative", "ad_account_id", "profile_username"]}],
+  activateChatgptAdsAd: ["POST", "/uploadposts/ads/chatgpt/ads/{ad_id}/activate", {"q": ["ad_account_id", "profile_username"]}],
+  pauseChatgptAdsAd: ["POST", "/uploadposts/ads/chatgpt/ads/{ad_id}/pause", {"q": ["ad_account_id", "profile_username"]}],
+  archiveChatgptAdsAd: ["POST", "/uploadposts/ads/chatgpt/ads/{ad_id}/archive", {"q": ["ad_account_id", "profile_username"]}],
+  getChatgptAdsAdInsights: ["GET", "/uploadposts/ads/chatgpt/ads/{ad_id}/insights", {"q": ["since", "until", "time_granularity", "aggregation_level", "fields", "segments", "filters", "sort", "time_ranges", "limit", "after", "before", "ad_account_id", "profile_username"]}],
+  previewChatgptAdsAd: ["POST", "/uploadposts/ads/chatgpt/ads/{ad_id}/preview", {"q": ["ad_account_id", "profile_username"]}],
+  uploadChatgptAdsCreative: ["POST", "/uploadposts/ads/chatgpt/creatives", {"q": ["ad_account_id", "profile_username"], "b": ["image_url", "ad_account_id", "profile_username", "file"], "f": ["file"]}],
+  getChatgptAdsAccountInsights: ["GET", "/uploadposts/ads/chatgpt/insights", {"q": ["since", "until", "time_granularity", "aggregation_level", "fields", "segments", "filters", "sort", "time_ranges", "limit", "after", "before", "ad_account_id", "profile_username"]}],
+  promoteChatgptAds: ["POST", "/uploadposts/ads/chatgpt/promote", {"q": ["ad_account_id", "profile_username"], "b": ["title", "body", "target_url", "image_url", "file_id", "budget", "budget_micros", "max_bid", "max_bid_micros", "name", "status", "bidding_type", "billing_event_type", "start_time", "end_time", "description", "conversion_event_setting_ids", "locations", "custom_audience_ids", "excluded_custom_audience_ids", "targeting", "context_hints", "price", "ad_group_name", "ad_name", "ad_account_id", "profile_username"]}],
+};
+// </openapi:operations>
 
 // Default export for CommonJS compatibility
 export default UploadPost;
