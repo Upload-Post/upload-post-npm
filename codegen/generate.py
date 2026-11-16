@@ -372,7 +372,7 @@ def npm_types(ops):
         for name, schema, desc, required in fields:
             doc = one_line(desc)
             if doc:
-                body.append(f'    /** {doc.replace("*/", "*\\/")} */\n')
+                body.append('    /** ' + doc.replace('*/', '*\\/') + ' */\n')
             body.append(f'    {ts_key(name)}{"" if required else "?"}: {ts_type(schema, open_enums=True)};\n')
         out.append(f'  /** Options of `{op["js"]}` (`{endpoint(op)}`). Any other API field is sent as well. */\n'
                    f'  export interface {npm_options_type(op)} extends ApiParams {{\n' + ''.join(body) + '  }\n\n')
@@ -383,7 +383,7 @@ def npm_types(ops):
             for k, v in props.items():
                 doc = one_line(resolve(v).get('description', ''))
                 if doc:
-                    rbody.append(f'    /** {doc.replace("*/", "*\\/")} */\n')
+                    rbody.append('    /** ' + doc.replace('*/', '*\\/') + ' */\n')
                 key = k if re.fullmatch(r'[A-Za-z_$][\w$]*', k) else json.dumps(k)
                 rbody.append(f'    {key}?: {ts_type(v)};\n')
             out.append(f'  /** Answer of `{op["js"]}`. */\n'
