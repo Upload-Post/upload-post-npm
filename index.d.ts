@@ -1095,6 +1095,39 @@ declare module 'upload-post' {
     [key: string]: any;
   }
 
+  export type MissingReason = 'not_supported' | 'reauth_required' | 'quota' | 'platform_delay' | 'not_fetched';
+
+  export interface PostAnalyticsDailyResponse {
+    success: boolean;
+    platform: string;
+    platform_post_id: string | null;
+    profile_username: string | null;
+    request_id?: string;
+    source: 'snapshot_cache';
+    /** `on_demand` on X and YouTube: only updated when someone reads the post. */
+    refresh_policy: 'on_demand' | 'on_read';
+    refresh_policy_note: string;
+    days: Array<{
+      date: string;
+      as_of: string;
+      source: 'post_read' | 'listing';
+      metrics: Record<string, number>;
+      account_id?: string;
+      /** Days since the previous row (null on the first one). */
+      gap_days: number | null;
+      /** Gained since the previous row, over `gap_days`. */
+      delta: Record<string, number> | null;
+      delta_reason?: 'account_changed';
+    }>;
+    snapshots: number;
+    first_date: string | null;
+    last_date: string | null;
+    as_of: string | null;
+    next_refresh_at: null;
+    missing_reason: MissingReason | null;
+    truncated?: boolean;
+  }
+
   export interface AnalyticsResponse {
     success: boolean;
     analytics?: {
@@ -1765,7 +1798,17 @@ declare module 'upload-post' {
      * @param profileUsername - Profile username
      * @param options - Query options
      */
-    getAnalytics(profileUsername: string, options?: { platforms?: string[]; pageId?: string; pageUrn?: string }): Promise<AnalyticsResponse>;
+    getAnalytics(profileUsername: string, options?: {
+      platforms?: string[];
+      pageId?: string;
+      pageUrn?: string;
+      /** Start of a period, YYYY-MM-DD: adds a `period` block per platform (from stored daily snapshots). */
+      since?: string;
+      /** End of the period, YYYY-MM-DD (default today, UTC; at most 366 days). */
+      until?: string;
+      /** `previous` adds the previous period of the same length and `vs_previous`. */
+      compare?: 'previous';
+    }): Promise<AnalyticsResponse>;
 
     /**
      * Get total impressions for a profile from daily snapshots
@@ -1804,17 +1847,39 @@ declare module 'upload-post' {
      *
      * @param requestId - The request_id from the upload
      */
-    getPostAnalytics(requestId: string): Promise<{
+    getPostAnalytics(requestId: string, options?: {
+      /** Only this platform. */
+      platform?: string;
+      /** Ask the network again even if a recent stored reading exists (limited per hour). */
+      refresh?: boolean;
+    }): Promise<{
       success: boolean;
       post: { request_id: string; profile_username: string; post_title: string; post_caption: string; media_type: string; upload_timestamp: string };
+      /** Oldest `as_of` of the platforms. */
+      as_of?: string | null;
+      /** Earliest `next_refresh_at` of the platforms. */
+      next_refresh_at?: string | null;
       platforms: Record<string, {
         success: boolean;
         platform_post_id?: string;
         post_url?: string;
-        /** Counters plus, on TikTok, retention / impression_sources / audience_types and watch times. */
+        /** Counters plus, on TikTok, retention / impression_sources / audience_types and watch times; normalized `avg_watch_seconds`, `watch_time_seconds`, `completion_rate` (0-100). */
         post_metrics?: Record<string, any>;
         post_metrics_source?: string;
         post_metrics_error?: string;
+        /** When the network was asked for these metrics. */
+        as_of?: string | null;
+        /** Earliest moment asking again can return newer metrics; null = only `refresh` refreshes them. */
+        next_refresh_at?: string | null;
+        /** `live` or `snapshot` (last stored reading), where freshness by post age applies. */
+        served_from?: 'live' | 'snapshot';
+        /** `refresh` asked past the hourly limit: the stored reading was served. */
+        refresh_limited?: boolean;
+        /** Error of the last live read when the post was deleted or access was lost. */
+        live_error?: string;
+        /** Metrics not reported, with the reason. */
+        missing?: Record<string, MissingReason>;
+        missing_reason?: MissingReason;
         /** TikTok only, when present: the upload's TikTok `publish_id` (drafts get their post id once published publicly) */
         original_publish_id?: string;
         profile_snapshot_at_post_date?: Record<string, number>;
@@ -1843,10 +1908,21 @@ declare module 'upload-post' {
       since?: string;
       /** End date, YYYY-MM-DD. Defaults to today. */
       until?: string;
+      /** views, likes, comments, shares, engagement, published_at or as_of; prefix `-` for descending. */
+      sort?: string;
+      /** Overrides the `-` prefix of sort. */
+      order?: 'asc' | 'desc';
+      /** What since/until filter on: the reading day (default) or the publish day. */
+      dateField?: 'captured_at' | 'published_at';
+      /** `external`: posts not published with Upload-Post; `all`: both. */
+      origin?: 'external' | 'all';
     }): Promise<{
       success: boolean;
       profile_username: string;
       platform: string | null;
+      as_of?: string | null;
+      next_refresh_at?: null;
+      truncated?: boolean;
       since: string;
       until: string;
       source: 'snapshot_cache';
@@ -1862,6 +1938,16 @@ declare module 'upload-post' {
         upload_timestamp?: string | null;
         /** TikTok only, when present: the upload's TikTok `publish_id` */
         original_publish_id?: string | null;
+        /** When the network was asked for these metrics. */
+        as_of?: string | null;
+        /** Posts published with Upload-Post. */
+        request_id?: string;
+        post_title?: string;
+        /** First 140 characters of the caption. */
+        caption_preview?: string;
+        origin?: 'upload_post' | 'external';
+        account_id?: string;
+        listing_source?: string;
       }>;
       limit: number;
       next_cursor: string | null;
@@ -1916,6 +2002,8 @@ declare module 'upload-post' {
       primary_impressions_field: string;
       available_metrics: string[];
       metric_labels: Record<string, string>;
+      /** Per metric: native label, API field, unit, kind, summable; plus delay_hours and views_field. */
+      metric_catalog?: Record<string, any>;
     }>>;
 
     /**
@@ -3651,7 +3739,68 @@ declare module 'upload-post' {
      * @param platform - Platform the post lives on
      * @param user - Profile username that owns the connected account
      */
-    getPostAnalyticsByPlatformId(platformPostId: string, platform: string, user: string): Promise<Record<string, unknown>>;
+    getPostAnalyticsByPlatformId(platformPostId: string, platform: string, user: string, options?: {
+      /** Ask the network again even if a recent stored reading exists (limited per hour). */
+      refresh?: boolean;
+    }): Promise<Record<string, unknown>>;
+
+    /**
+     * Day-by-day history of a post published with Upload-Post, from stored
+     * readings (never calls the network). `platform` is required.
+     */
+    getPostAnalyticsDaily(requestId: string, options: { platform: string; since?: string; until?: string }): Promise<PostAnalyticsDailyResponse>;
+
+    /** Day-by-day history of any post of a connected account, by its native id. */
+    getPostAnalyticsDailyByPlatformId(
+      platformPostId: string,
+      platform: string,
+      user: string,
+      options?: { since?: string; until?: string }
+    ): Promise<PostAnalyticsDailyResponse>;
+
+    /**
+     * Each post against the profile's other posts at the same age (1h, 24h,
+     * 7d, 30d), and median views by format, hour, weekday, hashtags and caption
+     * length. Computed from stored readings only.
+     */
+    getInsights(options: { user: string; platform?: string; since?: string; until?: string }): Promise<{
+      success: boolean;
+      profile_username: string;
+      since: string;
+      until: string;
+      ages: string[];
+      min_sample: number;
+      by_platform: Record<string, {
+        posts_considered: number;
+        posts_with_photos: number;
+        posts: Array<{
+          platform_post_id: string;
+          request_id?: string | null;
+          published_at: string | null;
+          format: string | null;
+          at_age: Record<string, { views: number; median_others?: number | null; n?: number; low_sample?: boolean; vs_median?: number | null }>;
+        }>;
+        groups: Record<string, Record<string, any>>;
+        derived?: boolean;
+        derived_notice?: string;
+      }>;
+      as_of?: string | null;
+      [key: string]: any;
+    }>;
+
+    /**
+     * Per profile and platform: connection, analytics polling, refresh mode,
+     * network delay, last readings, coverage and stored history. Never calls a network.
+     */
+    getAnalyticsStatus(options?: { user?: string; platform?: string }): Promise<{
+      success: boolean;
+      generated_at: string;
+      profiles: Array<{ profile_username: string; platforms: Record<string, Record<string, any>> }>;
+      missing_reasons: MissingReason[];
+      truncated?: boolean;
+      profiles_total?: number;
+      profiles_returned?: number;
+    }>;
 
     /**
      * Get detailed Reddit posts with full media information

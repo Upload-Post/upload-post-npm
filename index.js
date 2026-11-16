@@ -1308,7 +1308,13 @@ export class UploadPost {
    * @param {string[]} [options.platforms] - Filter by platforms (instagram, linkedin, facebook, x, youtube, tiktok, threads, pinterest, reddit)
    * @param {string} [options.pageId] - Facebook Page ID (required for Facebook analytics)
    * @param {string} [options.pageUrn] - LinkedIn organization/company page URN or numeric ID. LinkedIn analytics are only available for pages you administer; personal profiles are not supported (LinkedIn exposes no member-level analytics). Defaults to the first administered organization page.
-   * @returns {Promise<Object>} Analytics data per platform
+   * @param {string} [options.since] - Start of a period, YYYY-MM-DD. Adds a `period` block to each platform, computed from stored daily snapshots (no extra call to the networks).
+   * @param {string} [options.until] - End of the period, YYYY-MM-DD (defaults to today, UTC; at most 366 days).
+   * @param {'previous'} [options.compare] - `previous` adds the previous period of the same length and `vs_previous`.
+   * @returns {Promise<Object>} Analytics data per platform. Each block carries
+   *   `as_of` / `next_refresh_at` (when it was read and when asking again can
+   *   bring newer numbers), `missing` (metric -> reason), `views_field` and,
+   *   where totals come from a list of posts, `coverage`.
    */
   async getAnalytics(profileUsername, options = {}) {
     const params = {};
@@ -1317,6 +1323,9 @@ export class UploadPost {
     }
     if (options.pageId) params.page_id = options.pageId;
     if (options.pageUrn) params.page_urn = options.pageUrn;
+    if (options.since) params.since = options.since;
+    if (options.until) params.until = options.until;
+    if (options.compare) params.compare = options.compare;
     return this._request(`/analytics/${encodeURIComponent(profileUsername)}`, 'GET', params);
   }
 
@@ -1332,7 +1341,9 @@ export class UploadPost {
    * @param {string[]} [options.platforms] - Filter by platforms
    * @param {boolean} [options.breakdown] - Include per-platform and per-day breakdown
    * @param {string[]} [options.metrics] - Specific metrics to aggregate (e.g., ['likes', 'comments', 'shares'])
-   * @returns {Promise<Object>} Total impressions data
+   * @returns {Promise<Object>} Total impressions data. `total_impressions` is a
+   *   legacy mix of reach and impressions kept for compatibility; `views_total`
+   *   and `views_by_platform` (views only) are what compares with the native apps.
    */
   async getTotalImpressions(profileUsername, options = {}) {
     const params = {};
@@ -1373,11 +1384,69 @@ export class UploadPost {
    * is the upload's TikTok `publish_id`; `post_url` stays empty when the
    * account's @username is not known.
    *
+   * Freshness: each platform entry carries `as_of` (when the network was
+   * asked) and `next_refresh_at` (earliest moment asking again can return newer
+   * numbers; null = only `refresh` refreshes it). Depending on the post's age
+   * Upload-Post may answer from its last stored reading (`served_from:
+   * 'snapshot'`). X and YouTube posts are only updated when someone reads them.
+   *
    * @param {string} requestId - The request_id from the upload
+   * @param {Object} [options]
+   * @param {string} [options.platform] - Only this platform
+   * @param {boolean} [options.refresh] - Ask the network again even if a recent
+   *   stored reading exists (limited per hour; past it `refresh_limited: true`)
    * @returns {Promise<Object>} Post analytics with per-platform metrics
    */
-  async getPostAnalytics(requestId) {
-    return this._request(`/uploadposts/post-analytics/${encodeURIComponent(requestId)}`, 'GET');
+  async getPostAnalytics(requestId, options = {}) {
+    const params = {};
+    if (options.platform) params.platform = options.platform;
+    if (options.refresh) params.refresh = 'true';
+    return this._request(
+      `/uploadposts/post-analytics/${encodeURIComponent(requestId)}`,
+      'GET',
+      Object.keys(params).length ? params : null
+    );
+  }
+
+  /**
+   * Day-by-day history of a post published with Upload-Post, from the readings
+   * Upload-Post already stored (never calls the network). One row per day with
+   * a reading; `delta` is what the post gained over `gap_days`.
+   *
+   * @param {string} requestId - The request_id from the upload
+   * @param {Object} options
+   * @param {string} options.platform - Required: one upload can hold several platforms
+   * @param {string} [options.since] - YYYY-MM-DD
+   * @param {string} [options.until] - YYYY-MM-DD
+   * @returns {Promise<Object>} `days`, `refresh_policy`, `as_of`, `missing_reason`
+   */
+  async getPostAnalyticsDaily(requestId, options = {}) {
+    if (!options.platform) {
+      throw new Error('getPostAnalyticsDaily needs options.platform: one upload can hold several platforms.');
+    }
+    const params = { platform: options.platform };
+    if (options.since) params.since = options.since;
+    if (options.until) params.until = options.until;
+    return this._request(`/uploadposts/post-analytics/${encodeURIComponent(requestId)}/daily`, 'GET', params);
+  }
+
+  /**
+   * Day-by-day history of any post of a connected account, by its native id.
+   * Same answer as getPostAnalyticsDaily().
+   *
+   * @param {string} platformPostId - The native post ID on the platform
+   * @param {string} platform - The platform of the post
+   * @param {string} user - The profile_username that owns the social account
+   * @param {Object} [options]
+   * @param {string} [options.since] - YYYY-MM-DD
+   * @param {string} [options.until] - YYYY-MM-DD
+   * @returns {Promise<Object>} `days`, `refresh_policy`, `as_of`, `missing_reason`
+   */
+  async getPostAnalyticsDailyByPlatformId(platformPostId, platform, user, options = {}) {
+    const params = { platform_post_id: platformPostId, platform, user };
+    if (options.since) params.since = options.since;
+    if (options.until) params.until = options.until;
+    return this._request('/uploadposts/post-analytics/daily', 'GET', params);
   }
 
   /**
@@ -1386,14 +1455,20 @@ export class UploadPost {
    * @param {string} platformPostId - The native post ID on the platform (e.g., Instagram media ID)
    * @param {string} platform - The platform to query (instagram, youtube, tiktok, facebook, linkedin, x, threads, pinterest, reddit)
    * @param {string} user - The profile_username that owns the social account
-   * @returns {Promise<Object>} Post analytics with live per-post metrics from the platform API
+   * @param {Object} [options]
+   * @param {boolean} [options.refresh] - Ask the network again even if a recent
+   *   stored reading exists (limited per hour)
+   * @returns {Promise<Object>} Post analytics with per-post metrics, `as_of`,
+   *   `next_refresh_at` and, where it applies, `served_from`
    */
-  async getPostAnalyticsByPlatformId(platformPostId, platform, user) {
-    return this._request('/uploadposts/post-analytics', 'GET', {
+  async getPostAnalyticsByPlatformId(platformPostId, platform, user, options = {}) {
+    const params = {
       platform_post_id: platformPostId,
       platform,
       user,
-    });
+    };
+    if (options.refresh) params.refresh = 'true';
+    return this._request('/uploadposts/post-analytics', 'GET', params);
   }
 
   /**
@@ -1411,7 +1486,16 @@ export class UploadPost {
    * @param {string} [options.cursor] - Opaque cursor from a previous response's next_cursor
    * @param {string} [options.since] - Start date in YYYY-MM-DD format (defaults to 30 days ago)
    * @param {string} [options.until] - End date in YYYY-MM-DD format (defaults to today)
-   * @returns {Promise<Object>} Cached post metrics with next_cursor and has_more
+   * @param {string} [options.sort] - views, likes, comments, shares, engagement,
+   *   published_at or as_of; prefix `-` for descending (e.g. `-views`)
+   * @param {('asc'|'desc')} [options.order] - Overrides the `-` prefix of sort
+   * @param {('captured_at'|'published_at')} [options.dateField] - What since/until
+   *   filter on: the day of the reading (default) or the publish day
+   * @param {('external'|'all')} [options.origin] - `external`: posts not published
+   *   with Upload-Post, listed by account reads; `all`: both
+   * @returns {Promise<Object>} Cached post metrics with next_cursor and has_more.
+   *   Each row carries `as_of`; posts published with Upload-Post also carry
+   *   `request_id`, `post_title` and `caption_preview`.
    */
   async getCachedPostAnalytics(user, options = {}) {
     const params = { user };
@@ -1420,6 +1504,10 @@ export class UploadPost {
     if (options.cursor) params.cursor = options.cursor;
     if (options.since) params.since = options.since;
     if (options.until) params.until = options.until;
+    if (options.sort) params.sort = options.sort;
+    if (options.order) params.order = options.order;
+    if (options.dateField) params.date_field = options.dateField;
+    if (options.origin) params.origin = options.origin;
     return this._request('/uploadposts/post-analytics/cached', 'GET', params);
   }
 
@@ -1491,9 +1579,48 @@ export class UploadPost {
   }
 
   /**
+   * Each post compared with the profile's other posts at the same age (1h,
+   * 24h, 7d, 30d), and median views by format, hour (UTC), weekday (UTC),
+   * hashtag count and caption length. Computed from stored readings only.
+   *
+   * @param {Object} options
+   * @param {string} options.user - Profile username
+   * @param {string} [options.platform] - Only this platform
+   * @param {string} [options.since] - Posts published from this day, YYYY-MM-DD
+   * @param {string} [options.until] - Posts published until this day, YYYY-MM-DD
+   * @returns {Promise<Object>} `by_platform.<platform>.posts[].at_age` and `groups`
+   */
+  async getInsights(options = {}) {
+    const params = { user: options.user };
+    if (options.platform) params.platform = options.platform;
+    if (options.since) params.since = options.since;
+    if (options.until) params.until = options.until;
+    return this._request('/uploadposts/insights', 'GET', params);
+  }
+
+  /**
+   * Why is a number missing or old? Per profile and platform: connection,
+   * whether analytics reads are paused, refresh mode, network delay, last
+   * readings, coverage of recent posts and stored history. Never calls a network.
+   *
+   * @param {Object} [options]
+   * @param {string} [options.user] - Profile username (omit for every profile)
+   * @param {string} [options.platform] - Only this platform
+   * @returns {Promise<Object>} `profiles[].platforms.<platform>`
+   */
+  async getAnalyticsStatus(options = {}) {
+    const params = {};
+    if (options.user) params.user = options.user;
+    if (options.platform) params.platform = options.platform;
+    return this._request('/uploadposts/analytics-status', 'GET', Object.keys(params).length ? params : null);
+  }
+
+  /**
    * Get available metrics configuration for all supported platforms
    *
-   * @returns {Promise<Object>} Platform metrics config (primary fields, available metrics, labels)
+   * @returns {Promise<Object>} Platform metrics config (primary fields, available
+   *   metrics, labels) and, per platform, `metric_catalog` (native label, API
+   *   field, unit, kind, summable, delay)
    */
   async getPlatformMetrics() {
     return this._request('/uploadposts/platform-metrics', 'GET');
