@@ -9308,12 +9308,48 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "description": "The plan's profile limit is reached, with current_profiles and profile_limit (Business plans go over it with usage-based billing).\nerror_code `PROFILE_LIMIT_REACHED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "You have reached the limit of 5 profiles for your current plan (Basic)."
+                    },
+                    "error_code": {
+                      "type": "string",
+                      "example": "PROFILE_LIMIT_REACHED"
+                    },
+                    "current_profiles": {
+                      "type": "integer",
+                      "example": 5
+                    },
+                    "profile_limit": {
+                      "type": "integer",
+                      "example": 5
+                    }
+                  }
+                }
+              }
+            }
+          },
           "409": {
-            "description": "A profile with this username already exists.",
+            "description": "A profile with this username already exists (compared without case), also when two requests create it at the same time. The body has no error_code.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "Username already in use"
                 }
               }
             }
@@ -9688,16 +9724,34 @@
                         "facebook",
                         "x",
                         "threads",
+                        "pinterest",
+                        "reddit",
+                        "bluesky",
+                        "google_business",
                         "discord",
-                        "telegram"
+                        "telegram",
+                        "slack",
+                        "mastodon",
+                        "nostr",
+                        "lemmy",
+                        "devto",
+                        "hashnode",
+                        "wordpress",
+                        "whop",
+                        "listmonk",
+                        "twitch"
                       ]
                     },
-                    "description": "Platforms to show for connection. Defaults to all supported platforms."
+                    "description": "Platforms to show for connection. Defaults to every publishing platform; `twitch` (read-only: lists the channel's past broadcasts) only appears when named."
                   },
                   "show_calendar": {
                     "type": "boolean",
                     "description": "Whether to show the calendar view on the connection page.",
                     "default": true
+                  },
+                  "readonly_calendar": {
+                    "type": "boolean",
+                    "description": "Show only a read-only calendar on the connection page (no editing, no account connection)."
                   },
                   "language": {
                     "type": "string",
@@ -9732,6 +9786,15 @@
                   "client_approval": {
                     "type": "boolean",
                     "description": "Not generally available yet (post approvals). true lets the end client approve or reject the pending posts of this profile from the connect page (`/uploadposts/approvals/client`). Stored on the profile; generate again with false to turn it off."
+                  },
+                  "connect_theme": {
+                    "type": "string",
+                    "enum": [
+                      "light",
+                      "dark",
+                      "auto"
+                    ],
+                    "description": "Forces the connection page theme; `auto` (or null) follows the visitor's preference."
                   }
                 }
               }
@@ -9765,7 +9828,19 @@
             }
           },
           "400": {
-            "$ref": "#/components/responses/BadRequest"
+            "description": "Missing username, or an invalid connect_theme, ui_labels or client_approval (true or false; checked while post approvals are on).\nerror_code `invalid_client_approval` for client_approval.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "client_approval must be true or false",
+                  "error_code": "invalid_client_approval"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -11410,7 +11485,7 @@
       "get": {
         "operationId": "getDmConversations",
         "summary": "Get DM conversations (Instagram, Bluesky, Telegram)",
-        "description": "Retrieve the DM conversations of the account connected to the profile, including participants and recent messages. Bluesky (platform=bluesky) needs an app password created with access to direct messages (403 bluesky_dm_scope_missing otherwise), returns at most 25 conversations per page and adds status, unread_count, muted, kind, account and per-message direction, type, attachments, reactions and reply_to. Bluesky also takes kind, lock_status, view (summary: up to 100 per page; requests: experimental) and include (unread_counts, members); group conversations add a group block. Anything Bluesky marks as under development answers with experimental: true (403 bluesky_dm_experimental_disabled while not enabled). Telegram (platform=telegram) lists only the private chats of your own bot, and needs the bot's updates turned on, which is not generally available yet (409 telegram_updates_not_enabled until then).",
+        "description": "Retrieve the DM conversations of the account connected to the profile, including participants and recent messages. Bluesky (platform=bluesky) needs an app password created with access to direct messages (403 bluesky_dm_scope_missing otherwise), returns at most 25 conversations per page and adds status, unread_count, muted, kind, account and per-message direction, type, attachments, reactions and reply_to. Bluesky also takes kind, lock_status, view (summary: up to 100 per page; requests: experimental) and include (unread_counts, members); group conversations add a group block. Anything Bluesky marks as under development answers with experimental: true (403 bluesky_dm_experimental_disabled while not enabled). Telegram (platform=telegram) lists only the private chats of your own bot, and needs the bot's updates turned on with POST /uploadposts/telegram/updates (409 telegram_updates_not_enabled while they are off for that bot). WhatsApp and Messenger conversations are only open to a limited set of accounts while Meta reviews the permissions, and are not described here yet.",
         "tags": [
           "Instagram Interactions"
         ],
@@ -11697,7 +11772,7 @@
       "post": {
         "operationId": "sendDm",
         "summary": "Send a DM (Instagram, Bluesky, Telegram)",
-        "description": "Instagram: send a direct message to a user by IGSID; the recipient must have messaged your account first (24-hour messaging window policy enforced by Meta). Bluesky: recipient_id is a handle, DID or bsky.app profile link (or pass conversation_id); text up to 1000 characters (400 bluesky_message_too_long), up to 10 @handle mentions linked, one shared Bluesky post as attachment, reply_to, and sender_action (mark_seen, react, unreact, delete, accept, mute, unmute, leave). Buttons and templates are refused with 400. 504 bluesky_send_unconfirmed means the DM may have gone out: read the conversation before sending again. Telegram (your own bot): recipient_id is the numeric chat id; text up to 4096 characters, attachments by url or media_id (file_id), inline buttons (url or callback_data), reply_to, location, contact, business_connection_id (send as your Business account), checklist (Business), and sender_action (typing and the other chat actions, react, unreact, delete, mark_read and edit_checklist in Business chats). 403 telegram_recipient_not_started / telegram_recipient_blocked; 504 telegram_send_unconfirmed: it may have been sent.",
+        "description": "Instagram: send a direct message to a user by IGSID; the recipient must have messaged your account first (24-hour messaging window policy enforced by Meta). Bluesky: recipient_id is a handle, DID or bsky.app profile link (or pass conversation_id); text up to 1000 characters (400 bluesky_message_too_long), up to 10 @handle mentions linked, one shared Bluesky post as attachment, reply_to, and sender_action (mark_seen, react, unreact, delete, accept, mute, unmute, leave). Buttons and templates are refused with 400. 504 bluesky_send_unconfirmed means the DM may have gone out: read the conversation before sending again. Telegram (your own bot): recipient_id is the numeric chat id; text up to 4096 characters, attachments by url or media_id (file_id), inline buttons (url or callback_data), reply_to, location, contact, business_connection_id (send as your Business account), checklist (Business), and sender_action (typing and the other chat actions, react, unreact, delete, mark_read and edit_checklist in Business chats). 403 telegram_recipient_not_started / telegram_recipient_blocked; 504 telegram_send_unconfirmed: it may have been sent. WhatsApp and Messenger DMs are only open to a limited set of accounts while Meta reviews the permissions, and are not described here yet.",
         "tags": [
           "Instagram Interactions"
         ],
@@ -12199,7 +12274,7 @@
             }
           },
           "409": {
-            "description": "Nowhere to send it: reason webhook_removed, event_unsubscribed or blocked_url.",
+            "description": "Nowhere to send it, or it cannot be sent again (a removed webhook or subscription, a disabled subscription, a blocked URL or a real-time event that is not kept).\nreason `webhook_removed`, `event_unsubscribed`, `blocked_url`, `subscription_removed`, `subscription_disabled` or `not_redeliverable`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12214,7 +12289,7 @@
             }
           },
           "503": {
-            "description": "Redelivery temporarily disabled.",
+            "description": "Redelivery temporarily disabled, or webhook subscriptions switched off for a delivery of a subscription.\nreason `delivery_log_disabled` or `subscriptions_disabled`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -62838,6 +62913,10 @@
               ]
             },
             "description": "Connected social media accounts keyed by platform name."
+          },
+          "client_approval": {
+            "type": "boolean",
+            "description": "Only in GET /uploadposts/users/validate-jwt, while post approvals are on: true when this connection link may approve or reject the profile's pending posts (the link was generated with client_approval: true and the profile still has it on)."
           }
         }
       },

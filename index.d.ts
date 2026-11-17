@@ -2564,7 +2564,7 @@ declare module 'upload-post' {
   /** Answer of `getUserProfile`. */
   export interface GetUserProfileResponse extends ApiResponse {
     success?: boolean;
-    profile?: { username?: string; display_name?: string; created_at?: string; social_accounts?: Record<string, any>; [key: string]: any };
+    profile?: { username?: string; display_name?: string; created_at?: string; social_accounts?: Record<string, any>; client_approval?: boolean; [key: string]: any };
   }
 
   /** Options of `renameUserProfile` (`PATCH /api/uploadposts/users/{username}`). Any other API field is sent as well. */
@@ -5294,6 +5294,8 @@ declare module 'upload-post' {
        * Returned back in the `profile` object of validateJwt.
        */
       uiLabels?: Record<string, string>;
+      /** Force the connection page theme; `'auto'` (or `null`) follows the visitor's preference again. */
+      connectTheme?: 'light' | 'dark' | 'auto' | null;
       /**
        * Not generally available yet (post approvals). `true` lets the end client
        * approve or reject the pending posts of this profile from the connect page

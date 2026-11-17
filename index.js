@@ -1719,6 +1719,7 @@ export class UploadPost {
    * @param {string} [options.connectDescription] - Custom description for the connection page
    * @param {('en'|'es'|'de'|'fr'|'pt'|'pl'|'tr')} [options.language] - Force the connection page language for this profile. When omitted, the page auto-detects the visitor's browser language and falls back to English.
    * @param {Object.<string, string>} [options.uiLabels] - Flat map of i18n dot-path keys to replacement strings, e.g. `{ 'connect.title': 'Link your accounts' }`. Max 100 entries; keys must match `^[a-zA-Z0-9_.]+$` and values are strings of up to 300 characters. Returned back in the `profile` object of validateJwt.
+   * @param {('light'|'dark'|'auto'|null)} [options.connectTheme] - Force the connection page theme; `'auto'` (or `null`) follows the visitor's preference again.
    * @param {boolean} [options.clientApproval] - Not generally available yet (post approvals). `true` lets the end client approve or reject the pending posts of this profile from the connect page (`listClientPostApprovals`, `approveClientPostApproval`, `rejectClientPostApproval` with this JWT). Stored on the profile; generate again with `false` to turn it off.
    * @returns {Promise<Object>} JWT and connection URL
    */
@@ -1734,6 +1735,7 @@ export class UploadPost {
     if (options.connectDescription) body.connect_description = options.connectDescription;
     if (options.language) body.language = options.language;
     if (options.uiLabels) body.ui_labels = options.uiLabels;
+    if (options.connectTheme !== undefined) body.connect_theme = options.connectTheme;
     if (options.clientApproval !== undefined) body.client_approval = options.clientApproval;
     return this._request('/uploadposts/users/generate-jwt', 'POST', body);
   }
