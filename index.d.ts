@@ -5297,6 +5297,13 @@ declare module 'upload-post' {
       /** Force the connection page theme; `'auto'` (or `null`) follows the visitor's preference again. */
       connectTheme?: 'light' | 'dark' | 'auto' | null;
       /**
+       * `true` mints the link without changing the profile's saved settings (by
+       * default every setting not sent here is cleared). `platforms` then applies
+       * to this link only. Cannot be combined with the other options, which are
+       * stored on the profile (400 `preserve_settings_conflict`).
+       */
+      preserveSettings?: boolean;
+      /**
        * Not generally available yet (post approvals). `true` lets the end client
        * approve or reject the pending posts of this profile from the connect page
        * (`listClientPostApprovals` and friends, called with this JWT). Stored on
