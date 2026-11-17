@@ -402,7 +402,8 @@ def npm_types(ops):
             name = npm_response_type(op) + (str(i + 1) if variants else '')
             what = one_line(shape.get('description') or shape.get('title') or '', 160)
             label = f'Answer of `{op["js"]}`' + (f' (shape {i + 1}{": " + what if what else ""})' if variants else '')
-            out.append(f'  /** {label.replace("*/", "*\\/")}. */\n'
+            label = label.replace('*/', '*\\/')
+            out.append(f'  /** {label}. */\n'
                        f'  export interface {name} extends ApiResponse {{\n' + ''.join(rbody) + '  }\n\n')
             names.append(name)
         if not names:
