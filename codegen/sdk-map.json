@@ -85,6 +85,7 @@
     "getGoogleBusinessGoogleUpdatedLocationInfo": "getGoogleBusinessGoogleUpdates",
     "getGoogleBusinessGoogleUpdatedLodging": "getGoogleBusinessLodgingGoogleUpdated",
     "getGoogleBusinessLocationInfo": "getGoogleBusinessLocationInfo",
+    "getGoogleBusinessLocations": "getGoogleBusinessLocations",
     "getGoogleBusinessLodging": "getGoogleBusinessLodging",
     "getGoogleBusinessMedia": "getGoogleBusinessMedia",
     "getGoogleBusinessPerformance": "getGoogleBusinessPerformance",
@@ -138,7 +139,6 @@
     "listBlueskyActivitySubscriptions": "getBlueskyActivitySubscriptions",
     "listBlueskyDrafts": "listBlueskyDrafts",
     "listBlueskyNotifications": "getBlueskyNotifications",
-    "listGoogleBusinessAccountLocations": "listGoogleBusinessLocations",
     "listGoogleBusinessAccounts": "listGoogleBusinessAccounts",
     "listGoogleBusinessAdmins": "listGoogleBusinessAdmins",
     "listGoogleBusinessAvailableAttributes": "getGoogleBusinessAvailableAttributes",
@@ -146,7 +146,7 @@
     "listGoogleBusinessCustomerMedia": "listGoogleBusinessCustomerMedia",
     "listGoogleBusinessInvitations": "listGoogleBusinessInvitations",
     "listGoogleBusinessLocationChoices": "getGoogleBusinessPinnedLocation",
-    "listGoogleBusinessLocations": "getGoogleBusinessLocations",
+    "listGoogleBusinessLocations": "listGoogleBusinessLocations",
     "listGoogleBusinessMedia": "listGoogleBusinessMedia",
     "listGoogleBusinessPlaceActionTypes": "getGoogleBusinessPlaceActionTypes",
     "listGoogleBusinessPlaceActions": "listGoogleBusinessPlaceActions",
@@ -289,7 +289,9 @@
     "updateGoogleBusinessAttributesPost": "Deprecated POST alias of PATCH /uploadposts/google-business/attributes; updateGoogleBusinessAttributes covers it.",
     "updateGoogleBusinessLocationInfoPost": "Deprecated POST alias of PATCH /uploadposts/google-business/location-info; updateGoogleBusinessLocationInfo covers it.",
     "deleteGoogleBusinessLocationPost": "Deprecated POST alias of DELETE /uploadposts/google-business/locations/delete; deleteGoogleBusinessLocation covers it.",
-    "replyToGoogleBusinessReviewPost": "Deprecated POST alias of PUT /uploadposts/google-business/reviews/reply; replyToGoogleBusinessReview covers it."
+    "replyToGoogleBusinessReviewPost": "Deprecated POST alias of PUT /uploadposts/google-business/reviews/reply; replyToGoogleBusinessReview covers it.",
+    "batchGetGoogleBusinessReviewsPost": "Deprecated POST alias of GET /uploadposts/google-business/reviews/batch; batchGetGoogleBusinessReviews covers it.",
+    "updateGoogleBusinessNotificationSettingsPatch": "Deprecated PATCH alias of PUT /uploadposts/google-business/notifications; updateGoogleBusinessNotificationSettings covers it."
   },
   "names": {},
   "overrides": {}

@@ -48,6 +48,12 @@ declare module 'upload-post' {
     /** Post title/caption. Required for YouTube, Reddit, and text posts. Optional for TikTok, Instagram, Facebook, LinkedIn, X, Threads, Bluesky, Pinterest. */
     title?: string;
     /**
+     * Images attached to the first comment (Reddit; not on scheduled or queued
+     * posts): local paths, Buffers or URLs. The API takes files only, so URLs are
+     * downloaded by the SDK and sent as files.
+     */
+    firstCommentMedia?: string | Buffer | Array<string | Buffer>;
+    /**
      * Key the API uses to collapse duplicate uploads within a 24-hour window.
      * Pass the same value when retrying a failed upload, otherwise the retry publishes a second post.
      */
@@ -2182,7 +2188,10 @@ declare module 'upload-post' {
 
   /** Options of `createPinterestBoard` (`POST /api/uploadposts/pinterest/boards`). Any other API field is sent as well. */
   export interface CreatePinterestBoardOptions extends ApiParams {
-    user: string;
+    /** Profile username (alias user); default the first profile with Pinterest. */
+    profile?: string;
+    /** Alias of profile. */
+    user?: string;
     name: string;
     description?: string;
     /** SECRET is rejected (400). */
@@ -2192,7 +2201,7 @@ declare module 'upload-post' {
   /** Answer of `createPinterestBoard`. */
   export interface CreatePinterestBoardResponse extends ApiResponse {
     success?: boolean;
-    board?: Record<string, any>;
+    board?: { id?: string; name?: string; privacy?: string; description?: string; [key: string]: any };
   }
 
   /** Options of `queryYoutubeAnalytics` (`GET /api/uploadposts/youtube/analytics/query`). Any other API field is sent as well. */
@@ -2390,8 +2399,10 @@ declare module 'upload-post' {
 
   /** Options of `getThreadsPublishingLimit` (`GET /api/uploadposts/threads/publishing_limit`). Any other API field is sent as well. */
   export interface GetThreadsPublishingLimitOptions extends ApiParams {
-    /** Profile username. */
-    user: string;
+    /** Profile username (or use profile). */
+    user?: string;
+    /** Alias of user. */
+    profile?: string;
     /** Skip the cache. */
     refresh?: boolean;
   }
@@ -2426,14 +2437,18 @@ declare module 'upload-post' {
   export interface CreatePinterestBoardSectionOptions extends ApiParams {
     /** Board id. */
     boardId: string;
-    user: string;
+    /** Profile username (alias user); default the first profile with Pinterest. */
+    profile?: string;
+    /** Alias of profile. */
+    user?: string;
     name: string;
   }
 
   /** Answer of `createPinterestBoardSection`. */
   export interface CreatePinterestBoardSectionResponse extends ApiResponse {
     success?: boolean;
-    section?: Record<string, any>;
+    board_id?: string;
+    section?: { id?: string; name?: string; [key: string]: any };
   }
 
   /** Options of `getFacebookPageInfo` (`GET /api/uploadposts/facebook/page-info`). Any other API field is sent as well. */
@@ -2847,6 +2862,8 @@ declare module 'upload-post' {
     message?: string;
     email?: string;
     plan?: string;
+    /** AI Shorts analyses (POST /uploadposts/analyze-shorts) for the current 30-day window. Read-only: calling this endpoint never uses one. Same rules as the analysis itself. null only if the account data cannot be read. */
+    analyze_shorts?: { limit?: number; used?: number; remaining?: number; resets_at?: string; [key: string]: any };
   }
 
   /** Options of `startOauthConnection` (`POST /api/uploadposts/oauth/{platform}/start`). Any other API field is sent as well. */
@@ -2946,8 +2963,8 @@ declare module 'upload-post' {
   export interface CreateWebhookSubscriptionOptions extends ApiParams {
     /** Public https URL. */
     url: string;
-    /** Event names (dots are accepted: social_account.connected). Also youtube_video_published / youtube_video_updated and the post approval events (post_approval_requested, post_approved, post_rejected, post_approval_expired)... */
-    events: ("upload_completed" | "social_account_connected" | "social_account_disconnected" | "social_account_reauth_required" | "dm_received" | "comment_received" | "telegram_update" | "review_received" | "review_updated" | "customer_media_received" | "listing_google_update" | "listing_duplicate" | "listing_control_changed" | "post_analytics_updated" | (string & {}))[];
+    /** Event names. youtube_video_* only while YouTube push is on and post_approval_* only while post approvals are on; otherwise 400 invalid_events with allowed_events. */
+    events: ("upload_completed" | "social_account_connected" | "social_account_disconnected" | "social_account_reauth_required" | "dm_received" | "comment_received" | "review_received" | "review_updated" | "customer_media_received" | "listing_google_update" | "listing_duplicate" | "listing_control_changed" | "telegram_update" | "post_analytics_updated" | "youtube_video_published" | "youtube_video_updated" | "post_approval_requested" | "post_approved" | "post_rejected" | "post_approval_expired" | (string & {}))[];
     /** Only events of this profile. */
     profileUsername?: string;
     source?: string;
@@ -4011,68 +4028,6 @@ declare module 'upload-post' {
     google_setting_kept?: boolean;
     webhook_events_to_subscribe?: string[];
     notice?: string;
-  }
-
-  /** Options of `updateGoogleBusinessNotificationSettingsPatch` (`PATCH /api/uploadposts/google-business/notifications`). Any other API field is sent as well. */
-  export interface UpdateGoogleBusinessNotificationSettingsPatchOptions extends ApiParams {
-    /** Profile username with Google Business connected (alias `profile`). */
-    user: string;
-    /** Google account, `accounts/{id}` or a bare id. Default: the account saved when Google Business was connected. */
-    account?: string;
-    /** `true` (default) or `false`. */
-    enabled?: boolean;
-    /** Types to receive (alias `notification_types`). Default: all six. */
-    types?: ("GOOGLE_UPDATE" | "NEW_REVIEW" | "UPDATED_REVIEW" | "NEW_CUSTOMER_MEDIA" | "DUPLICATE_LOCATION" | "VOICE_OF_MERCHANT_UPDATED" | (string & {}))[];
-    /** Must be `true`: this replaces any other tool's setting for this Google account. */
-    confirm: boolean;
-    /** `true` to replace a setting that belongs to another tool. */
-    force?: boolean;
-    /** With `enabled: false` and `force: true` on another tool's setting: switch that tool's notifications off too. */
-    confirmOtherTool?: boolean;
-  }
-
-  /** Answer of `updateGoogleBusinessNotificationSettingsPatch`. */
-  export interface UpdateGoogleBusinessNotificationSettingsPatchResponse extends ApiResponse {
-    success?: boolean;
-    account?: string;
-    /** Google's NotificationSetting (`name`, `notificationTypes`, `pubsubTopic`). */
-    notification_setting?: Record<string, any>;
-    active?: boolean;
-    managed_by_upload_post?: boolean;
-    other_tool_configured?: boolean;
-    available_types?: string[];
-    /** Google notification type -> webhook event. */
-    webhook_events?: Record<string, any>;
-    changed?: boolean;
-    google_setting_kept?: boolean;
-    webhook_events_to_subscribe?: string[];
-    notice?: string;
-  }
-
-  /** Options of `batchGetGoogleBusinessReviewsPost` (`POST /api/uploadposts/google-business/reviews/batch`). Any other API field is sent as well. */
-  export interface BatchGetGoogleBusinessReviewsPostOptions extends ApiParams {
-    /** Profile username with Google Business connected (alias `profile`). */
-    user: string;
-    /** Comma-separated list or JSON array (bare ids, `locations/{id}` or full paths). Default: the account's selected location. */
-    locationIds?: string | string[];
-    /** 1-50 (alias `pageSize`). */
-    pageSize?: number;
-    /** Cursor from `nextPageToken` (alias `pageToken`). */
-    pageToken?: string;
-    /** `updateTime desc` (default), `rating` or `rating desc`; shortcuts `newest`, `lowest`, `highest`. Alias `orderBy`. */
-    orderBy?: string;
-    /** `true` skips reviews without text (deprecated by Google). */
-    ignoreRatingOnlyReviews?: boolean;
-  }
-
-  /** Answer of `batchGetGoogleBusinessReviewsPost`. */
-  export interface BatchGetGoogleBusinessReviewsPostResponse extends ApiResponse {
-    success?: boolean;
-    /** Full paths used. */
-    locations?: string[];
-    /** Each item carries its location and the review. */
-    locationReviews?: (Record<string, any>)[];
-    nextPageToken?: string;
   }
 
   /** Options of `startGoogleBusinessVerification` (`POST /api/uploadposts/google-business/verification/start`). Any other API field is sent as well. */
@@ -7038,6 +6993,8 @@ declare module 'upload-post' {
     /**
      * Send a gift from the bot's Stars.
      *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_stars_spend_disabled` until the feature is available.
+     *
      * sendGift. Spends the bot's Stars. Requires confirm=true and max_star_count (checked against the current price).
      *
      * `POST /api/uploadposts/telegram/gifts`
@@ -7046,6 +7003,8 @@ declare module 'upload-post' {
 
     /**
      * Gift Telegram Premium from the bot's Stars.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_stars_spend_disabled` until the feature is available.
      *
      * Spends the bot's Stars.
      *
@@ -7074,6 +7033,8 @@ declare module 'upload-post' {
     /**
      * Turn Telegram updates on or off.
      *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_updates_unavailable` until the feature is available.
+     *
      * Opt-in per bot. A webhook that is not Upload-Post's is never replaced without replace_existing_webhook=true (409 telegram_webhook_in_use otherwise). With no webhook, the answer warns that a getUpdates integration stops receiving.
      *
      * `POST /api/uploadposts/telegram/updates`
@@ -7092,6 +7053,8 @@ declare module 'upload-post' {
     /**
      * Telegram Business connections.
      *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
      * Connections of the bot with Telegram Business accounts (rights, enabled).
      *
      * `GET /api/uploadposts/telegram/business-connections`
@@ -7100,6 +7063,8 @@ declare module 'upload-post' {
 
     /**
      * Telegram Business account.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
      *
      * The connected account.
      *
@@ -7110,6 +7075,8 @@ declare module 'upload-post' {
     /**
      * Update the Telegram Business profile.
      *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
      * first_name/last_name, username, bio, photo (multipart or media_url, is_public), remove_photo, gift_settings.
      *
      * `PATCH /api/uploadposts/telegram/business-profile`
@@ -7118,6 +7085,8 @@ declare module 'upload-post' {
 
     /**
      * Post a Telegram story.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
      *
      * postStory on behalf of the Business account. Photos 1080x1920 up to 10 MB; videos 720x1280 H.265 up to 30 MB, 60 s.
      *
@@ -7128,6 +7097,8 @@ declare module 'upload-post' {
     /**
      * Edit a Telegram story.
      *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
      * editStory.
      *
      * `PATCH /api/uploadposts/telegram/business-stories`
@@ -7136,6 +7107,8 @@ declare module 'upload-post' {
 
     /**
      * Delete a Telegram story.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
      *
      * deleteStory.
      *
@@ -7146,6 +7119,8 @@ declare module 'upload-post' {
     /**
      * Repost a Telegram story.
      *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
      * repostStory from another Business account of the same bot.
      *
      * `POST /api/uploadposts/telegram/business-stories/repost`
@@ -7154,6 +7129,8 @@ declare module 'upload-post' {
 
     /**
      * Telegram Business gifts.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
      *
      * getBusinessAccountGifts with Telegram's filters.
      *
@@ -7164,6 +7141,8 @@ declare module 'upload-post' {
     /**
      * Convert, upgrade, transfer or delete a gift.
      *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
      * Irreversible: requires confirm=true and an idempotency_key (a repeat with the same key returns the first answer).
      *
      * `POST /api/uploadposts/telegram/business-gifts`
@@ -7173,6 +7152,8 @@ declare module 'upload-post' {
     /**
      * Telegram Business Stars balance.
      *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
      * getBusinessAccountStarBalance.
      *
      * `GET /api/uploadposts/telegram/business-stars`
@@ -7181,6 +7162,8 @@ declare module 'upload-post' {
 
     /**
      * Move Stars to the bot.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
      *
      * transferBusinessAccountStars (1-10000). Requires confirm=true and an idempotency_key.
      *
@@ -7274,6 +7257,8 @@ declare module 'upload-post' {
     /**
      * Create a Pinterest board.
      *
+     * Without a profile the first profile of the account with a Pinterest account is used.
+     *
      * `POST /api/uploadposts/pinterest/boards`
      */
     createPinterestBoard(options: CreatePinterestBoardOptions): Promise<CreatePinterestBoardResponse>;
@@ -7281,7 +7266,7 @@ declare module 'upload-post' {
     /**
      * Run a YouTube Analytics channel report.
      *
-     * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. reports.query for the profile's channel with any dimensions, metrics, filters and sort of YouTube's channel reports. Validated against the official report tables before it reaches YouTube (invalid combinations: 400 youtube_analytics_unsupported_query with hints, nothing spent). Revenue and ad metrics are not available. Answers are cached (12 h; 7 days for ranges that ended more than 5 days ago). Each uncached call counts 1 request of the account's daily Analytics allowance. Data has a 48-72 h delay.
+     * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. reports.query for the profile's channel with any dimensions, metrics, filters and sort of YouTube's channel reports. Validated against the official report tables before it reaches YouTube (invalid combinations: 400 youtube_analytics_unsupported_query with hints, nothing spent). Revenue and ad metrics are not available. Answers are cached (12 h; 7 days for ranges that ended more than 5 days ago). Each uncached call counts 1 request of the account's daily Analytics allowance. Data has a 48-72 h delay.
      *
      * `GET /api/uploadposts/youtube/analytics/query`
      */
@@ -7290,7 +7275,7 @@ declare module 'upload-post' {
     /**
      * YouTube Analytics report catalog.
      *
-     * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. The 47 YouTube channel reports with their dimensions, metrics, filters, sort options and row limits. Does not call YouTube.
+     * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. The 47 YouTube channel reports with their dimensions, metrics, filters, sort options and row limits. Does not call YouTube.
      *
      * `GET /api/uploadposts/youtube/analytics/reports`
      */
@@ -7299,7 +7284,7 @@ declare module 'upload-post' {
     /**
      * List YouTube Analytics groups.
      *
-     * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. groups.list of the channel (mine=true, or ids). Cached 30 minutes; 1 request of the Analytics allowance per uncached call.
+     * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. groups.list of the channel (mine=true, or ids). Cached 30 minutes; 1 request of the Analytics allowance per uncached call.
      *
      * `GET /api/uploadposts/youtube/analytics/groups`
      */
@@ -7308,7 +7293,7 @@ declare module 'upload-post' {
     /**
      * List the items of a YouTube Analytics group.
      *
-     * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. groupItems.list. Cached 30 minutes.
+     * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. groupItems.list. Cached 30 minutes.
      *
      * `GET /api/uploadposts/youtube/analytics/groups/{group_id}/items`
      */
@@ -7316,6 +7301,8 @@ declare module 'upload-post' {
 
     /**
      * Daily allowance of YouTube Analytics and bulk reports.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.
      *
      * The caller's own usage today of the Analytics and bulk reports allowances. While Analytics and bulk reports are not generally available yet, each service shows enabled: false.
      *
@@ -7326,7 +7313,7 @@ declare module 'upload-post' {
     /**
      * List YouTube bulk report types.
      *
-     * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. reportTypes.list for the channel (one page, cached 24 h). can_create_job marks the channel/playlist types that can be scheduled.
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. reportTypes.list for the channel (one page, cached 24 h). can_create_job marks the channel/playlist types that can be scheduled.
      *
      * `GET /api/uploadposts/youtube/reporting/report-types`
      */
@@ -7335,7 +7322,7 @@ declare module 'upload-post' {
     /**
      * List YouTube reporting jobs.
      *
-     * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.list of the channel (one page). used_by_upload_post marks the job behind Upload-Post's thumbnail impressions.
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.list of the channel (one page). used_by_upload_post marks the job behind Upload-Post's thumbnail impressions.
      *
      * `GET /api/uploadposts/youtube/reporting/jobs`
      */
@@ -7344,7 +7331,7 @@ declare module 'upload-post' {
     /**
      * Create a YouTube reporting job.
      *
-     * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.create: YouTube then generates one CSV per day (first ones within ~48 h, covering the previous 30 days). One job per report type and up to 20 per channel.
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.create: YouTube then generates one CSV per day (first ones within ~48 h, covering the previous 30 days). One job per report type and up to 20 per channel.
      *
      * `POST /api/uploadposts/youtube/reporting/jobs`
      */
@@ -7353,7 +7340,7 @@ declare module 'upload-post' {
     /**
      * Get a YouTube reporting job.
      *
-     * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.get.
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.get.
      *
      * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}`
      */
@@ -7362,7 +7349,7 @@ declare module 'upload-post' {
     /**
      * Delete a YouTube reporting job.
      *
-     * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.delete: stops the daily reports. Requires confirm: true. A channel_reach_basic_a1 job (used by Upload-Post for thumbnail impressions) cannot be deleted (409 youtube_reporting_job_in_use). 502 youtube_write_outcome_unknown: list the jobs to check.
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.delete: stops the daily reports. Requires confirm: true. A channel_reach_basic_a1 job (used by Upload-Post for thumbnail impressions) cannot be deleted (409 youtube_reporting_job_in_use). 502 youtube_write_outcome_unknown: list the jobs to check.
      *
      * `DELETE /api/uploadposts/youtube/reporting/jobs/{job_id}`
      */
@@ -7371,7 +7358,7 @@ declare module 'upload-post' {
     /**
      * List the reports of a YouTube reporting job.
      *
-     * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.list (one page). Each item has download_path.
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.list (one page). Each item has download_path.
      *
      * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports`
      */
@@ -7380,7 +7367,7 @@ declare module 'upload-post' {
     /**
      * Get a YouTube report.
      *
-     * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.get (metadata).
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.get (metadata).
      *
      * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}`
      */
@@ -7389,7 +7376,7 @@ declare module 'upload-post' {
     /**
      * Download a YouTube report (CSV).
      *
-     * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. The report's CSV file, streamed. Up to 100 MB; up to 2 downloads at a time per account. Counts 2 requests of the bulk reports allowance.
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. The report's CSV file, streamed. Up to 100 MB; up to 2 downloads at a time per account. Counts 2 requests of the bulk reports allowance.
      *
      * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}/download`
      */
@@ -7398,7 +7385,7 @@ declare module 'upload-post' {
     /**
      * YouTube new video notifications status.
      *
-     * Not generally available yet: answers 503 youtube_feature_disabled until it is enabled. State of the push subscription of the profile's channel (null when off). No YouTube quota.
+     * **Not generally available yet.** Answers 503 youtube_feature_disabled until it is enabled. State of the push subscription of the profile's channel (null when off). No YouTube quota.
      *
      * `GET /api/uploadposts/youtube/push`
      */
@@ -7407,7 +7394,7 @@ declare module 'upload-post' {
     /**
      * Turn on YouTube new video notifications.
      *
-     * Not generally available yet: answers 503 youtube_feature_disabled until it is enabled. Requires a webhook listing youtube_video_published and/or youtube_video_updated. No YouTube quota.
+     * **Not generally available yet.** Answers 503 youtube_feature_disabled until it is enabled. Requires a webhook listing youtube_video_published and/or youtube_video_updated. No YouTube quota.
      *
      * `POST /api/uploadposts/youtube/push`
      */
@@ -7416,7 +7403,7 @@ declare module 'upload-post' {
     /**
      * Turn off YouTube new video notifications.
      *
-     * Not generally available yet: answers 503 youtube_feature_disabled until it is enabled. No YouTube quota.
+     * **Not generally available yet.** Answers 503 youtube_feature_disabled until it is enabled. No YouTube quota.
      *
      * `DELETE /api/uploadposts/youtube/push`
      */
@@ -7434,9 +7421,11 @@ declare module 'upload-post' {
     /**
      * Threads publishing quota.
      *
+     * Send user or profile (one is required: 400 without both).
+     *
      * `GET /api/uploadposts/threads/publishing_limit`
      */
-    getThreadsPublishingLimit(options: GetThreadsPublishingLimitOptions): Promise<GetThreadsPublishingLimitResponse>;
+    getThreadsPublishingLimit(options?: GetThreadsPublishingLimitOptions): Promise<GetThreadsPublishingLimitResponse>;
 
     /**
      * List the sections of a Pinterest board.
@@ -7447,6 +7436,8 @@ declare module 'upload-post' {
 
     /**
      * Create a section in a Pinterest board.
+     *
+     * Without a profile the first profile of the account with a Pinterest account is used.
      *
      * `POST /api/uploadposts/pinterest/boards/{board_id}/sections`
      */
@@ -7814,7 +7805,9 @@ declare module 'upload-post' {
     /**
      * Delete the Bluesky chat account.
      *
-     * **Not generally available yet: answers `403` `bluesky_chat_delete_disabled`.**
+     * **Not generally available yet.** Answers `403` `bluesky_chat_delete_disabled`.
+     *
+     * Deletes every conversation and message of the account's Bluesky chat account (not the Bluesky account). Needs confirm: true and confirm_handle; not enabled yet (403 bluesky_chat_delete_disabled). Account owner only; every attempt is recorded.
      *
      * `POST /api/uploadposts/dms/bluesky/account/delete`
      */
@@ -7823,7 +7816,9 @@ declare module 'upload-post' {
     /**
      * Bluesky groups shared with someone.
      *
-     * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
      *
      * `GET /api/uploadposts/dms/bluesky/groups`
      */
@@ -7832,7 +7827,9 @@ declare module 'upload-post' {
     /**
      * Create a Bluesky group chat.
      *
-     * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Members get a request to accept. Every invited member counts as one DM (all or nothing); at most 10 members by handle per request. Idempotent for 10 minutes per idempotency_key (or name + members). Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
      *
      * `POST /api/uploadposts/dms/bluesky/groups`
      */
@@ -7841,7 +7838,9 @@ declare module 'upload-post' {
     /**
      * Rename, lock or unlock a Bluesky group.
      *
-     * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Owner only. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
      *
      * `PATCH /api/uploadposts/dms/bluesky/groups/{conversation_id}`
      */
@@ -7850,7 +7849,9 @@ declare module 'upload-post' {
     /**
      * Bluesky group members.
      *
-     * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
      *
      * `GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
      */
@@ -7859,7 +7860,9 @@ declare module 'upload-post' {
     /**
      * Add members to a Bluesky group.
      *
-     * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Owner only. One DM of quota per added member. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
      *
      * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
      */
@@ -7868,7 +7871,9 @@ declare module 'upload-post' {
     /**
      * Remove members from a Bluesky group.
      *
-     * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Owner only. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
      *
      * `DELETE /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
      */
@@ -7877,7 +7882,9 @@ declare module 'upload-post' {
     /**
      * Manage a Bluesky group join link.
      *
-     * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * action: create, edit, enable or disable. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
      *
      * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-link`
      */
@@ -7886,7 +7893,9 @@ declare module 'upload-post' {
     /**
      * Pending requests to join a Bluesky group.
      *
-     * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Owner only. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
      *
      * `GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests`
      */
@@ -7895,7 +7904,9 @@ declare module 'upload-post' {
     /**
      * Answer or withdraw a Bluesky join request.
      *
-     * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * action: approve / reject (with member), mark_read, or withdraw (your own request). Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
      *
      * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests`
      */
@@ -7904,7 +7915,9 @@ declare module 'upload-post' {
     /**
      * Preview Bluesky join links.
      *
-     * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Up to 50 codes; status active, disabled or invalid. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
      *
      * `GET /api/uploadposts/dms/bluesky/join-links`
      */
@@ -7913,7 +7926,9 @@ declare module 'upload-post' {
     /**
      * Ask to join a Bluesky group.
      *
-     * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * status is joined or pending. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
      *
      * `POST /api/uploadposts/dms/bluesky/join-links`
      */
@@ -7933,7 +7948,9 @@ declare module 'upload-post' {
     /**
      * Follow, block or mute (one target per call).
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * follow/unfollow (daily limit), block/unblock, mute/unmute (only_reposts, only_quoteposts), mute_list/unmute_list, block_list/unblock_list (moderation lists), mute_thread/unmute_thread.
      *
      * `POST /api/uploadposts/bluesky/graph`
      */
@@ -7942,7 +7959,9 @@ declare module 'upload-post' {
     /**
      * The account's lists.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * getLists for the account.
      *
      * `GET /api/uploadposts/bluesky/lists`
      */
@@ -7951,7 +7970,9 @@ declare module 'upload-post' {
     /**
      * Create a list.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Curated, moderation or reference list.
      *
      * `POST /api/uploadposts/bluesky/lists`
      */
@@ -7960,7 +7981,9 @@ declare module 'upload-post' {
     /**
      * A list and its members.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * getList.
      *
      * `GET /api/uploadposts/bluesky/lists/{list_id}`
      */
@@ -7969,7 +7992,9 @@ declare module 'upload-post' {
     /**
      * Update a list.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Merges the fields sent.
      *
      * `PATCH /api/uploadposts/bluesky/lists/{list_id}`
      */
@@ -7978,7 +8003,9 @@ declare module 'upload-post' {
     /**
      * Delete a list and its members.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Needs confirm=true.
      *
      * `DELETE /api/uploadposts/bluesky/lists/{list_id}`
      */
@@ -7987,7 +8014,9 @@ declare module 'upload-post' {
     /**
      * List members.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * getList items.
      *
      * `GET /api/uploadposts/bluesky/lists/{list_id}/members`
      */
@@ -7996,7 +8025,9 @@ declare module 'upload-post' {
     /**
      * Add a member.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * One account per call.
      *
      * `POST /api/uploadposts/bluesky/lists/{list_id}/members`
      */
@@ -8005,7 +8036,9 @@ declare module 'upload-post' {
     /**
      * Remove a member.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * One account per call.
      *
      * `DELETE /api/uploadposts/bluesky/lists/{list_id}/members`
      */
@@ -8014,7 +8047,9 @@ declare module 'upload-post' {
     /**
      * Ask not to appear in a reference list.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * referencelistoptout.
      *
      * `POST /api/uploadposts/bluesky/lists/opt-out`
      */
@@ -8023,7 +8058,7 @@ declare module 'upload-post' {
     /**
      * Withdraw the opt-out.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
      *
      * `DELETE /api/uploadposts/bluesky/lists/opt-out`
      */
@@ -8032,7 +8067,7 @@ declare module 'upload-post' {
     /**
      * The account's starter packs.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
      *
      * `GET /api/uploadposts/bluesky/starter-packs`
      */
@@ -8041,7 +8076,7 @@ declare module 'upload-post' {
     /**
      * Create a starter pack.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
      *
      * `POST /api/uploadposts/bluesky/starter-packs`
      */
@@ -8050,7 +8085,7 @@ declare module 'upload-post' {
     /**
      * A starter pack.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
      *
      * `GET /api/uploadposts/bluesky/starter-packs/{pack_id}`
      */
@@ -8059,7 +8094,9 @@ declare module 'upload-post' {
     /**
      * Update a starter pack.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * name, description, feeds.
      *
      * `PATCH /api/uploadposts/bluesky/starter-packs/{pack_id}`
      */
@@ -8068,7 +8105,9 @@ declare module 'upload-post' {
     /**
      * Delete a starter pack.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Needs confirm=true; delete_list=true also deletes its list.
      *
      * `DELETE /api/uploadposts/bluesky/starter-packs/{pack_id}`
      */
@@ -8077,7 +8116,7 @@ declare module 'upload-post' {
     /**
      * Feeds declared by the account.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
      *
      * `GET /api/uploadposts/bluesky/feeds`
      */
@@ -8086,7 +8125,9 @@ declare module 'upload-post' {
     /**
      * Declare a custom feed.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Points to a feed generator service run by someone else.
      *
      * `POST /api/uploadposts/bluesky/feeds`
      */
@@ -8095,7 +8136,7 @@ declare module 'upload-post' {
     /**
      * Update a feed declaration.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
      *
      * `PATCH /api/uploadposts/bluesky/feeds/{rkey}`
      */
@@ -8104,7 +8145,9 @@ declare module 'upload-post' {
     /**
      * Delete a feed declaration.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Needs confirm=true.
      *
      * `DELETE /api/uploadposts/bluesky/feeds/{rkey}`
      */
@@ -8113,7 +8156,9 @@ declare module 'upload-post' {
     /**
      * Report a post or account to Bluesky moderation.
      *
-     * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Needs confirm=true. Up to 20 reports per account per UTC day.
      *
      * `POST /api/uploadposts/bluesky/report`
      */
@@ -8257,6 +8302,8 @@ declare module 'upload-post' {
     /**
      * Rename a Google Business account.
      *
+     * **Not generally available yet.** Off by default: answers `403` with `ownership_changes_disabled` until the feature is available.
+     *
      * Renames a business account (only the name). With `validate_only: true` Google checks the request without changing anything (no `confirm` needed); that mode works today. A real rename is not generally available yet: 403 `ownership_changes_disabled`. `account` must be the account connected to the profile or the owner of one of its saved locations (404 `account_not_found` otherwise).
      *
      * `PATCH /api/uploadposts/google-business/accounts`
@@ -8265,6 +8312,8 @@ declare module 'upload-post' {
 
     /**
      * Invite an admin.
+     *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
      *
      * Google emails the invitation; the person gets access once they accept. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
      *
@@ -8275,6 +8324,8 @@ declare module 'upload-post' {
     /**
      * Change an admin's role.
      *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+     *
      * Changes the role of an admin (`admin_name` from GET /admins). If the role is already that one, the answer has `unchanged: true` and nothing is sent. Refused with 409 `last_owner` if it would demote the last owner and 409 `connected_identity` if it would demote the Google account connected to Upload-Post. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
      *
      * `PATCH /api/uploadposts/google-business/admins`
@@ -8283,6 +8334,8 @@ declare module 'upload-post' {
 
     /**
      * Remove an admin.
+     *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
      *
      * Removes an admin at once (they would have to be invited again). Refused with 409 `last_owner` / `connected_identity` like the role change. JSON body. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
      *
@@ -8293,6 +8346,8 @@ declare module 'upload-post' {
     /**
      * Accept an invitation.
      *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+     *
      * Accepts a pending invitation (404 `invitation_not_found` otherwise). Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
      *
      * `POST /api/uploadposts/google-business/invitations/accept`
@@ -8301,6 +8356,8 @@ declare module 'upload-post' {
 
     /**
      * Decline an invitation.
+     *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
      *
      * Declines a pending invitation (404 `invitation_not_found` otherwise). Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
      *
@@ -8311,6 +8368,8 @@ declare module 'upload-post' {
     /**
      * Transfer a location to another account.
      *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+     *
      * Moves a location to another Google account. Google only allows it when the connected user owns the location and manages the destination account. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
      *
      * `POST /api/uploadposts/google-business/locations/transfer`
@@ -8320,7 +8379,7 @@ declare module 'upload-post' {
     /**
      * Create a location.
      *
-     * Not generally available yet: answers 503 `gbp_feature_disabled` before anything else is checked. Send `location` (a Google Location object) or the friendly fields of location info, plus `language_code`. `title`, `primary_category` and `language_code` are required. Needs `confirm: true` (not with `dry_run`). `request_id` comes back in every answer: on 502 `google_result_unknown` repeat with the same `request_id` and Google never creates it twice. Search first with google-locations/search. Daily creation limits: 429 `daily_limit_reached` / `google_daily_quota_exhausted`.
+     * **Not generally available yet.** Answers 503 `gbp_feature_disabled` before anything else is checked. Send `location` (a Google Location object) or the friendly fields of location info, plus `language_code`. `title`, `primary_category` and `language_code` are required. Needs `confirm: true` (not with `dry_run`). `request_id` comes back in every answer: on 502 `google_result_unknown` repeat with the same `request_id` and Google never creates it twice. Search first with google-locations/search. Daily creation limits: 429 `daily_limit_reached` / `google_daily_quota_exhausted`.
      *
      * `POST /api/uploadposts/google-business/locations/create`
      */
@@ -8329,7 +8388,7 @@ declare module 'upload-post' {
     /**
      * Delete a location.
      *
-     * Not generally available yet: answers 503 `gbp_feature_disabled` before anything else is checked. Irreversible. Needs `confirm: true`. If Google does not allow deleting it through the API: 409 `location_cannot_be_deleted` (delete it from business.google.com).
+     * **Not generally available yet.** Answers 503 `gbp_feature_disabled` before anything else is checked. Irreversible. Needs `confirm: true`. If Google does not allow deleting it through the API: 409 `location_cannot_be_deleted` (delete it from business.google.com).
      *
      * `DELETE /api/uploadposts/google-business/locations/delete`
      */
@@ -8338,7 +8397,7 @@ declare module 'upload-post' {
     /**
      * Get real-time notification settings.
      *
-     * Not generally available yet: answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Google keeps one notification setting per Google account; when another tool owns it, `other_tool_configured` is `true`.
+     * **Not generally available yet.** Answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Google keeps one notification setting per Google account; when another tool owns it, `other_tool_configured` is `true`.
      *
      * `GET /api/uploadposts/google-business/notifications`
      */
@@ -8347,34 +8406,16 @@ declare module 'upload-post' {
     /**
      * Turn real-time notifications on or off.
      *
-     * Not generally available yet: answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Turns notifications on or off for the Google account; webhooks must also list the events (`review_received`, `review_updated`, `customer_media_received`, `listing_google_update`, `listing_duplicate`, `listing_control_changed`) in `webhook_events`. Needs `confirm: true`. If Google does not confirm the change (`outcome_unknown: true`), read the setting before retrying.
+     * **Not generally available yet.** Answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Turns notifications on or off for the Google account; webhooks must also list the events (`review_received`, `review_updated`, `customer_media_received`, `listing_google_update`, `listing_duplicate`, `listing_control_changed`) in `webhook_events`. Needs `confirm: true`. If Google does not confirm the change (`outcome_unknown: true`), read the setting before retrying.
      *
      * `PUT /api/uploadposts/google-business/notifications`
      */
     updateGoogleBusinessNotificationSettings(options: UpdateGoogleBusinessNotificationSettingsOptions): Promise<UpdateGoogleBusinessNotificationSettingsResponse>;
 
     /**
-     * Turn real-time notifications on or off (PATCH).
-     *
-     * Not generally available yet: answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Turns notifications on or off for the Google account; webhooks must also list the events (`review_received`, `review_updated`, `customer_media_received`, `listing_google_update`, `listing_duplicate`, `listing_control_changed`) in `webhook_events`. Needs `confirm: true`. If Google does not confirm the change (`outcome_unknown: true`), read the setting before retrying. Same as PUT.
-     *
-     * `PATCH /api/uploadposts/google-business/notifications`
-     */
-    updateGoogleBusinessNotificationSettingsPatch(options: UpdateGoogleBusinessNotificationSettingsPatchOptions): Promise<UpdateGoogleBusinessNotificationSettingsPatchResponse>;
-
-    /**
-     * Batch get reviews (JSON body).
-     *
-     * Reviews of several locations in one call (`locations:batchGetReviews`). Locations of several Google accounts are fetched with one call per account; `nextPageToken` (starting with `up1:`) carries every account's cursor: pass it back unchanged. Google's own errors keep Google's HTTP status (e.g. 409, 412, 500, 503) with details in `google_error`. Some validation errors carry only `error`, without `error_code`. Same as GET, with a JSON body.
-     *
-     * `POST /api/uploadposts/google-business/reviews/batch`
-     */
-    batchGetGoogleBusinessReviewsPost(options: BatchGetGoogleBusinessReviewsPostOptions): Promise<BatchGetGoogleBusinessReviewsPostResponse>;
-
-    /**
      * Start a verification.
      *
-     * Not generally available yet: answers 503 `gbp_feature_disabled`. Google contacts the business (postcard, SMS, call or email), so `confirm: true` is required. 3 verifications a day per location (429 `daily_limit_reached`, `scope: location`). `AUTO` verifications are `COMPLETED` at once; the others wait for the code. On 502 `google_result_unknown`, check the list before trying again.
+     * **Not generally available yet.** Answers 503 `gbp_feature_disabled`. Google contacts the business (postcard, SMS, call or email), so `confirm: true` is required. 3 verifications a day per location (429 `daily_limit_reached`, `scope: location`). `AUTO` verifications are `COMPLETED` at once; the others wait for the code. On 502 `google_result_unknown`, check the list before trying again.
      *
      * `POST /api/uploadposts/google-business/verification/start`
      */
@@ -8383,7 +8424,7 @@ declare module 'upload-post' {
     /**
      * Enter the verification code.
      *
-     * Not generally available yet: answers 503 `gbp_feature_disabled`. Sends the code Google sent. 10 attempts a day per account and location (429 `daily_limit_reached`); only codes Google actually checked count. `state: COMPLETED` when Google accepts it.
+     * **Not generally available yet.** Answers 503 `gbp_feature_disabled`. Sends the code Google sent. 10 attempts a day per account and location (429 `daily_limit_reached`); only codes Google actually checked count. `state: COMPLETED` when Google accepts it.
      *
      * `POST /api/uploadposts/google-business/verification/complete`
      */
@@ -8392,7 +8433,7 @@ declare module 'upload-post' {
     /**
      * Get an instant verification token.
      *
-     * Not generally available yet: answers 503 `gbp_feature_disabled`. Asks Google for an instant verification token. When Google reserves it to its vetted partners, 403 `partner_only`: use verification/start instead.
+     * **Not generally available yet.** Answers 503 `gbp_feature_disabled`. Asks Google for an instant verification token. When Google reserves it to its vetted partners, 403 `partner_only`: use verification/start instead.
      *
      * `POST /api/uploadposts/google-business/verification/token`
      */

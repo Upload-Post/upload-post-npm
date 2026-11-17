@@ -86,8 +86,12 @@ def first_paragraphs(text, limit=700):
     text = (text or '').strip()
     paras = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
     na = ''
-    if paras and paras[0].startswith('**Not generally available yet.**'):
-        na = paras.pop(0)
+    if paras and re.match(r'^\W*not generally available yet', paras[0], re.I):
+        # The spec writes it several ways ("**Not generally available yet.** ...",
+        # "**Not generally available yet: answers 503 ...**", plain text).
+        rest = re.sub(r'^\W*not generally available yet\W*', '', paras.pop(0).replace('**', ''), flags=re.I)
+        rest = rest[:1].upper() + rest[1:]
+        na = '**Not generally available yet.** ' + rest if rest else '**Not generally available yet.**'
     body = paras[0] if paras else ''
     if len(body) > limit:
         cut = body[:limit]
@@ -528,6 +532,23 @@ def pyrepr(meta):
 
 # ------------------------------------------------------------------ README
 
+def readme_availability():
+    """The hand-written methods whose operation the spec marks not generally available."""
+    rows = []
+    for op in operations():
+        name = MAP.get('existing', {}).get(op['id'])
+        if not name or not op['na']:
+            continue
+        note = availability_note(op).replace('**Not generally available yet.**', '').strip()
+        rows.append(f'| `{name}` | `{endpoint(op)}` | {one_line(note, 160).replace("|", "/")} |\n')
+    if not rows:
+        return 'Every hand-written method is generally available.\n'
+    return ('These hand-written methods call operations that are **not generally available yet**: '
+            'they answer an error (usually HTTP 503) until the feature is switched on for your account. '
+            'Generated from `codegen/openapi.json`.\n\n'
+            '| Method | Endpoint | Until it is switched on |\n| :-- | :-- | :-- |\n' + ''.join(rows))
+
+
 def readme(ops, lang):
     out = ['Generated from the OpenAPI spec (`codegen/openapi.json`) by `codegen/generate.py`. ']
     if lang == 'npm':
@@ -608,6 +629,8 @@ def main():
     text = open(readme_path, encoding='utf-8').read()
     files[readme_path] = replace_region(text, '<!-- openapi:methods -->', '<!-- /openapi:methods -->',
                                         readme(ops, TARGET), 'README.md')
+    files[readme_path] = replace_region(files[readme_path], '<!-- openapi:availability -->',
+                                        '<!-- /openapi:availability -->', readme_availability(), 'README.md')
     stale = []
     for path, content in files.items():
         current = open(path, encoding='utf-8').read()

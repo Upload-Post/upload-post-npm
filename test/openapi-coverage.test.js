@@ -96,6 +96,28 @@ describe('every operation of the spec has a method', () => {
     assert.deepEqual(absent, []);
   });
 
+  test('availability notes come from x-availability', () => {
+    const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+    const region = readme.split('<!-- openapi:availability -->')[1].split('<!-- /openapi:availability -->')[0];
+    const src = fs.readFileSync(new URL('../index.js', import.meta.url), 'utf8');
+    for (const [route, item] of Object.entries(spec.paths)) {
+      for (const verb of ['get', 'post', 'put', 'patch', 'delete']) {
+        const op = item[verb];
+        if (!op) continue;
+        const na = op['x-availability'] === 'not_generally_available';
+        const generated = generatedFor({ verb: verb.toUpperCase(), route });
+        if (generated) {
+          assert.equal(Boolean(generated[1][2].na), na, `${op.operationId}: na flag`);
+          const doc = src.split(`  async ${generated[0]}(options`)[0].split('/**').pop();
+          assert.equal(doc.includes('Not generally available yet'), na, `${op.operationId}: JSDoc note`);
+        } else if (map.existing[op.operationId]) {
+          assert.equal(region.includes(`| \`${map.existing[op.operationId]}\` | \`${verb.toUpperCase()} /api${route}\``), na,
+            `${op.operationId}: README availability list`);
+        }
+      }
+    }
+  });
+
   test('every generated method is declared in index.d.ts', () => {
     const undeclared = Object.keys(TABLE).filter((name) => !new RegExp(`\\n    ${name}\\(options`).test(dts));
     assert.deepEqual(undeclared, []);

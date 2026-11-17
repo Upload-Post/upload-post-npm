@@ -121,3 +121,61 @@ describe('the fields added for the spec', () => {
     assert.equal([...body.matchAll(/name="exclude_reply_user_ids\[\]"/g)].length, 2);
   });
 });
+
+describe('firstCommentMedia', () => {
+  const uploads = [];
+  const install = (fail) => {
+    uploads.length = 0;
+    axios.defaults.adapter = async (config) => {
+      if (config.url.startsWith('https://images.example.com/')) {
+        if (fail) {
+          const error = new Error('Request failed with status code 404');
+          error.response = { status: 404, data: Buffer.from('nope'), headers: {} };
+          throw error;
+        }
+        return { data: Buffer.from('PNGDATA'), status: 200, statusText: 'OK', headers: { 'content-type': 'image/png' }, config };
+      }
+      uploads.push(config);
+      return { data: { success: true }, status: 200, statusText: 'OK', headers: {}, config };
+    };
+  };
+
+  // The API reads first_comment_media[] from the uploaded files only: a URL in
+  // that field was ignored, so the post went out without the images.
+  for (const [method, leading] of [['upload', ['https://example.com/v.mp4']], ['uploadPhotos', [['https://example.com/a.jpg']]], ['uploadText', []]]) {
+    test(`${method}: a URL is downloaded and sent as a file`, async () => {
+      install(false);
+      await new UploadPost('k')[method](...leading, {
+        user: 'u', title: 't', platforms: ['reddit'], firstCommentMedia: ['https://images.example.com/chart.png', tmpFile],
+      });
+      const form = uploads[0].data;
+      const parts = form._streams.filter((p) => typeof p === 'string' && p.includes('name="first_comment_media[]"'));
+      assert.equal(parts.length, 2);
+      assert.match(parts[0], /filename="chart.png"/);
+      assert.match(parts[0], /Content-Type: image\/png/);
+      assert.match(parts[1], /filename="file.jpg"/);
+      assert.ok(form._streams.some((p) => Buffer.isBuffer(p) && p.toString() === 'PNGDATA'));
+    });
+  }
+
+  test('the download does not carry the API key', async () => {
+    const seen = [];
+    axios.defaults.adapter = async (config) => {
+      seen.push(config);
+      return { data: Buffer.from('x'), status: 200, statusText: 'OK', headers: {}, config };
+    };
+    await new UploadPost('secret-key').uploadText({ user: 'u', title: 't', platforms: ['reddit'], firstCommentMedia: 'https://images.example.com/a.jpg' });
+    const download = seen.find((c) => c.url.startsWith('https://images.example.com/'));
+    assert.ok(download);
+    assert.ok(!JSON.stringify(download.headers || {}).includes('secret-key'));
+  });
+
+  test('a URL that cannot be downloaded fails the upload before sending it', async () => {
+    install(true);
+    await assert.rejects(
+      () => new UploadPost('k').uploadText({ user: 'u', title: 't', platforms: ['reddit'], firstCommentMedia: 'https://images.example.com/missing.png' }),
+      /could not download firstCommentMedia https:\/\/images\.example\.com\/missing\.png/,
+    );
+    assert.equal(uploads.length, 0);
+  });
+});

@@ -252,11 +252,49 @@ export class UploadPost {
               form.append('first_comment_media[]', createReadStream(mediaItem));
             }
           }
+        } else if (mediaItem && Buffer.isBuffer(mediaItem.buffer) && mediaItem.filename) {
+          // A URL downloaded by _withFirstCommentFiles().
+          form.append('first_comment_media[]', mediaItem.buffer, { filename: mediaItem.filename, contentType: mediaItem.contentType });
+        } else if (Buffer.isBuffer(mediaItem)) {
+          form.append('first_comment_media[]', mediaItem, { filename: 'image.jpg' });
         } else {
           form.append('first_comment_media[]', mediaItem);
         }
       }
     }
+  }
+
+  /**
+   * The API takes first comment images (`first_comment_media[]`) as files only: a
+   * URL in that field was ignored without a word. URLs in `firstCommentMedia` are
+   * downloaded here and sent as files; a URL that cannot be downloaded fails the
+   * upload with an error that says which one, instead of publishing without it.
+   * @private
+   */
+  async _withFirstCommentFiles(options) {
+    if (!options || !options.firstCommentMedia) return options;
+    const items = Array.isArray(options.firstCommentMedia) ? options.firstCommentMedia : [options.firstCommentMedia];
+    const isUrl = (v) => typeof v === 'string' && /^https?:\/\//i.test(v);
+    if (!items.some(isUrl)) return options;
+    const resolved = [];
+    for (const item of items) {
+      if (!isUrl(item)) {
+        resolved.push(item);
+        continue;
+      }
+      let response;
+      try {
+        // Plain request: no API key or Upload-Post headers go to a third-party host.
+        response = await axios.get(item, { responseType: 'arraybuffer', timeout: 60000, maxContentLength: 50 * 1024 * 1024, headers: {} });
+      } catch (error) {
+        throw new Error(`Upload-Post: could not download firstCommentMedia ${item} (${error.message}). `
+          + 'The API takes first comment images as files: pass a local path or a Buffer instead.');
+      }
+      const name = decodeURIComponent(new URL(item).pathname.split('/').pop() || '') || 'image.jpg';
+      const contentType = String(response.headers?.['content-type'] || '').split(';')[0] || undefined;
+      resolved.push({ buffer: Buffer.from(response.data), filename: name, contentType });
+    }
+    return { ...options, firstCommentMedia: resolved };
   }
 
   /**
@@ -1032,6 +1070,7 @@ export class UploadPost {
       form.append('video', createReadStream(videoPathOrUrl));
     }
 
+    options = await this._withFirstCommentFiles(options);
     this._addCommonParams(form, options);
     
     const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
@@ -1147,6 +1186,7 @@ export class UploadPost {
       }
     }
 
+    options = await this._withFirstCommentFiles(options);
     this._addCommonParams(form, options);
     
     const platforms = Array.isArray(options.platforms) ? options.platforms : [options.platforms];
@@ -1213,6 +1253,7 @@ export class UploadPost {
   async uploadText(options) {
     const form = new FormData();
 
+    options = await this._withFirstCommentFiles(options);
     this._addCommonParams(form, options);
 
     // Generic link_url support
@@ -4950,6 +4991,8 @@ export class UploadPost {
   /**
    * Send a gift from the bot's Stars.
    *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_stars_spend_disabled` until the feature is available.
+   *
    * sendGift. Spends the bot's Stars. Requires confirm=true and max_star_count (checked against the current price).
    *
    * `POST /api/uploadposts/telegram/gifts`
@@ -4962,6 +5005,8 @@ export class UploadPost {
 
   /**
    * Gift Telegram Premium from the bot's Stars.
+   *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_stars_spend_disabled` until the feature is available.
    *
    * Spends the bot's Stars.
    *
@@ -5002,6 +5047,8 @@ export class UploadPost {
   /**
    * Turn Telegram updates on or off.
    *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_updates_unavailable` until the feature is available.
+   *
    * Opt-in per bot. A webhook that is not Upload-Post's is never replaced without replace_existing_webhook=true (409 telegram_webhook_in_use otherwise). With no webhook, the answer warns that a getUpdates integration stops receiving.
    *
    * `POST /api/uploadposts/telegram/updates`
@@ -5028,6 +5075,8 @@ export class UploadPost {
   /**
    * Telegram Business connections.
    *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+   *
    * Connections of the bot with Telegram Business accounts (rights, enabled).
    *
    * `GET /api/uploadposts/telegram/business-connections`
@@ -5040,6 +5089,8 @@ export class UploadPost {
 
   /**
    * Telegram Business account.
+   *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
    *
    * The connected account.
    *
@@ -5054,6 +5105,8 @@ export class UploadPost {
   /**
    * Update the Telegram Business profile.
    *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+   *
    * first_name/last_name, username, bio, photo (multipart or media_url, is_public), remove_photo, gift_settings.
    *
    * `PATCH /api/uploadposts/telegram/business-profile`
@@ -5066,6 +5119,8 @@ export class UploadPost {
 
   /**
    * Post a Telegram story.
+   *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
    *
    * postStory on behalf of the Business account. Photos 1080x1920 up to 10 MB; videos 720x1280 H.265 up to 30 MB, 60 s.
    *
@@ -5080,6 +5135,8 @@ export class UploadPost {
   /**
    * Edit a Telegram story.
    *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+   *
    * editStory.
    *
    * `PATCH /api/uploadposts/telegram/business-stories`
@@ -5092,6 +5149,8 @@ export class UploadPost {
 
   /**
    * Delete a Telegram story.
+   *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
    *
    * deleteStory.
    *
@@ -5106,6 +5165,8 @@ export class UploadPost {
   /**
    * Repost a Telegram story.
    *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+   *
    * repostStory from another Business account of the same bot.
    *
    * `POST /api/uploadposts/telegram/business-stories/repost`
@@ -5118,6 +5179,8 @@ export class UploadPost {
 
   /**
    * Telegram Business gifts.
+   *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
    *
    * getBusinessAccountGifts with Telegram's filters.
    *
@@ -5132,6 +5195,8 @@ export class UploadPost {
   /**
    * Convert, upgrade, transfer or delete a gift.
    *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+   *
    * Irreversible: requires confirm=true and an idempotency_key (a repeat with the same key returns the first answer).
    *
    * `POST /api/uploadposts/telegram/business-gifts`
@@ -5145,6 +5210,8 @@ export class UploadPost {
   /**
    * Telegram Business Stars balance.
    *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+   *
    * getBusinessAccountStarBalance.
    *
    * `GET /api/uploadposts/telegram/business-stars`
@@ -5157,6 +5224,8 @@ export class UploadPost {
 
   /**
    * Move Stars to the bot.
+   *
+   * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
    *
    * transferBusinessAccountStars (1-10000). Requires confirm=true and an idempotency_key.
    *
@@ -5287,6 +5356,8 @@ export class UploadPost {
   /**
    * Create a Pinterest board.
    *
+   * Without a profile the first profile of the account with a Pinterest account is used.
+   *
    * `POST /api/uploadposts/pinterest/boards`
    * @param {CreatePinterestBoardOptions} options
    * @returns {Promise<Object>}
@@ -5298,7 +5369,7 @@ export class UploadPost {
   /**
    * Run a YouTube Analytics channel report.
    *
-   * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. reports.query for the profile's channel with any dimensions, metrics, filters and sort of YouTube's channel reports. Validated against the official report tables before it reaches YouTube (invalid combinations: 400 youtube_analytics_unsupported_query with hints, nothing spent). Revenue and ad metrics are not available. Answers are cached (12 h; 7 days for ranges that ended more than 5 days ago). Each uncached call counts 1 request of the account's daily Analytics allowance. Data has a 48-72 h delay.
+   * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. reports.query for the profile's channel with any dimensions, metrics, filters and sort of YouTube's channel reports. Validated against the official report tables before it reaches YouTube (invalid combinations: 400 youtube_analytics_unsupported_query with hints, nothing spent). Revenue and ad metrics are not available. Answers are cached (12 h; 7 days for ranges that ended more than 5 days ago). Each uncached call counts 1 request of the account's daily Analytics allowance. Data has a 48-72 h delay.
    *
    * `GET /api/uploadposts/youtube/analytics/query`
    * @param {QueryYoutubeAnalyticsOptions} options
@@ -5311,7 +5382,7 @@ export class UploadPost {
   /**
    * YouTube Analytics report catalog.
    *
-   * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. The 47 YouTube channel reports with their dimensions, metrics, filters, sort options and row limits. Does not call YouTube.
+   * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. The 47 YouTube channel reports with their dimensions, metrics, filters, sort options and row limits. Does not call YouTube.
    *
    * `GET /api/uploadposts/youtube/analytics/reports`
    * @param {ListYoutubeAnalyticsReportsOptions} options
@@ -5324,7 +5395,7 @@ export class UploadPost {
   /**
    * List YouTube Analytics groups.
    *
-   * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. groups.list of the channel (mine=true, or ids). Cached 30 minutes; 1 request of the Analytics allowance per uncached call.
+   * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. groups.list of the channel (mine=true, or ids). Cached 30 minutes; 1 request of the Analytics allowance per uncached call.
    *
    * `GET /api/uploadposts/youtube/analytics/groups`
    * @param {ListYoutubeAnalyticsGroupsOptions} options
@@ -5337,7 +5408,7 @@ export class UploadPost {
   /**
    * List the items of a YouTube Analytics group.
    *
-   * Not generally available yet: answers 503 youtube_analytics_disabled until it is enabled. groupItems.list. Cached 30 minutes.
+   * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. groupItems.list. Cached 30 minutes.
    *
    * `GET /api/uploadposts/youtube/analytics/groups/{group_id}/items`
    * @param {ListYoutubeAnalyticsGroupItemsOptions} options
@@ -5349,6 +5420,8 @@ export class UploadPost {
 
   /**
    * Daily allowance of YouTube Analytics and bulk reports.
+   *
+   * **Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.
    *
    * The caller's own usage today of the Analytics and bulk reports allowances. While Analytics and bulk reports are not generally available yet, each service shows enabled: false.
    *
@@ -5363,7 +5436,7 @@ export class UploadPost {
   /**
    * List YouTube bulk report types.
    *
-   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. reportTypes.list for the channel (one page, cached 24 h). can_create_job marks the channel/playlist types that can be scheduled.
+   * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. reportTypes.list for the channel (one page, cached 24 h). can_create_job marks the channel/playlist types that can be scheduled.
    *
    * `GET /api/uploadposts/youtube/reporting/report-types`
    * @param {ListYoutubeReportTypesOptions} options
@@ -5376,7 +5449,7 @@ export class UploadPost {
   /**
    * List YouTube reporting jobs.
    *
-   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.list of the channel (one page). used_by_upload_post marks the job behind Upload-Post's thumbnail impressions.
+   * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.list of the channel (one page). used_by_upload_post marks the job behind Upload-Post's thumbnail impressions.
    *
    * `GET /api/uploadposts/youtube/reporting/jobs`
    * @param {ListYoutubeReportingJobsOptions} options
@@ -5389,7 +5462,7 @@ export class UploadPost {
   /**
    * Create a YouTube reporting job.
    *
-   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.create: YouTube then generates one CSV per day (first ones within ~48 h, covering the previous 30 days). One job per report type and up to 20 per channel.
+   * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.create: YouTube then generates one CSV per day (first ones within ~48 h, covering the previous 30 days). One job per report type and up to 20 per channel.
    *
    * `POST /api/uploadposts/youtube/reporting/jobs`
    * @param {CreateYoutubeReportingJobOptions} options
@@ -5402,7 +5475,7 @@ export class UploadPost {
   /**
    * Get a YouTube reporting job.
    *
-   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.get.
+   * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.get.
    *
    * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}`
    * @param {GetYoutubeReportingJobOptions} options
@@ -5415,7 +5488,7 @@ export class UploadPost {
   /**
    * Delete a YouTube reporting job.
    *
-   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.delete: stops the daily reports. Requires confirm: true. A channel_reach_basic_a1 job (used by Upload-Post for thumbnail impressions) cannot be deleted (409 youtube_reporting_job_in_use). 502 youtube_write_outcome_unknown: list the jobs to check.
+   * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.delete: stops the daily reports. Requires confirm: true. A channel_reach_basic_a1 job (used by Upload-Post for thumbnail impressions) cannot be deleted (409 youtube_reporting_job_in_use). 502 youtube_write_outcome_unknown: list the jobs to check.
    *
    * `DELETE /api/uploadposts/youtube/reporting/jobs/{job_id}`
    * @param {DeleteYoutubeReportingJobOptions} options
@@ -5428,7 +5501,7 @@ export class UploadPost {
   /**
    * List the reports of a YouTube reporting job.
    *
-   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.list (one page). Each item has download_path.
+   * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.list (one page). Each item has download_path.
    *
    * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports`
    * @param {ListYoutubeReportsOptions} options
@@ -5441,7 +5514,7 @@ export class UploadPost {
   /**
    * Get a YouTube report.
    *
-   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.get (metadata).
+   * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.get (metadata).
    *
    * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}`
    * @param {GetYoutubeReportOptions} options
@@ -5454,7 +5527,7 @@ export class UploadPost {
   /**
    * Download a YouTube report (CSV).
    *
-   * Not generally available yet: answers 503 youtube_reporting_disabled until it is enabled. The report's CSV file, streamed. Up to 100 MB; up to 2 downloads at a time per account. Counts 2 requests of the bulk reports allowance.
+   * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. The report's CSV file, streamed. Up to 100 MB; up to 2 downloads at a time per account. Counts 2 requests of the bulk reports allowance.
    *
    * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}/download`
    * @param {DownloadYoutubeReportOptions} options
@@ -5467,7 +5540,7 @@ export class UploadPost {
   /**
    * YouTube new video notifications status.
    *
-   * Not generally available yet: answers 503 youtube_feature_disabled until it is enabled. State of the push subscription of the profile's channel (null when off). No YouTube quota.
+   * **Not generally available yet.** Answers 503 youtube_feature_disabled until it is enabled. State of the push subscription of the profile's channel (null when off). No YouTube quota.
    *
    * `GET /api/uploadposts/youtube/push`
    * @param {GetYoutubePushOptions} options
@@ -5480,7 +5553,7 @@ export class UploadPost {
   /**
    * Turn on YouTube new video notifications.
    *
-   * Not generally available yet: answers 503 youtube_feature_disabled until it is enabled. Requires a webhook listing youtube_video_published and/or youtube_video_updated. No YouTube quota.
+   * **Not generally available yet.** Answers 503 youtube_feature_disabled until it is enabled. Requires a webhook listing youtube_video_published and/or youtube_video_updated. No YouTube quota.
    *
    * `POST /api/uploadposts/youtube/push`
    * @param {EnableYoutubePushOptions} options
@@ -5493,7 +5566,7 @@ export class UploadPost {
   /**
    * Turn off YouTube new video notifications.
    *
-   * Not generally available yet: answers 503 youtube_feature_disabled until it is enabled. No YouTube quota.
+   * **Not generally available yet.** Answers 503 youtube_feature_disabled until it is enabled. No YouTube quota.
    *
    * `DELETE /api/uploadposts/youtube/push`
    * @param {DisableYoutubePushOptions} options
@@ -5519,8 +5592,10 @@ export class UploadPost {
   /**
    * Threads publishing quota.
    *
+   * Send user or profile (one is required: 400 without both).
+   *
    * `GET /api/uploadposts/threads/publishing_limit`
-   * @param {GetThreadsPublishingLimitOptions} options
+   * @param {GetThreadsPublishingLimitOptions} [options]
    * @returns {Promise<Object>}
    */
   async getThreadsPublishingLimit(options = {}) {
@@ -5540,6 +5615,8 @@ export class UploadPost {
 
   /**
    * Create a section in a Pinterest board.
+   *
+   * Without a profile the first profile of the account with a Pinterest account is used.
    *
    * `POST /api/uploadposts/pinterest/boards/{board_id}/sections`
    * @param {CreatePinterestBoardSectionOptions} options
@@ -6062,7 +6139,9 @@ export class UploadPost {
   /**
    * Delete the Bluesky chat account.
    *
-   * **Not generally available yet: answers `403` `bluesky_chat_delete_disabled`.**
+   * **Not generally available yet.** Answers `403` `bluesky_chat_delete_disabled`.
+   *
+   * Deletes every conversation and message of the account's Bluesky chat account (not the Bluesky account). Needs confirm: true and confirm_handle; not enabled yet (403 bluesky_chat_delete_disabled). Account owner only; every attempt is recorded.
    *
    * `POST /api/uploadposts/dms/bluesky/account/delete`
    * @param {DeleteBlueskyChatAccountOptions} options
@@ -6075,7 +6154,9 @@ export class UploadPost {
   /**
    * Bluesky groups shared with someone.
    *
-   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+   *
+   * Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
    *
    * `GET /api/uploadposts/dms/bluesky/groups`
    * @param {ListBlueskyMutualGroupsOptions} options
@@ -6088,7 +6169,9 @@ export class UploadPost {
   /**
    * Create a Bluesky group chat.
    *
-   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+   *
+   * Members get a request to accept. Every invited member counts as one DM (all or nothing); at most 10 members by handle per request. Idempotent for 10 minutes per idempotency_key (or name + members). Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
    *
    * `POST /api/uploadposts/dms/bluesky/groups`
    * @param {CreateBlueskyGroupOptions} options
@@ -6101,7 +6184,9 @@ export class UploadPost {
   /**
    * Rename, lock or unlock a Bluesky group.
    *
-   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+   *
+   * Owner only. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
    *
    * `PATCH /api/uploadposts/dms/bluesky/groups/{conversation_id}`
    * @param {EditBlueskyGroupOptions} options
@@ -6114,7 +6199,9 @@ export class UploadPost {
   /**
    * Bluesky group members.
    *
-   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+   *
+   * Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
    *
    * `GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
    * @param {ListBlueskyGroupMembersOptions} options
@@ -6127,7 +6214,9 @@ export class UploadPost {
   /**
    * Add members to a Bluesky group.
    *
-   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+   *
+   * Owner only. One DM of quota per added member. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
    *
    * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
    * @param {AddBlueskyGroupMembersOptions} options
@@ -6140,7 +6229,9 @@ export class UploadPost {
   /**
    * Remove members from a Bluesky group.
    *
-   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+   *
+   * Owner only. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
    *
    * `DELETE /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
    * @param {RemoveBlueskyGroupMembersOptions} options
@@ -6153,7 +6244,9 @@ export class UploadPost {
   /**
    * Manage a Bluesky group join link.
    *
-   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+   *
+   * action: create, edit, enable or disable. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
    *
    * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-link`
    * @param {ManageBlueskyJoinLinkOptions} options
@@ -6166,7 +6259,9 @@ export class UploadPost {
   /**
    * Pending requests to join a Bluesky group.
    *
-   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+   *
+   * Owner only. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
    *
    * `GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests`
    * @param {ListBlueskyJoinRequestsOptions} options
@@ -6179,7 +6274,9 @@ export class UploadPost {
   /**
    * Answer or withdraw a Bluesky join request.
    *
-   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+   *
+   * action: approve / reject (with member), mark_read, or withdraw (your own request). Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
    *
    * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests`
    * @param {AnswerBlueskyJoinRequestOptions} options
@@ -6192,7 +6289,9 @@ export class UploadPost {
   /**
    * Preview Bluesky join links.
    *
-   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+   *
+   * Up to 50 codes; status active, disabled or invalid. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
    *
    * `GET /api/uploadposts/dms/bluesky/join-links`
    * @param {PreviewBlueskyJoinLinksOptions} options
@@ -6205,7 +6304,9 @@ export class UploadPost {
   /**
    * Ask to join a Bluesky group.
    *
-   * **Not generally available yet: group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.**
+   * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+   *
+   * status is joined or pending. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
    *
    * `POST /api/uploadposts/dms/bluesky/join-links`
    * @param {JoinBlueskyGroupOptions} options
@@ -6232,7 +6333,9 @@ export class UploadPost {
   /**
    * Follow, block or mute (one target per call).
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * follow/unfollow (daily limit), block/unblock, mute/unmute (only_reposts, only_quoteposts), mute_list/unmute_list, block_list/unblock_list (moderation lists), mute_thread/unmute_thread.
    *
    * `POST /api/uploadposts/bluesky/graph`
    * @param {BlueskyGraphActionOptions} options
@@ -6245,7 +6348,9 @@ export class UploadPost {
   /**
    * The account's lists.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * getLists for the account.
    *
    * `GET /api/uploadposts/bluesky/lists`
    * @param {ListBlueskyListsOptions} options
@@ -6258,7 +6363,9 @@ export class UploadPost {
   /**
    * Create a list.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * Curated, moderation or reference list.
    *
    * `POST /api/uploadposts/bluesky/lists`
    * @param {CreateBlueskyListOptions} options
@@ -6271,7 +6378,9 @@ export class UploadPost {
   /**
    * A list and its members.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * getList.
    *
    * `GET /api/uploadposts/bluesky/lists/{list_id}`
    * @param {GetBlueskyListOptions} options
@@ -6284,7 +6393,9 @@ export class UploadPost {
   /**
    * Update a list.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * Merges the fields sent.
    *
    * `PATCH /api/uploadposts/bluesky/lists/{list_id}`
    * @param {UpdateBlueskyListOptions} options
@@ -6297,7 +6408,9 @@ export class UploadPost {
   /**
    * Delete a list and its members.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * Needs confirm=true.
    *
    * `DELETE /api/uploadposts/bluesky/lists/{list_id}`
    * @param {DeleteBlueskyListOptions} options
@@ -6310,7 +6423,9 @@ export class UploadPost {
   /**
    * List members.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * getList items.
    *
    * `GET /api/uploadposts/bluesky/lists/{list_id}/members`
    * @param {ListBlueskyListMembersOptions} options
@@ -6323,7 +6438,9 @@ export class UploadPost {
   /**
    * Add a member.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * One account per call.
    *
    * `POST /api/uploadposts/bluesky/lists/{list_id}/members`
    * @param {AddBlueskyListMemberOptions} options
@@ -6336,7 +6453,9 @@ export class UploadPost {
   /**
    * Remove a member.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * One account per call.
    *
    * `DELETE /api/uploadposts/bluesky/lists/{list_id}/members`
    * @param {RemoveBlueskyListMemberOptions} options
@@ -6349,7 +6468,9 @@ export class UploadPost {
   /**
    * Ask not to appear in a reference list.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * referencelistoptout.
    *
    * `POST /api/uploadposts/bluesky/lists/opt-out`
    * @param {OptOutBlueskyListOptions} options
@@ -6362,7 +6483,7 @@ export class UploadPost {
   /**
    * Withdraw the opt-out.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
    *
    * `DELETE /api/uploadposts/bluesky/lists/opt-out`
    * @param {RemoveOptOutBlueskyListOptions} options
@@ -6375,7 +6496,7 @@ export class UploadPost {
   /**
    * The account's starter packs.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
    *
    * `GET /api/uploadposts/bluesky/starter-packs`
    * @param {ListBlueskyStarterPacksOptions} options
@@ -6388,7 +6509,7 @@ export class UploadPost {
   /**
    * Create a starter pack.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
    *
    * `POST /api/uploadposts/bluesky/starter-packs`
    * @param {CreateBlueskyStarterPackOptions} options
@@ -6401,7 +6522,7 @@ export class UploadPost {
   /**
    * A starter pack.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
    *
    * `GET /api/uploadposts/bluesky/starter-packs/{pack_id}`
    * @param {GetBlueskyStarterPackOptions} options
@@ -6414,7 +6535,9 @@ export class UploadPost {
   /**
    * Update a starter pack.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * name, description, feeds.
    *
    * `PATCH /api/uploadposts/bluesky/starter-packs/{pack_id}`
    * @param {UpdateBlueskyStarterPackOptions} options
@@ -6427,7 +6550,9 @@ export class UploadPost {
   /**
    * Delete a starter pack.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * Needs confirm=true; delete_list=true also deletes its list.
    *
    * `DELETE /api/uploadposts/bluesky/starter-packs/{pack_id}`
    * @param {DeleteBlueskyStarterPackOptions} options
@@ -6440,7 +6565,7 @@ export class UploadPost {
   /**
    * Feeds declared by the account.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
    *
    * `GET /api/uploadposts/bluesky/feeds`
    * @param {ListBlueskyFeedsOptions} options
@@ -6453,7 +6578,9 @@ export class UploadPost {
   /**
    * Declare a custom feed.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * Points to a feed generator service run by someone else.
    *
    * `POST /api/uploadposts/bluesky/feeds`
    * @param {CreateBlueskyFeedOptions} options
@@ -6466,7 +6593,7 @@ export class UploadPost {
   /**
    * Update a feed declaration.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
    *
    * `PATCH /api/uploadposts/bluesky/feeds/{rkey}`
    * @param {UpdateBlueskyFeedOptions} options
@@ -6479,7 +6606,9 @@ export class UploadPost {
   /**
    * Delete a feed declaration.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * Needs confirm=true.
    *
    * `DELETE /api/uploadposts/bluesky/feeds/{rkey}`
    * @param {DeleteBlueskyFeedOptions} options
@@ -6492,7 +6621,9 @@ export class UploadPost {
   /**
    * Report a post or account to Bluesky moderation.
    *
-   * **Not generally available yet: answers `503` `bluesky_feature_disabled` until it is turned on.**
+   * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+   *
+   * Needs confirm=true. Up to 20 reports per account per UTC day.
    *
    * `POST /api/uploadposts/bluesky/report`
    * @param {ReportOnBlueskyOptions} options
@@ -6685,6 +6816,8 @@ export class UploadPost {
   /**
    * Rename a Google Business account.
    *
+   * **Not generally available yet.** Off by default: answers `403` with `ownership_changes_disabled` until the feature is available.
+   *
    * Renames a business account (only the name). With `validate_only: true` Google checks the request without changing anything (no `confirm` needed); that mode works today. A real rename is not generally available yet: 403 `ownership_changes_disabled`. `account` must be the account connected to the profile or the owner of one of its saved locations (404 `account_not_found` otherwise).
    *
    * `PATCH /api/uploadposts/google-business/accounts`
@@ -6697,6 +6830,8 @@ export class UploadPost {
 
   /**
    * Invite an admin.
+   *
+   * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
    *
    * Google emails the invitation; the person gets access once they accept. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
    *
@@ -6711,6 +6846,8 @@ export class UploadPost {
   /**
    * Change an admin's role.
    *
+   * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+   *
    * Changes the role of an admin (`admin_name` from GET /admins). If the role is already that one, the answer has `unchanged: true` and nothing is sent. Refused with 409 `last_owner` if it would demote the last owner and 409 `connected_identity` if it would demote the Google account connected to Upload-Post. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
    *
    * `PATCH /api/uploadposts/google-business/admins`
@@ -6723,6 +6860,8 @@ export class UploadPost {
 
   /**
    * Remove an admin.
+   *
+   * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
    *
    * Removes an admin at once (they would have to be invited again). Refused with 409 `last_owner` / `connected_identity` like the role change. JSON body. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
    *
@@ -6737,6 +6876,8 @@ export class UploadPost {
   /**
    * Accept an invitation.
    *
+   * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+   *
    * Accepts a pending invitation (404 `invitation_not_found` otherwise). Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
    *
    * `POST /api/uploadposts/google-business/invitations/accept`
@@ -6749,6 +6890,8 @@ export class UploadPost {
 
   /**
    * Decline an invitation.
+   *
+   * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
    *
    * Declines a pending invitation (404 `invitation_not_found` otherwise). Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
    *
@@ -6763,6 +6906,8 @@ export class UploadPost {
   /**
    * Transfer a location to another account.
    *
+   * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+   *
    * Moves a location to another Google account. Google only allows it when the connected user owns the location and manages the destination account. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
    *
    * `POST /api/uploadposts/google-business/locations/transfer`
@@ -6776,7 +6921,7 @@ export class UploadPost {
   /**
    * Create a location.
    *
-   * Not generally available yet: answers 503 `gbp_feature_disabled` before anything else is checked. Send `location` (a Google Location object) or the friendly fields of location info, plus `language_code`. `title`, `primary_category` and `language_code` are required. Needs `confirm: true` (not with `dry_run`). `request_id` comes back in every answer: on 502 `google_result_unknown` repeat with the same `request_id` and Google never creates it twice. Search first with google-locations/search. Daily creation limits: 429 `daily_limit_reached` / `google_daily_quota_exhausted`.
+   * **Not generally available yet.** Answers 503 `gbp_feature_disabled` before anything else is checked. Send `location` (a Google Location object) or the friendly fields of location info, plus `language_code`. `title`, `primary_category` and `language_code` are required. Needs `confirm: true` (not with `dry_run`). `request_id` comes back in every answer: on 502 `google_result_unknown` repeat with the same `request_id` and Google never creates it twice. Search first with google-locations/search. Daily creation limits: 429 `daily_limit_reached` / `google_daily_quota_exhausted`.
    *
    * `POST /api/uploadposts/google-business/locations/create`
    * @param {CreateGoogleBusinessLocationOptions} options
@@ -6789,7 +6934,7 @@ export class UploadPost {
   /**
    * Delete a location.
    *
-   * Not generally available yet: answers 503 `gbp_feature_disabled` before anything else is checked. Irreversible. Needs `confirm: true`. If Google does not allow deleting it through the API: 409 `location_cannot_be_deleted` (delete it from business.google.com).
+   * **Not generally available yet.** Answers 503 `gbp_feature_disabled` before anything else is checked. Irreversible. Needs `confirm: true`. If Google does not allow deleting it through the API: 409 `location_cannot_be_deleted` (delete it from business.google.com).
    *
    * `DELETE /api/uploadposts/google-business/locations/delete`
    * @param {DeleteGoogleBusinessLocationOptions} options
@@ -6802,7 +6947,7 @@ export class UploadPost {
   /**
    * Get real-time notification settings.
    *
-   * Not generally available yet: answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Google keeps one notification setting per Google account; when another tool owns it, `other_tool_configured` is `true`.
+   * **Not generally available yet.** Answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Google keeps one notification setting per Google account; when another tool owns it, `other_tool_configured` is `true`.
    *
    * `GET /api/uploadposts/google-business/notifications`
    * @param {GetGoogleBusinessNotificationSettingsOptions} options
@@ -6815,7 +6960,7 @@ export class UploadPost {
   /**
    * Turn real-time notifications on or off.
    *
-   * Not generally available yet: answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Turns notifications on or off for the Google account; webhooks must also list the events (`review_received`, `review_updated`, `customer_media_received`, `listing_google_update`, `listing_duplicate`, `listing_control_changed`) in `webhook_events`. Needs `confirm: true`. If Google does not confirm the change (`outcome_unknown: true`), read the setting before retrying.
+   * **Not generally available yet.** Answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Turns notifications on or off for the Google account; webhooks must also list the events (`review_received`, `review_updated`, `customer_media_received`, `listing_google_update`, `listing_duplicate`, `listing_control_changed`) in `webhook_events`. Needs `confirm: true`. If Google does not confirm the change (`outcome_unknown: true`), read the setting before retrying.
    *
    * `PUT /api/uploadposts/google-business/notifications`
    * @param {UpdateGoogleBusinessNotificationSettingsOptions} options
@@ -6826,35 +6971,9 @@ export class UploadPost {
   }
 
   /**
-   * Turn real-time notifications on or off (PATCH).
-   *
-   * Not generally available yet: answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Turns notifications on or off for the Google account; webhooks must also list the events (`review_received`, `review_updated`, `customer_media_received`, `listing_google_update`, `listing_duplicate`, `listing_control_changed`) in `webhook_events`. Needs `confirm: true`. If Google does not confirm the change (`outcome_unknown: true`), read the setting before retrying. Same as PUT.
-   *
-   * `PATCH /api/uploadposts/google-business/notifications`
-   * @param {UpdateGoogleBusinessNotificationSettingsPatchOptions} options
-   * @returns {Promise<Object>}
-   */
-  async updateGoogleBusinessNotificationSettingsPatch(options = {}) {
-    return this._op('updateGoogleBusinessNotificationSettingsPatch', options);
-  }
-
-  /**
-   * Batch get reviews (JSON body).
-   *
-   * Reviews of several locations in one call (`locations:batchGetReviews`). Locations of several Google accounts are fetched with one call per account; `nextPageToken` (starting with `up1:`) carries every account's cursor: pass it back unchanged. Google's own errors keep Google's HTTP status (e.g. 409, 412, 500, 503) with details in `google_error`. Some validation errors carry only `error`, without `error_code`. Same as GET, with a JSON body.
-   *
-   * `POST /api/uploadposts/google-business/reviews/batch`
-   * @param {BatchGetGoogleBusinessReviewsPostOptions} options
-   * @returns {Promise<Object>}
-   */
-  async batchGetGoogleBusinessReviewsPost(options = {}) {
-    return this._op('batchGetGoogleBusinessReviewsPost', options);
-  }
-
-  /**
    * Start a verification.
    *
-   * Not generally available yet: answers 503 `gbp_feature_disabled`. Google contacts the business (postcard, SMS, call or email), so `confirm: true` is required. 3 verifications a day per location (429 `daily_limit_reached`, `scope: location`). `AUTO` verifications are `COMPLETED` at once; the others wait for the code. On 502 `google_result_unknown`, check the list before trying again.
+   * **Not generally available yet.** Answers 503 `gbp_feature_disabled`. Google contacts the business (postcard, SMS, call or email), so `confirm: true` is required. 3 verifications a day per location (429 `daily_limit_reached`, `scope: location`). `AUTO` verifications are `COMPLETED` at once; the others wait for the code. On 502 `google_result_unknown`, check the list before trying again.
    *
    * `POST /api/uploadposts/google-business/verification/start`
    * @param {StartGoogleBusinessVerificationOptions} options
@@ -6867,7 +6986,7 @@ export class UploadPost {
   /**
    * Enter the verification code.
    *
-   * Not generally available yet: answers 503 `gbp_feature_disabled`. Sends the code Google sent. 10 attempts a day per account and location (429 `daily_limit_reached`); only codes Google actually checked count. `state: COMPLETED` when Google accepts it.
+   * **Not generally available yet.** Answers 503 `gbp_feature_disabled`. Sends the code Google sent. 10 attempts a day per account and location (429 `daily_limit_reached`); only codes Google actually checked count. `state: COMPLETED` when Google accepts it.
    *
    * `POST /api/uploadposts/google-business/verification/complete`
    * @param {CompleteGoogleBusinessVerificationOptions} options
@@ -6880,7 +6999,7 @@ export class UploadPost {
   /**
    * Get an instant verification token.
    *
-   * Not generally available yet: answers 503 `gbp_feature_disabled`. Asks Google for an instant verification token. When Google reserves it to its vetted partners, 403 `partner_only`: use verification/start instead.
+   * **Not generally available yet.** Answers 503 `gbp_feature_disabled`. Asks Google for an instant verification token. When Google reserves it to its vetted partners, 403 `partner_only`: use verification/start instead.
    *
    * `POST /api/uploadposts/google-business/verification/token`
    * @param {GenerateGoogleBusinessVerificationTokenOptions} options
@@ -7330,23 +7449,23 @@ UploadPost.FILE_FIELDS = new Set([
 // na = not generally available yet (HTTP 503 until switched on).
 // <openapi:operations>
 UploadPost.OPENAPI_OPERATIONS = {
-  sendTelegramGift: ["POST", "/uploadposts/telegram/gifts", {"b": ["user", "user_id", "chat_id", "gift_id", "max_star_count", "pay_for_upgrade", "text", "text_parse_mode", "text_entities", "confirm", "idempotency_key"]}],
-  giftTelegramPremium: ["POST", "/uploadposts/telegram/gifts/premium", {"b": ["user", "user_id", "month_count", "star_count", "text", "confirm", "idempotency_key"]}],
+  sendTelegramGift: ["POST", "/uploadposts/telegram/gifts", {"b": ["user", "user_id", "chat_id", "gift_id", "max_star_count", "pay_for_upgrade", "text", "text_parse_mode", "text_entities", "confirm", "idempotency_key"], "na": 1}],
+  giftTelegramPremium: ["POST", "/uploadposts/telegram/gifts/premium", {"b": ["user", "user_id", "month_count", "star_count", "text", "confirm", "idempotency_key"], "na": 1}],
   getTelegramPaymentSettings: ["GET", "/uploadposts/telegram/payments/settings", {"q": ["user"]}],
   updateTelegramPaymentSettings: ["PUT", "/uploadposts/telegram/payments/settings", {"b": ["user", "pre_checkout", "max_total_amount", "allowed_payload_prefixes", "error_message", "shipping", "shipping_options", "shipping_countries", "only_upload_post_invoices", "confirm"]}],
-  setTelegramUpdates: ["POST", "/uploadposts/telegram/updates", {"b": ["user", "enabled", "replace_existing_webhook", "forward_url", "business_chats", "auto_answer_callbacks", "extra_updates"]}],
+  setTelegramUpdates: ["POST", "/uploadposts/telegram/updates", {"b": ["user", "enabled", "replace_existing_webhook", "forward_url", "business_chats", "auto_answer_callbacks", "extra_updates"], "na": 1}],
   answerTelegramQuery: ["POST", "/uploadposts/telegram/answer", {"b": ["user", "type", "query_id", "text", "show_alert", "url", "cache_time", "results", "is_personal", "next_offset", "button", "result", "web_app_url", "data", "ok", "shipping_options", "error_message"]}],
-  getTelegramBusinessConnections: ["GET", "/uploadposts/telegram/business-connections", {"q": ["user", "business_connection_id"]}],
-  getTelegramBusinessProfile: ["GET", "/uploadposts/telegram/business-profile", {"q": ["user", "business_connection_id"]}],
-  updateTelegramBusinessProfile: ["PATCH", "/uploadposts/telegram/business-profile", {"b": ["user", "business_connection_id", "first_name", "last_name", "username", "bio", "media_url", "is_public", "remove_photo", "gift_settings"]}],
-  postTelegramStory: ["POST", "/uploadposts/telegram/business-stories", {"b": ["user", "business_connection_id", "media_url", "active_period", "caption", "parse_mode", "caption_entities", "areas", "post_to_chat_page", "protect_content", "story_id"]}],
-  editTelegramStory: ["PATCH", "/uploadposts/telegram/business-stories", {"b": ["user", "business_connection_id", "media_url", "active_period", "caption", "parse_mode", "caption_entities", "areas", "post_to_chat_page", "protect_content", "story_id"]}],
-  deleteTelegramStory: ["DELETE", "/uploadposts/telegram/business-stories", {"b": ["user", "business_connection_id", "media_url", "active_period", "caption", "parse_mode", "caption_entities", "areas", "post_to_chat_page", "protect_content", "story_id"]}],
-  repostTelegramStory: ["POST", "/uploadposts/telegram/business-stories/repost", {"b": ["user", "business_connection_id", "from_chat_id", "from_story_id", "active_period", "post_to_chat_page", "protect_content"]}],
-  getTelegramBusinessGifts: ["GET", "/uploadposts/telegram/business-gifts", {"q": ["user", "business_connection_id"]}],
-  manageTelegramBusinessGift: ["POST", "/uploadposts/telegram/business-gifts", {"b": ["user", "business_connection_id", "action", "owned_gift_id", "confirm", "keep_original_details", "star_count", "idempotency_key", "new_owner_chat_id"]}],
-  getTelegramBusinessStars: ["GET", "/uploadposts/telegram/business-stars", {"q": ["user", "business_connection_id"]}],
-  transferTelegramBusinessStars: ["POST", "/uploadposts/telegram/business-stars/transfer", {"b": ["user", "business_connection_id", "star_count", "idempotency_key", "confirm"]}],
+  getTelegramBusinessConnections: ["GET", "/uploadposts/telegram/business-connections", {"q": ["user", "business_connection_id"], "na": 1}],
+  getTelegramBusinessProfile: ["GET", "/uploadposts/telegram/business-profile", {"q": ["user", "business_connection_id"], "na": 1}],
+  updateTelegramBusinessProfile: ["PATCH", "/uploadposts/telegram/business-profile", {"b": ["user", "business_connection_id", "first_name", "last_name", "username", "bio", "media_url", "is_public", "remove_photo", "gift_settings"], "na": 1}],
+  postTelegramStory: ["POST", "/uploadposts/telegram/business-stories", {"b": ["user", "business_connection_id", "media_url", "active_period", "caption", "parse_mode", "caption_entities", "areas", "post_to_chat_page", "protect_content", "story_id"], "na": 1}],
+  editTelegramStory: ["PATCH", "/uploadposts/telegram/business-stories", {"b": ["user", "business_connection_id", "media_url", "active_period", "caption", "parse_mode", "caption_entities", "areas", "post_to_chat_page", "protect_content", "story_id"], "na": 1}],
+  deleteTelegramStory: ["DELETE", "/uploadposts/telegram/business-stories", {"b": ["user", "business_connection_id", "media_url", "active_period", "caption", "parse_mode", "caption_entities", "areas", "post_to_chat_page", "protect_content", "story_id"], "na": 1}],
+  repostTelegramStory: ["POST", "/uploadposts/telegram/business-stories/repost", {"b": ["user", "business_connection_id", "from_chat_id", "from_story_id", "active_period", "post_to_chat_page", "protect_content"], "na": 1}],
+  getTelegramBusinessGifts: ["GET", "/uploadposts/telegram/business-gifts", {"q": ["user", "business_connection_id"], "na": 1}],
+  manageTelegramBusinessGift: ["POST", "/uploadposts/telegram/business-gifts", {"b": ["user", "business_connection_id", "action", "owned_gift_id", "confirm", "keep_original_details", "star_count", "idempotency_key", "new_owner_chat_id"], "na": 1}],
+  getTelegramBusinessStars: ["GET", "/uploadposts/telegram/business-stars", {"q": ["user", "business_connection_id"], "na": 1}],
+  transferTelegramBusinessStars: ["POST", "/uploadposts/telegram/business-stars/transfer", {"b": ["user", "business_connection_id", "star_count", "idempotency_key", "confirm"], "na": 1}],
   analyzeShorts: ["POST", "/uploadposts/analyze-shorts", {"b": ["video", "platforms", "language"], "f": ["video"], "mp": 1}],
   rewriteCaptions: ["POST", "/uploadposts/rewrite-captions", {"b": ["content", "language", "platforms"]}],
   createMediaUpload: ["POST", "/uploadposts/media-uploads", {"b": ["media_type", "filename", "content_type", "content_length", "source"]}],
@@ -7356,27 +7475,27 @@ UploadPost.OPENAPI_OPERATIONS = {
   getScheduledPost: ["GET", "/uploadposts/schedule/{job_id}", {}],
   getScheduledPostThumbnail: ["GET", "/uploadposts/schedule/{job_id}/thumbnail", {}],
   getScheduledPostPreview: ["GET", "/uploadposts/schedule/{job_id}/preview", {}],
-  createPinterestBoard: ["POST", "/uploadposts/pinterest/boards", {"b": ["user", "name", "description", "privacy"]}],
-  queryYoutubeAnalytics: ["GET", "/uploadposts/youtube/analytics/query", {"q": ["user", "start_date", "end_date", "metrics", "dimensions", "filters", "sort", "max_results", "start_index", "report"]}],
-  listYoutubeAnalyticsReports: ["GET", "/uploadposts/youtube/analytics/reports", {"q": ["user"]}],
-  listYoutubeAnalyticsGroups: ["GET", "/uploadposts/youtube/analytics/groups", {"q": ["user", "ids", "page_token"]}],
-  listYoutubeAnalyticsGroupItems: ["GET", "/uploadposts/youtube/analytics/groups/{group_id}/items", {"q": ["user"]}],
-  getYoutubeAnalyticsUsage: ["GET", "/uploadposts/youtube/analytics/usage", {}],
-  listYoutubeReportTypes: ["GET", "/uploadposts/youtube/reporting/report-types", {"q": ["user", "page_token", "page_size"]}],
-  listYoutubeReportingJobs: ["GET", "/uploadposts/youtube/reporting/jobs", {"q": ["user", "page_token", "page_size"]}],
-  createYoutubeReportingJob: ["POST", "/uploadposts/youtube/reporting/jobs", {"b": ["user", "report_type_id", "name"]}],
-  getYoutubeReportingJob: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}", {"q": ["user"]}],
-  deleteYoutubeReportingJob: ["DELETE", "/uploadposts/youtube/reporting/jobs/{job_id}", {"b": ["user", "confirm"]}],
-  listYoutubeReports: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}/reports", {"q": ["user", "created_after", "start_time_at_or_after", "start_time_before", "page_token", "page_size"]}],
-  getYoutubeReport: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}", {"q": ["user"]}],
-  downloadYoutubeReport: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}/download", {"q": ["user"], "raw": "text"}],
-  getYoutubePush: ["GET", "/uploadposts/youtube/push", {"q": ["user"]}],
-  enableYoutubePush: ["POST", "/uploadposts/youtube/push", {"b": ["user"]}],
-  disableYoutubePush: ["DELETE", "/uploadposts/youtube/push", {"b": ["user"]}],
+  createPinterestBoard: ["POST", "/uploadposts/pinterest/boards", {"q": ["profile", "user"], "b": ["user", "name", "description", "privacy", "profile"]}],
+  queryYoutubeAnalytics: ["GET", "/uploadposts/youtube/analytics/query", {"q": ["user", "start_date", "end_date", "metrics", "dimensions", "filters", "sort", "max_results", "start_index", "report"], "na": 1}],
+  listYoutubeAnalyticsReports: ["GET", "/uploadposts/youtube/analytics/reports", {"q": ["user"], "na": 1}],
+  listYoutubeAnalyticsGroups: ["GET", "/uploadposts/youtube/analytics/groups", {"q": ["user", "ids", "page_token"], "na": 1}],
+  listYoutubeAnalyticsGroupItems: ["GET", "/uploadposts/youtube/analytics/groups/{group_id}/items", {"q": ["user"], "na": 1}],
+  getYoutubeAnalyticsUsage: ["GET", "/uploadposts/youtube/analytics/usage", {"na": 1}],
+  listYoutubeReportTypes: ["GET", "/uploadposts/youtube/reporting/report-types", {"q": ["user", "page_token", "page_size"], "na": 1}],
+  listYoutubeReportingJobs: ["GET", "/uploadposts/youtube/reporting/jobs", {"q": ["user", "page_token", "page_size"], "na": 1}],
+  createYoutubeReportingJob: ["POST", "/uploadposts/youtube/reporting/jobs", {"b": ["user", "report_type_id", "name"], "na": 1}],
+  getYoutubeReportingJob: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}", {"q": ["user"], "na": 1}],
+  deleteYoutubeReportingJob: ["DELETE", "/uploadposts/youtube/reporting/jobs/{job_id}", {"b": ["user", "confirm"], "na": 1}],
+  listYoutubeReports: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}/reports", {"q": ["user", "created_after", "start_time_at_or_after", "start_time_before", "page_token", "page_size"], "na": 1}],
+  getYoutubeReport: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}", {"q": ["user"], "na": 1}],
+  downloadYoutubeReport: ["GET", "/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}/download", {"q": ["user"], "raw": "text", "na": 1}],
+  getYoutubePush: ["GET", "/uploadposts/youtube/push", {"q": ["user"], "na": 1}],
+  enableYoutubePush: ["POST", "/uploadposts/youtube/push", {"b": ["user"], "na": 1}],
+  disableYoutubePush: ["DELETE", "/uploadposts/youtube/push", {"b": ["user"], "na": 1}],
   getInstagramPublishingLimit: ["GET", "/uploadposts/instagram/publishing_limit", {"q": ["profile", "refresh"]}],
-  getThreadsPublishingLimit: ["GET", "/uploadposts/threads/publishing_limit", {"q": ["user", "refresh"]}],
+  getThreadsPublishingLimit: ["GET", "/uploadposts/threads/publishing_limit", {"q": ["user", "profile", "refresh"]}],
   listPinterestBoardSections: ["GET", "/uploadposts/pinterest/boards/{board_id}/sections", {"q": ["profile"]}],
-  createPinterestBoardSection: ["POST", "/uploadposts/pinterest/boards/{board_id}/sections", {"b": ["user", "name"]}],
+  createPinterestBoardSection: ["POST", "/uploadposts/pinterest/boards/{board_id}/sections", {"q": ["profile", "user"], "b": ["user", "name", "profile"]}],
   getFacebookPageInfo: ["GET", "/uploadposts/facebook/page-info", {"q": ["user", "page_id"]}],
   updateFacebookPageInfo: ["PATCH", "/uploadposts/facebook/page-info", {"b": ["user", "page_id", "validate_only", "about", "description", "website", "phone", "emails", "hours", "picture_url", "cover_url"]}],
   listRedditSubreddits: ["GET", "/uploadposts/reddit/subreddits", {"q": ["profile"]}],
@@ -7416,40 +7535,40 @@ UploadPost.OPENAPI_OPERATIONS = {
   deleteWebhookSubscription: ["DELETE", "/uploadposts/webhooks/subscriptions/{subscription_id}", {"na": 1}],
   testWebhookSubscription: ["POST", "/uploadposts/webhooks/subscriptions/{subscription_id}/test", {"b": ["event"], "na": 1}],
   deleteCommentPost: ["POST", "/uploadposts/comments/delete", {"b": ["platform", "user", "comment_id", "post_id"]}],
-  deleteBlueskyChatAccount: ["POST", "/uploadposts/dms/bluesky/account/delete", {"b": ["user", "confirm", "confirm_handle"]}],
-  listBlueskyMutualGroups: ["GET", "/uploadposts/dms/bluesky/groups", {"q": ["user", "subject", "limit", "cursor"]}],
-  createBlueskyGroup: ["POST", "/uploadposts/dms/bluesky/groups", {"b": ["user", "name", "members", "idempotency_key"]}],
-  editBlueskyGroup: ["PATCH", "/uploadposts/dms/bluesky/groups/{conversation_id}", {"b": ["user", "name", "locked"]}],
-  listBlueskyGroupMembers: ["GET", "/uploadposts/dms/bluesky/groups/{conversation_id}/members", {"q": ["user"]}],
-  addBlueskyGroupMembers: ["POST", "/uploadposts/dms/bluesky/groups/{conversation_id}/members", {"b": ["user", "members"]}],
-  removeBlueskyGroupMembers: ["DELETE", "/uploadposts/dms/bluesky/groups/{conversation_id}/members", {"b": ["user", "members"]}],
-  manageBlueskyJoinLink: ["POST", "/uploadposts/dms/bluesky/groups/{conversation_id}/join-link", {"b": ["user", "action", "require_approval", "join_rule"]}],
-  listBlueskyJoinRequests: ["GET", "/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests", {"q": ["user"]}],
-  answerBlueskyJoinRequest: ["POST", "/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests", {"b": ["user", "action", "member"]}],
-  previewBlueskyJoinLinks: ["GET", "/uploadposts/dms/bluesky/join-links", {"q": ["user", "codes"]}],
-  joinBlueskyGroup: ["POST", "/uploadposts/dms/bluesky/join-links", {"b": ["user", "code"]}],
+  deleteBlueskyChatAccount: ["POST", "/uploadposts/dms/bluesky/account/delete", {"b": ["user", "confirm", "confirm_handle"], "na": 1}],
+  listBlueskyMutualGroups: ["GET", "/uploadposts/dms/bluesky/groups", {"q": ["user", "subject", "limit", "cursor"], "na": 1}],
+  createBlueskyGroup: ["POST", "/uploadposts/dms/bluesky/groups", {"b": ["user", "name", "members", "idempotency_key"], "na": 1}],
+  editBlueskyGroup: ["PATCH", "/uploadposts/dms/bluesky/groups/{conversation_id}", {"b": ["user", "name", "locked"], "na": 1}],
+  listBlueskyGroupMembers: ["GET", "/uploadposts/dms/bluesky/groups/{conversation_id}/members", {"q": ["user"], "na": 1}],
+  addBlueskyGroupMembers: ["POST", "/uploadposts/dms/bluesky/groups/{conversation_id}/members", {"b": ["user", "members"], "na": 1}],
+  removeBlueskyGroupMembers: ["DELETE", "/uploadposts/dms/bluesky/groups/{conversation_id}/members", {"b": ["user", "members"], "na": 1}],
+  manageBlueskyJoinLink: ["POST", "/uploadposts/dms/bluesky/groups/{conversation_id}/join-link", {"b": ["user", "action", "require_approval", "join_rule"], "na": 1}],
+  listBlueskyJoinRequests: ["GET", "/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests", {"q": ["user"], "na": 1}],
+  answerBlueskyJoinRequest: ["POST", "/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests", {"b": ["user", "action", "member"], "na": 1}],
+  previewBlueskyJoinLinks: ["GET", "/uploadposts/dms/bluesky/join-links", {"q": ["user", "codes"], "na": 1}],
+  joinBlueskyGroup: ["POST", "/uploadposts/dms/bluesky/join-links", {"b": ["user", "code"], "na": 1}],
   downloadDmMedia: ["GET", "/uploadposts/dms/media", {"q": ["platform", "user", "media_id"], "raw": "binary"}],
-  blueskyGraphAction: ["POST", "/uploadposts/bluesky/graph", {"b": ["user", "action", "actor", "list", "post_id", "only_reposts", "only_quoteposts"]}],
-  listBlueskyLists: ["GET", "/uploadposts/bluesky/lists", {"q": ["user", "purposes", "cursor"]}],
-  createBlueskyList: ["POST", "/uploadposts/bluesky/lists", {"b": ["user", "name", "purpose", "description", "avatar", "avatar_url", "remove_avatar"], "f": ["avatar"]}],
-  getBlueskyList: ["GET", "/uploadposts/bluesky/lists/{list_id}", {"q": ["user"]}],
-  updateBlueskyList: ["PATCH", "/uploadposts/bluesky/lists/{list_id}", {"b": ["user", "name", "purpose", "description", "avatar", "avatar_url", "remove_avatar"], "f": ["avatar"]}],
-  deleteBlueskyList: ["DELETE", "/uploadposts/bluesky/lists/{list_id}", {"b": ["user", "confirm"]}],
-  listBlueskyListMembers: ["GET", "/uploadposts/bluesky/lists/{list_id}/members", {"q": ["user"]}],
-  addBlueskyListMember: ["POST", "/uploadposts/bluesky/lists/{list_id}/members", {"b": ["user", "actor"]}],
-  removeBlueskyListMember: ["DELETE", "/uploadposts/bluesky/lists/{list_id}/members", {"b": ["user", "actor"]}],
-  optOutBlueskyList: ["POST", "/uploadposts/bluesky/lists/opt-out", {"b": ["user", "list"]}],
-  removeOptOutBlueskyList: ["DELETE", "/uploadposts/bluesky/lists/opt-out", {"b": ["user", "list"]}],
-  listBlueskyStarterPacks: ["GET", "/uploadposts/bluesky/starter-packs", {"q": ["user"]}],
-  createBlueskyStarterPack: ["POST", "/uploadposts/bluesky/starter-packs", {"b": ["user", "name", "description", "feeds", "list", "members"]}],
-  getBlueskyStarterPack: ["GET", "/uploadposts/bluesky/starter-packs/{pack_id}", {"q": ["user"]}],
-  updateBlueskyStarterPack: ["PATCH", "/uploadposts/bluesky/starter-packs/{pack_id}", {"b": ["user", "name", "description", "feeds", "list", "members"]}],
-  deleteBlueskyStarterPack: ["DELETE", "/uploadposts/bluesky/starter-packs/{pack_id}", {"b": ["user", "confirm", "delete_list"]}],
-  listBlueskyFeeds: ["GET", "/uploadposts/bluesky/feeds", {"q": ["user"]}],
-  createBlueskyFeed: ["POST", "/uploadposts/bluesky/feeds", {"b": ["user", "rkey", "did", "display_name", "description", "avatar", "accepts_interactions", "content_mode"], "f": ["avatar"]}],
-  updateBlueskyFeed: ["PATCH", "/uploadposts/bluesky/feeds/{rkey}", {"b": ["user", "did", "display_name", "description", "avatar", "accepts_interactions", "content_mode"], "f": ["avatar"]}],
-  deleteBlueskyFeed: ["DELETE", "/uploadposts/bluesky/feeds/{rkey}", {"b": ["user", "confirm"]}],
-  reportOnBluesky: ["POST", "/uploadposts/bluesky/report", {"b": ["user", "post_id", "actor", "reason_type", "reason", "confirm"]}],
+  blueskyGraphAction: ["POST", "/uploadposts/bluesky/graph", {"b": ["user", "action", "actor", "list", "post_id", "only_reposts", "only_quoteposts"], "na": 1}],
+  listBlueskyLists: ["GET", "/uploadposts/bluesky/lists", {"q": ["user", "purposes", "cursor"], "na": 1}],
+  createBlueskyList: ["POST", "/uploadposts/bluesky/lists", {"b": ["user", "name", "purpose", "description", "avatar", "avatar_url", "remove_avatar"], "f": ["avatar"], "na": 1}],
+  getBlueskyList: ["GET", "/uploadposts/bluesky/lists/{list_id}", {"q": ["user"], "na": 1}],
+  updateBlueskyList: ["PATCH", "/uploadposts/bluesky/lists/{list_id}", {"b": ["user", "name", "purpose", "description", "avatar", "avatar_url", "remove_avatar"], "f": ["avatar"], "na": 1}],
+  deleteBlueskyList: ["DELETE", "/uploadposts/bluesky/lists/{list_id}", {"b": ["user", "confirm"], "na": 1}],
+  listBlueskyListMembers: ["GET", "/uploadposts/bluesky/lists/{list_id}/members", {"q": ["user"], "na": 1}],
+  addBlueskyListMember: ["POST", "/uploadposts/bluesky/lists/{list_id}/members", {"b": ["user", "actor"], "na": 1}],
+  removeBlueskyListMember: ["DELETE", "/uploadposts/bluesky/lists/{list_id}/members", {"b": ["user", "actor"], "na": 1}],
+  optOutBlueskyList: ["POST", "/uploadposts/bluesky/lists/opt-out", {"b": ["user", "list"], "na": 1}],
+  removeOptOutBlueskyList: ["DELETE", "/uploadposts/bluesky/lists/opt-out", {"b": ["user", "list"], "na": 1}],
+  listBlueskyStarterPacks: ["GET", "/uploadposts/bluesky/starter-packs", {"q": ["user"], "na": 1}],
+  createBlueskyStarterPack: ["POST", "/uploadposts/bluesky/starter-packs", {"b": ["user", "name", "description", "feeds", "list", "members"], "na": 1}],
+  getBlueskyStarterPack: ["GET", "/uploadposts/bluesky/starter-packs/{pack_id}", {"q": ["user"], "na": 1}],
+  updateBlueskyStarterPack: ["PATCH", "/uploadposts/bluesky/starter-packs/{pack_id}", {"b": ["user", "name", "description", "feeds", "list", "members"], "na": 1}],
+  deleteBlueskyStarterPack: ["DELETE", "/uploadposts/bluesky/starter-packs/{pack_id}", {"b": ["user", "confirm", "delete_list"], "na": 1}],
+  listBlueskyFeeds: ["GET", "/uploadposts/bluesky/feeds", {"q": ["user"], "na": 1}],
+  createBlueskyFeed: ["POST", "/uploadposts/bluesky/feeds", {"b": ["user", "rkey", "did", "display_name", "description", "avatar", "accepts_interactions", "content_mode"], "f": ["avatar"], "na": 1}],
+  updateBlueskyFeed: ["PATCH", "/uploadposts/bluesky/feeds/{rkey}", {"b": ["user", "did", "display_name", "description", "avatar", "accepts_interactions", "content_mode"], "f": ["avatar"], "na": 1}],
+  deleteBlueskyFeed: ["DELETE", "/uploadposts/bluesky/feeds/{rkey}", {"b": ["user", "confirm"], "na": 1}],
+  reportOnBluesky: ["POST", "/uploadposts/bluesky/report", {"b": ["user", "post_id", "actor", "reason_type", "reason", "confirm"], "na": 1}],
   listPostApprovals: ["GET", "/uploadposts/approvals", {"q": ["status", "profile_username", "author", "limit", "before"], "na": 1}],
   getPostApproval: ["GET", "/uploadposts/approvals/{approval_id}", {"na": 1}],
   editPostApproval: ["PATCH", "/uploadposts/approvals/{approval_id}", {"b": ["title", "caption", "description", "platform_content", "fields", "scheduled_date", "timezone", "cover_image_base64", "remove_cover"], "na": 1}],
@@ -7462,22 +7581,20 @@ UploadPost.OPENAPI_OPERATIONS = {
   getTeamRoles: ["GET", "/uploadposts/teams/roles", {}],
   listTeamAudit: ["GET", "/uploadposts/teams/audit", {"q": ["actor", "action", "profile_username", "target_id", "since", "until", "limit", "cursor"]}],
   sendFeedback: ["POST", "/uploadposts/feedback", {"b": ["message", "category", "endpoint", "request_id", "agent"]}],
-  updateGoogleBusinessAccount: ["PATCH", "/uploadposts/google-business/accounts", {"b": ["user", "account", "account_name", "validate_only", "confirm"]}],
-  createGoogleBusinessAdmin: ["POST", "/uploadposts/google-business/admins", {"b": ["user", "scope", "account", "location_id", "admin", "admin_account", "role", "confirm"]}],
-  updateGoogleBusinessAdmin: ["PATCH", "/uploadposts/google-business/admins", {"b": ["user", "admin_name", "role", "confirm"]}],
-  deleteGoogleBusinessAdmin: ["DELETE", "/uploadposts/google-business/admins", {"b": ["user", "admin_name", "confirm"]}],
-  acceptGoogleBusinessInvitation: ["POST", "/uploadposts/google-business/invitations/accept", {"b": ["user", "invitation", "confirm"]}],
-  declineGoogleBusinessInvitation: ["POST", "/uploadposts/google-business/invitations/decline", {"b": ["user", "invitation", "confirm"]}],
-  transferGoogleBusinessLocation: ["POST", "/uploadposts/google-business/locations/transfer", {"b": ["user", "location_id", "destination_account", "confirm"]}],
-  createGoogleBusinessLocation: ["POST", "/uploadposts/google-business/locations/create", {"b": ["user", "account", "location", "language_code", "title", "primary_category", "request_id", "dry_run", "confirm"]}],
-  deleteGoogleBusinessLocation: ["DELETE", "/uploadposts/google-business/locations/delete", {"b": ["user", "location_id", "confirm"]}],
-  getGoogleBusinessNotificationSettings: ["GET", "/uploadposts/google-business/notifications", {"q": ["user", "account"]}],
-  updateGoogleBusinessNotificationSettings: ["PUT", "/uploadposts/google-business/notifications", {"b": ["user", "account", "enabled", "types", "confirm", "force", "confirm_other_tool"]}],
-  updateGoogleBusinessNotificationSettingsPatch: ["PATCH", "/uploadposts/google-business/notifications", {"b": ["user", "account", "enabled", "types", "confirm", "force", "confirm_other_tool"]}],
-  batchGetGoogleBusinessReviewsPost: ["POST", "/uploadposts/google-business/reviews/batch", {"b": ["user", "location_ids", "page_size", "page_token", "order_by", "ignoreRatingOnlyReviews"]}],
-  startGoogleBusinessVerification: ["POST", "/uploadposts/google-business/verification/start", {"b": ["user", "location_id", "method", "phone_number", "email_address", "mailer_contact", "trusted_partner_token", "token", "language_code", "context", "confirm"]}],
-  completeGoogleBusinessVerification: ["POST", "/uploadposts/google-business/verification/complete", {"b": ["user", "location_id", "verification_name", "verification_id", "pin"]}],
-  generateGoogleBusinessVerificationToken: ["POST", "/uploadposts/google-business/verification/token", {"b": ["user", "location_id"]}],
+  updateGoogleBusinessAccount: ["PATCH", "/uploadposts/google-business/accounts", {"b": ["user", "account", "account_name", "validate_only", "confirm"], "na": 1}],
+  createGoogleBusinessAdmin: ["POST", "/uploadposts/google-business/admins", {"b": ["user", "scope", "account", "location_id", "admin", "admin_account", "role", "confirm"], "na": 1}],
+  updateGoogleBusinessAdmin: ["PATCH", "/uploadposts/google-business/admins", {"b": ["user", "admin_name", "role", "confirm"], "na": 1}],
+  deleteGoogleBusinessAdmin: ["DELETE", "/uploadposts/google-business/admins", {"b": ["user", "admin_name", "confirm"], "na": 1}],
+  acceptGoogleBusinessInvitation: ["POST", "/uploadposts/google-business/invitations/accept", {"b": ["user", "invitation", "confirm"], "na": 1}],
+  declineGoogleBusinessInvitation: ["POST", "/uploadposts/google-business/invitations/decline", {"b": ["user", "invitation", "confirm"], "na": 1}],
+  transferGoogleBusinessLocation: ["POST", "/uploadposts/google-business/locations/transfer", {"b": ["user", "location_id", "destination_account", "confirm"], "na": 1}],
+  createGoogleBusinessLocation: ["POST", "/uploadposts/google-business/locations/create", {"b": ["user", "account", "location", "language_code", "title", "primary_category", "request_id", "dry_run", "confirm"], "na": 1}],
+  deleteGoogleBusinessLocation: ["DELETE", "/uploadposts/google-business/locations/delete", {"b": ["user", "location_id", "confirm"], "na": 1}],
+  getGoogleBusinessNotificationSettings: ["GET", "/uploadposts/google-business/notifications", {"q": ["user", "account"], "na": 1}],
+  updateGoogleBusinessNotificationSettings: ["PUT", "/uploadposts/google-business/notifications", {"b": ["user", "account", "enabled", "types", "confirm", "force", "confirm_other_tool"], "na": 1}],
+  startGoogleBusinessVerification: ["POST", "/uploadposts/google-business/verification/start", {"b": ["user", "location_id", "method", "phone_number", "email_address", "mailer_contact", "trusted_partner_token", "token", "language_code", "context", "confirm"], "na": 1}],
+  completeGoogleBusinessVerification: ["POST", "/uploadposts/google-business/verification/complete", {"b": ["user", "location_id", "verification_name", "verification_id", "pin"], "na": 1}],
+  generateGoogleBusinessVerificationToken: ["POST", "/uploadposts/google-business/verification/token", {"b": ["user", "location_id"], "na": 1}],
   connectChatgptAdsAccount: ["POST", "/uploadposts/ads/chatgpt/connect", {"b": ["api_key", "profile_username", "name", "default"]}],
   listChatgptAdsAccounts: ["GET", "/uploadposts/ads/chatgpt/accounts", {}],
   disconnectChatgptAdsAccount: ["DELETE", "/uploadposts/ads/chatgpt/accounts/{ad_account_id}", {"q": ["profile_username"]}],

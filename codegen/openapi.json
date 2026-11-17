@@ -527,7 +527,7 @@
       "post": {
         "operationId": "sendTelegramInvoice",
         "summary": "Send a Telegram invoice",
-        "description": "sendInvoice in Telegram Stars (XTR) or a provider currency.",
+        "description": "sendInvoice in Telegram Stars (XTR) or a provider currency. An invoice that spends the bot's Stars (paid broadcast) is off by default: 503 `telegram_stars_spend_disabled`.",
         "tags": [
           "Telegram"
         ],
@@ -1006,7 +1006,7 @@
       "post": {
         "operationId": "sendTelegramGift",
         "summary": "Send a gift from the bot's Stars",
-        "description": "sendGift. Spends the bot's Stars. Requires confirm=true and max_star_count (checked against the current price).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_stars_spend_disabled` until the feature is available.\n\nsendGift. Spends the bot's Stars. Requires confirm=true and max_star_count (checked against the current price).",
         "tags": [
           "Telegram"
         ],
@@ -1094,8 +1094,24 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `telegram_stars_spend_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "telegram_stars_spend_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/telegram/gifts/premium": {
@@ -1184,9 +1200,25 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `telegram_stars_spend_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "telegram_stars_spend_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
-        "description": "Spends the bot's Stars."
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_stars_spend_disabled` until the feature is available.\n\nSpends the bot's Stars.",
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/telegram/gifts/owned": {
@@ -1685,7 +1717,7 @@
                       "type": "string",
                       "format": "binary"
                     },
-                    "description": "Image files to attach to the first comment as inline images. Currently supported on Reddit. Not available for scheduled or queued posts."
+                    "description": "Image files to attach to the first comment as inline images. Currently supported on Reddit. Not available for scheduled or queued posts. Files only (multipart parts): a URL sent in this field is ignored."
                   },
                   "instagram_title": {
                     "type": "string",
@@ -2448,7 +2480,7 @@
                       "type": "string",
                       "format": "binary"
                     },
-                    "description": "One or more image files to attach to the first comment. Currently supported on Reddit. Not available for scheduled or queued posts."
+                    "description": "One or more image files to attach to the first comment. Currently supported on Reddit. Not available for scheduled or queued posts. Files only (multipart parts): a URL sent in this field is ignored."
                   },
                   "instagram_title": {
                     "type": "string",
@@ -2982,7 +3014,7 @@
                       "type": "string",
                       "format": "binary"
                     },
-                    "description": "One or more image files to attach to the first comment. Currently supported on Reddit. Not available for scheduled or queued posts."
+                    "description": "One or more image files to attach to the first comment. Currently supported on Reddit. Not available for scheduled or queued posts. Files only (multipart parts): a URL sent in this field is ignored."
                   },
                   "linkedin_title": {
                     "type": "string",
@@ -4883,7 +4915,8 @@
                 "type": "object",
                 "properties": {
                   "user": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Profile username. Also accepted as profile, or as ?profile= / ?user= in the query."
                   },
                   "name": {
                     "type": "string"
@@ -4898,10 +4931,45 @@
                       "PROTECTED"
                     ],
                     "description": "SECRET is rejected (400)."
+                  },
+                  "profile": {
+                    "type": "string",
+                    "description": "Alias of user."
                   }
                 },
                 "required": [
-                  "user",
+                  "name"
+                ]
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user": {
+                    "type": "string",
+                    "description": "Profile username. Also accepted as profile, or as ?profile= / ?user= in the query."
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "privacy": {
+                    "type": "string",
+                    "enum": [
+                      "PUBLIC",
+                      "PROTECTED"
+                    ],
+                    "description": "SECRET is rejected (400)."
+                  },
+                  "profile": {
+                    "type": "string",
+                    "description": "Alias of user."
+                  }
+                },
+                "required": [
                   "name"
                 ]
               }
@@ -4922,7 +4990,21 @@
                     },
                     "board": {
                       "type": "object",
-                      "additionalProperties": true
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "privacy": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      }
                     }
                   }
                 }
@@ -4935,7 +5017,28 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "profile",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Profile username (alias user); default the first profile with Pinterest."
+          },
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Alias of profile."
+          }
+        ],
+        "description": "Without a profile the first profile of the account with a Pinterest account is used."
       }
     },
     "/uploadposts/youtube/videos": {
@@ -5351,7 +5454,7 @@
       "get": {
         "operationId": "listYoutubeLiveBroadcasts",
         "summary": "List YouTube live broadcasts",
-        "description": "liveBroadcasts.list. 1 unit.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nliveBroadcasts.list. 1 unit.",
         "tags": [
           "Platform Integration"
         ],
@@ -5398,6 +5501,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -5469,12 +5587,13 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "createYoutubeLiveBroadcast",
         "summary": "Create a YouTube live broadcast",
-        "description": "liveBroadcasts.insert (1 unit). With create_stream=true also creates and binds a stream (3 units) and returns the ingestion URL and key. The stream key is only returned to the account owner (team members get \"<hidden>\").",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nliveBroadcasts.insert (1 unit). With create_stream=true also creates and binds a stream (3 units) and returns the ingestion URL and key. The stream key is only returned to the account owner (team members get \"<hidden>\").",
         "tags": [
           "Platform Integration"
         ],
@@ -5510,6 +5629,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -5634,14 +5768,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/broadcasts/{broadcast_id}": {
       "get": {
         "operationId": "getYoutubeLiveBroadcast",
         "summary": "Get a YouTube live broadcast",
-        "description": "1 unit.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\n1 unit.",
         "tags": [
           "Platform Integration"
         ],
@@ -5677,6 +5812,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -5706,12 +5856,13 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "patch": {
         "operationId": "updateYoutubeLiveBroadcast",
         "summary": "Edit a YouTube live broadcast",
-        "description": "Read + liveBroadcasts.update (2 units). Only sent fields change.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nRead + liveBroadcasts.update (2 units). Only sent fields change.",
         "tags": [
           "Platform Integration"
         ],
@@ -5751,6 +5902,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -5888,12 +6054,13 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteYoutubeLiveBroadcast",
         "summary": "Delete a YouTube live broadcast",
-        "description": "1 unit. Cannot be undone.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\n1 unit. Cannot be undone.",
         "tags": [
           "Platform Integration"
         ],
@@ -5929,6 +6096,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -5959,14 +6141,15 @@
             },
             "required": true
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/broadcasts/{broadcast_id}/bind": {
       "post": {
         "operationId": "bindYoutubeLiveBroadcast",
         "summary": "Bind or unbind a stream",
-        "description": "liveBroadcasts.bind. 1 unit.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nliveBroadcasts.bind. 1 unit.",
         "tags": [
           "Platform Integration"
         ],
@@ -6002,6 +6185,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6039,14 +6237,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/broadcasts/{broadcast_id}/transition": {
       "post": {
         "operationId": "transitionYoutubeLiveBroadcast",
         "summary": "Go testing, live or complete",
-        "description": "liveBroadcasts.transition. 1 unit. live and complete need confirm=true. Poll GET until the status changes.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nliveBroadcasts.transition. 1 unit. live and complete need confirm=true. Poll GET until the status changes.",
         "tags": [
           "Platform Integration"
         ],
@@ -6082,6 +6281,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6125,14 +6339,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/broadcasts/{broadcast_id}/cuepoint": {
       "post": {
         "operationId": "insertYoutubeLiveCuepoint",
         "summary": "Insert an ad break",
-        "description": "liveBroadcasts.cuepoint. 1 unit.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nliveBroadcasts.cuepoint. 1 unit.",
         "tags": [
           "Platform Integration"
         ],
@@ -6168,6 +6383,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6208,14 +6438,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/streams": {
       "get": {
         "operationId": "listYoutubeLiveStreams",
         "summary": "List YouTube live streams",
-        "description": "liveStreams.list. 1 unit. The stream key is only returned to the account owner (team members get \"<hidden>\").",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nliveStreams.list. 1 unit. The stream key is only returned to the account owner (team members get \"<hidden>\").",
         "tags": [
           "Platform Integration"
         ],
@@ -6262,6 +6493,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6314,12 +6560,13 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "createYoutubeLiveStream",
         "summary": "Create a YouTube live stream",
-        "description": "liveStreams.insert. 1 unit. The stream key is only returned to the account owner (team members get \"<hidden>\").",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nliveStreams.insert. 1 unit. The stream key is only returned to the account owner (team members get \"<hidden>\").",
         "tags": [
           "Platform Integration"
         ],
@@ -6355,6 +6602,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -6416,14 +6678,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/streams/{stream_id}": {
       "get": {
         "operationId": "getYoutubeLiveStream",
         "summary": "Get a YouTube live stream",
-        "description": "1 unit. Health in status.healthStatus. The stream key is only returned to the account owner (team members get \"<hidden>\").",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\n1 unit. Health in status.healthStatus. The stream key is only returned to the account owner (team members get \"<hidden>\").",
         "tags": [
           "Platform Integration"
         ],
@@ -6459,6 +6722,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6488,12 +6766,13 @@
               "type": "boolean"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "patch": {
         "operationId": "updateYoutubeLiveStream",
         "summary": "Edit a YouTube live stream",
-        "description": "Title and description only. 2 units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nTitle and description only. 2 units.",
         "tags": [
           "Platform Integration"
         ],
@@ -6529,6 +6808,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6568,12 +6862,13 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteYoutubeLiveStream",
         "summary": "Delete a YouTube live stream",
-        "description": "1 unit.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\n1 unit.",
         "tags": [
           "Platform Integration"
         ],
@@ -6609,6 +6904,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6639,14 +6949,15 @@
             },
             "required": true
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/chat": {
       "get": {
         "operationId": "listYoutubeLiveChatMessages",
         "summary": "Read a YouTube live chat page",
-        "description": "liveChatMessages.list: one page (5 units). Wait polling_interval_ms (min 5 s) before the next read with next_page_token.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nliveChatMessages.list: one page (5 units). Wait polling_interval_ms (min 5 s) before the next read with next_page_token.",
         "tags": [
           "Platform Integration"
         ],
@@ -6693,6 +7004,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6753,12 +7079,13 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "sendYoutubeLiveChatMessage",
         "summary": "Post a message or poll in a YouTube live chat",
-        "description": "liveChatMessages.insert (20 units), as the channel.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nliveChatMessages.insert (20 units), as the channel.",
         "tags": [
           "Platform Integration"
         ],
@@ -6798,6 +7125,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -6849,14 +7191,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/chat/polls/{message_id}/close": {
       "post": {
         "operationId": "closeYoutubeLiveChatPoll",
         "summary": "Close a live chat poll",
-        "description": "liveChatMessages.transition status=closed. 20 units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nliveChatMessages.transition status=closed. 20 units.",
         "tags": [
           "Platform Integration"
         ],
@@ -6892,6 +7235,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6913,14 +7271,15 @@
             },
             "required": true
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/chat/messages/{message_id}": {
       "delete": {
         "operationId": "deleteYoutubeLiveChatMessage",
         "summary": "Delete a live chat message",
-        "description": "20 units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\n20 units.",
         "tags": [
           "Platform Integration"
         ],
@@ -6956,6 +7315,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -6986,14 +7360,15 @@
             },
             "required": true
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/moderators": {
       "get": {
         "operationId": "listYoutubeLiveChatModerators",
         "summary": "List live chat moderators",
-        "description": "50 units per page.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\n50 units per page.",
         "tags": [
           "Platform Integration"
         ],
@@ -7040,6 +7415,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -7084,12 +7474,13 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "addYoutubeLiveChatModerator",
         "summary": "Add a live chat moderator",
-        "description": "200 units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\n200 units.",
         "tags": [
           "Platform Integration"
         ],
@@ -7125,6 +7516,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -7155,14 +7561,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/moderators/{moderator_id}": {
       "delete": {
         "operationId": "removeYoutubeLiveChatModerator",
         "summary": "Remove a live chat moderator",
-        "description": "200 units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\n200 units.",
         "tags": [
           "Platform Integration"
         ],
@@ -7198,6 +7605,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -7228,14 +7650,15 @@
             },
             "required": true
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/bans": {
       "post": {
         "operationId": "banYoutubeLiveChatUser",
         "summary": "Ban a user from a live chat",
-        "description": "200 units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\n200 units.",
         "tags": [
           "Platform Integration"
         ],
@@ -7271,6 +7694,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -7316,14 +7754,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/bans/{ban_id}": {
       "delete": {
         "operationId": "unbanYoutubeLiveChatUser",
         "summary": "Lift a live chat ban",
-        "description": "200 units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\n200 units.",
         "tags": [
           "Platform Integration"
         ],
@@ -7359,6 +7798,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -7380,14 +7834,15 @@
             },
             "required": true
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/live/super-chats": {
       "get": {
         "operationId": "listYoutubeSuperChats",
         "summary": "List Super Chats and Super Stickers",
-        "description": "superChatEvents.list, last 30 days. 2 units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nsuperChatEvents.list, last 30 days. 2 units.",
         "tags": [
           "Platform Integration"
         ],
@@ -7434,6 +7889,21 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -7470,59 +7940,8 @@
               "type": "string"
             }
           }
-        ]
-      }
-    },
-    "/uploadposts/reddit/detailed-posts": {
-      "get": {
-        "operationId": "getRedditDetailedPosts",
-        "summary": "Get Reddit detailed posts",
-        "description": "Retrieve detailed posts from a Reddit account connected to a profile, including complete media information. Supports automatic pagination up to 2000 posts.",
-        "tags": [
-          "Platform Integration"
         ],
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "profile_username",
-            "in": "query",
-            "required": true,
-            "description": "Username of the profile with a connected Reddit account.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Reddit posts retrieved successfully.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "posts": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/RedditPost"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalServerError"
-          }
-        }
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/tiktok/music/trending": {
@@ -8787,6 +9206,35 @@
                     "plan": {
                       "type": "string",
                       "example": "Professional"
+                    },
+                    "analyze_shorts": {
+                      "type": "object",
+                      "description": "AI Shorts analyses (POST /uploadposts/analyze-shorts) for the current 30-day window. Read-only: calling this endpoint never uses one. Same rules as the analysis itself. null only if the account data cannot be read.",
+                      "properties": {
+                        "limit": {
+                          "type": "integer",
+                          "description": "Analyses included in the plan per window.",
+                          "example": 300
+                        },
+                        "used": {
+                          "type": "integer",
+                          "description": "Analyses used in the current window.",
+                          "example": 12
+                        },
+                        "remaining": {
+                          "type": "integer",
+                          "description": "Analyses left in the current window (never below 0).",
+                          "example": 288
+                        },
+                        "resets_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true,
+                          "description": "When the counter restarts (UTC). null when no window is running: the next analysis starts a new 30-day window with the full limit.",
+                          "example": "2026-12-10T08:15:00Z"
+                        }
+                      },
+                      "nullable": true
                     }
                   }
                 }
@@ -9332,7 +9780,7 @@
       "get": {
         "operationId": "validateJwt",
         "summary": "Validate JWT",
-        "description": "Validate a JWT token and return the associated profile details. Uses Bearer token authentication.",
+        "description": "Validates a profile JWT (Authorization: Bearer <token>) and returns its profile. GET only: POST answers 405.",
         "tags": [
           "Authentication"
         ],
@@ -9380,6 +9828,31 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "The profile is not available on the current plan. error_code: `PROFILE_BLOCKED`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "PROFILE_BLOCKED",
+                  "message": "The profile is not available on the current plan."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The user or the profile of the token no longer exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionError"
+                }
+              }
+            }
           }
         }
       }
@@ -9605,15 +10078,9 @@
       "post": {
         "operationId": "configureNotifications",
         "summary": "Configure webhook notifications",
-        "description": "Configure notification preferences for upload events. Supports webhook (POST to your URL) and Telegram notifications.",
+        "description": "Updates the notification settings (only the fields sent change). Accepted fields: channels, webhook_url, webhook_events, telegram_chat_id, slack_webhook_url, whatsapp_to_phone. Team members (X-Act-As-User) cannot change where notifications go (403). The webhook_secret is created with the first webhook_url and is never set by the client.",
         "tags": [
           "Webhooks"
-        ],
-        "servers": [
-          {
-            "url": "https://app.upload-post.com/api",
-            "description": "Application server (notifications endpoint)"
-          }
         ],
         "requestBody": {
           "required": true,
@@ -9632,6 +10099,14 @@
                       "telegram": {
                         "type": "boolean",
                         "description": "Enable/disable Telegram notifications."
+                      },
+                      "slack": {
+                        "type": "boolean",
+                        "description": "Enable/disable Slack notifications (needs slack_webhook_url)."
+                      },
+                      "whatsapp": {
+                        "type": "boolean",
+                        "description": "Enable/disable WhatsApp notifications (needs whatsapp_to_phone)."
                       }
                     }
                   },
@@ -9645,17 +10120,32 @@
                     "description": "Telegram chat ID for notifications."
                   },
                   "webhook_events": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "enum": [
-                        "upload_completed",
-                        "social_account.connected",
-                        "social_account.disconnected",
-                        "social_account.reauth_required"
-                      ]
-                    },
-                    "description": "List of webhook event types to subscribe to. If omitted, all events are enabled."
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "boolean"
+                        },
+                        "description": "Event name -> enabled."
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/WebhookEventName"
+                        },
+                        "description": "Names of the enabled events."
+                      }
+                    ],
+                    "description": "Which events the account webhook receives: an object {event: true|false} or a list of names; both are stored as sent and returned the same way. Omitted or empty = every event except the opt-in ones."
+                  },
+                  "slack_webhook_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Slack Incoming Webhook URL for notifications (public URL; an empty value clears it)."
+                  },
+                  "whatsapp_to_phone": {
+                    "type": "string",
+                    "description": "Phone number that receives WhatsApp notifications."
                   }
                 }
               }
@@ -9664,7 +10154,7 @@
         },
         "responses": {
           "200": {
-            "description": "Notification settings updated successfully.",
+            "description": "Settings saved.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9675,32 +10165,7 @@
                       "example": true
                     },
                     "notifications": {
-                      "type": "object",
-                      "properties": {
-                        "channels": {
-                          "type": "object",
-                          "properties": {
-                            "webhook": {
-                              "type": "boolean"
-                            },
-                            "telegram": {
-                              "type": "boolean"
-                            }
-                          }
-                        },
-                        "webhook_url": {
-                          "type": "string"
-                        },
-                        "telegram_chat_id": {
-                          "type": "string"
-                        },
-                        "webhook_events": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        }
-                      }
+                      "$ref": "#/components/schemas/NotificationSettings"
                     }
                   }
                 }
@@ -9709,6 +10174,26 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "400": {
+            "description": "No valid field, or a webhook_url / slack_webhook_url that is not a public URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Team members cannot change where the owner's notifications are delivered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionError"
+                }
+              }
+            }
           }
         },
         "callbacks": {
@@ -14587,7 +15072,7 @@
       "post": {
         "operationId": "setTelegramUpdates",
         "summary": "Turn Telegram updates on or off",
-        "description": "Opt-in per bot. A webhook that is not Upload-Post's is never replaced without replace_existing_webhook=true (409 telegram_webhook_in_use otherwise). With no webhook, the answer warns that a getUpdates integration stops receiving.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_updates_unavailable` until the feature is available.\n\nOpt-in per bot. A webhook that is not Upload-Post's is never replaced without replace_existing_webhook=true (409 telegram_webhook_in_use otherwise). With no webhook, the answer warns that a getUpdates integration stops receiving.",
         "tags": [
           "Telegram"
         ],
@@ -14668,7 +15153,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/telegram/answer": {
@@ -14805,7 +15291,7 @@
       "get": {
         "operationId": "getTelegramBusinessConnections",
         "summary": "Telegram Business connections",
-        "description": "Connections of the bot with Telegram Business accounts (rights, enabled).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.\n\nConnections of the bot with Telegram Business accounts (rights, enabled).",
         "tags": [
           "Telegram"
         ],
@@ -14851,14 +15337,15 @@
             },
             "description": "Optional when the bot has one active Business connection."
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/telegram/business-profile": {
       "get": {
         "operationId": "getTelegramBusinessProfile",
         "summary": "Telegram Business account",
-        "description": "The connected account.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.\n\nThe connected account.",
         "tags": [
           "Telegram"
         ],
@@ -14904,12 +15391,13 @@
             },
             "description": "Optional when the bot has one active Business connection."
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "patch": {
         "operationId": "updateTelegramBusinessProfile",
         "summary": "Update the Telegram Business profile",
-        "description": "first_name/last_name, username, bio, photo (multipart or media_url, is_public), remove_photo, gift_settings.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.\n\nfirst_name/last_name, username, bio, photo (multipart or media_url, is_public), remove_photo, gift_settings.",
         "tags": [
           "Telegram"
         ],
@@ -14990,14 +15478,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/telegram/business-stories": {
       "post": {
         "operationId": "postTelegramStory",
         "summary": "Post a Telegram story",
-        "description": "postStory on behalf of the Business account. Photos 1080x1920 up to 10 MB; videos 720x1280 H.265 up to 30 MB, 60 s.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.\n\npostStory on behalf of the Business account. Photos 1080x1920 up to 10 MB; videos 720x1280 H.265 up to 30 MB, 60 s.",
         "tags": [
           "Telegram"
         ],
@@ -15086,12 +15575,13 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "patch": {
         "operationId": "editTelegramStory",
         "summary": "Edit a Telegram story",
-        "description": "editStory.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.\n\neditStory.",
         "tags": [
           "Telegram"
         ],
@@ -15180,12 +15670,13 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteTelegramStory",
         "summary": "Delete a Telegram story",
-        "description": "deleteStory.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.\n\ndeleteStory.",
         "tags": [
           "Telegram"
         ],
@@ -15275,14 +15766,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/telegram/business-stories/repost": {
       "post": {
         "operationId": "repostTelegramStory",
         "summary": "Repost a Telegram story",
-        "description": "repostStory from another Business account of the same bot.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.\n\nrepostStory from another Business account of the same bot.",
         "tags": [
           "Telegram"
         ],
@@ -15354,14 +15846,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/telegram/business-gifts": {
       "get": {
         "operationId": "getTelegramBusinessGifts",
         "summary": "Telegram Business gifts",
-        "description": "getBusinessAccountGifts with Telegram's filters.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.\n\ngetBusinessAccountGifts with Telegram's filters.",
         "tags": [
           "Telegram"
         ],
@@ -15407,12 +15900,13 @@
             },
             "description": "Optional when the bot has one active Business connection."
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "manageTelegramBusinessGift",
         "summary": "Convert, upgrade, transfer or delete a gift",
-        "description": "Irreversible: requires confirm=true and an idempotency_key (a repeat with the same key returns the first answer).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.\n\nIrreversible: requires confirm=true and an idempotency_key (a repeat with the same key returns the first answer).",
         "tags": [
           "Telegram"
         ],
@@ -15498,14 +15992,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/telegram/business-stars": {
       "get": {
         "operationId": "getTelegramBusinessStars",
         "summary": "Telegram Business Stars balance",
-        "description": "getBusinessAccountStarBalance.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.\n\ngetBusinessAccountStarBalance.",
         "tags": [
           "Telegram"
         ],
@@ -15551,14 +16046,15 @@
             },
             "description": "Optional when the bot has one active Business connection."
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/telegram/business-stars/transfer": {
       "post": {
         "operationId": "transferTelegramBusinessStars",
         "summary": "Move Stars to the bot",
-        "description": "transferBusinessAccountStars (1-10000). Requires confirm=true and an idempotency_key.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.\n\ntransferBusinessAccountStars (1-10000). Requires confirm=true and an idempotency_key.",
         "tags": [
           "Telegram"
         ],
@@ -15622,7 +16118,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/bluesky/xrpc/{nsid}": {
@@ -18075,7 +18572,7 @@
       "post": {
         "operationId": "postAction",
         "summary": "Act on a published post (LinkedIn, Bluesky)",
-        "description": "LinkedIn: repost, edit. Bluesky: like, unlike, repost, unrepost, bookmark, unbookmark, pin, unpin, reply_settings, quote_settings, detach_quote, reattach_quote. Bluesky like and repost are not generally available yet (`503` `bluesky_feature_disabled`); once on, they count toward the Bluesky daily limit of 200 likes, reposts and follows per account.",
+        "description": "LinkedIn: repost, edit. Bluesky: like, unlike, repost, unrepost, bookmark, unbookmark, pin, unpin, reply_settings, quote_settings, detach_quote, reattach_quote. Bluesky like and repost are not generally available yet (`503` `bluesky_feature_disabled`); once on, they count toward the Bluesky daily limit of 200 likes, reposts and follows per account. Bluesky like and repost are off by default: 503 `bluesky_feature_disabled` (the other actions are available).",
         "tags": [
           "Bluesky"
         ],
@@ -19716,7 +20213,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/bluesky/lists": {
@@ -19836,7 +20334,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "createBlueskyList",
@@ -20020,7 +20519,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/bluesky/lists/{list_id}": {
@@ -20135,7 +20635,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "patch": {
         "operationId": "updateBlueskyList",
@@ -20326,7 +20827,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteBlueskyList",
@@ -20454,7 +20956,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/bluesky/lists/{list_id}/members": {
@@ -20569,7 +21072,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "addBlueskyListMember",
@@ -20696,7 +21200,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "removeBlueskyListMember",
@@ -20823,7 +21328,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/bluesky/lists/opt-out": {
@@ -20941,7 +21447,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "removeOptOutBlueskyList",
@@ -21057,7 +21564,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/bluesky/starter-packs": {
@@ -21163,7 +21671,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "createBlueskyStarterPack",
@@ -21301,7 +21810,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/bluesky/starter-packs/{pack_id}": {
@@ -21416,7 +21926,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "patch": {
         "operationId": "updateBlueskyStarterPack",
@@ -21564,7 +22075,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteBlueskyStarterPack",
@@ -21695,7 +22207,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/bluesky/feeds": {
@@ -21801,7 +22314,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "createBlueskyFeed",
@@ -21993,7 +22507,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/bluesky/feeds/{rkey}": {
@@ -22192,7 +22707,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteBlueskyFeed",
@@ -22320,7 +22836,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/bluesky/report": {
@@ -22454,7 +22971,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/bluesky/drafts": {
@@ -23296,7 +23814,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/dms/bluesky/groups": {
@@ -23364,7 +23883,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "get": {
         "operationId": "listBlueskyMutualGroups",
@@ -23428,7 +23948,8 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/dms/bluesky/groups/{conversation_id}": {
@@ -23496,7 +24017,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/dms/bluesky/groups/{conversation_id}/members": {
@@ -23548,7 +24070,8 @@
             },
             "description": "Profile username as configured in Upload-Post."
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "addBlueskyGroupMembers",
@@ -23615,7 +24138,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "removeBlueskyGroupMembers",
@@ -23682,7 +24206,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/dms/bluesky/groups/{conversation_id}/join-link": {
@@ -23764,7 +24289,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests": {
@@ -23816,7 +24342,8 @@
             },
             "description": "Profile username as configured in Upload-Post."
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "answerBlueskyJoinRequest",
@@ -23889,7 +24416,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/dms/bluesky/join-links": {
@@ -23942,7 +24470,8 @@
             },
             "description": "Comma-separated join link codes."
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "joinBlueskyGroup",
@@ -23996,14 +24525,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/comments": {
       "get": {
         "operationId": "listYoutubeCommentThreads",
         "summary": "List YouTube comment threads",
-        "description": "commentThreads.list of one video (video_id), of the whole channel (scope=channel) or by id (ids). Filter held-for-review or likely-spam comments of your channel. 1 quota unit per page; a page is reused for up to a minute.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ncommentThreads.list of one video (video_id), of the whole channel (scope=channel) or by id (ids). Filter held-for-review or likely-spam comments of your channel. 1 quota unit per page; a page is reused for up to a minute.",
         "tags": [
           "Platform Integration"
         ],
@@ -24387,12 +24917,13 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "createYoutubeComment",
         "summary": "Reply to or post a YouTube comment",
-        "description": "Reply to a top-level comment (parent_id) or post a new top-level comment on a video (video_id). 50 quota units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nReply to a top-level comment (parent_id) or post a new top-level comment on a video (video_id). 50 quota units.",
         "tags": [
           "Platform Integration"
         ],
@@ -24729,14 +25260,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/comments/replies": {
       "get": {
         "operationId": "listYoutubeCommentReplies",
         "summary": "List YouTube comment replies",
-        "description": "comments.list: replies of a top-level comment (parent_id) or comments by id (ids, up to 50). 1 quota unit.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ncomments.list: replies of a top-level comment (parent_id) or comments by id (ids, up to 50). 1 quota unit.",
         "tags": [
           "Platform Integration"
         ],
@@ -25071,14 +25603,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/comments/moderate": {
       "post": {
         "operationId": "moderateYoutubeComments",
         "summary": "Moderate YouTube comments",
-        "description": "comments.setModerationStatus for up to 50 comments of your channel in one call (50 quota units). status=rejected (and ban_author) need confirm=true; a rejected comment can never be published again and its replies are hidden too.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ncomments.setModerationStatus for up to 50 comments of your channel in one call (50 quota units). status=rejected (and ban_author) need confirm=true; a rejected comment can never be published again and its replies are hidden too.",
         "tags": [
           "Platform Integration"
         ],
@@ -25387,14 +25920,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/comments/{comment_id}": {
       "patch": {
         "operationId": "editYoutubeComment",
         "summary": "Edit your YouTube comment",
-        "description": "comments.update of the text of a comment written by the connected channel. 50 quota units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ncomments.update of the text of a comment written by the connected channel. 50 quota units.",
         "tags": [
           "Platform Integration"
         ],
@@ -25694,12 +26228,13 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteYoutubeComment",
         "summary": "Delete your YouTube comment",
-        "description": "comments.delete (only the author can delete; to remove someone else's comment, moderate it with status=rejected). Needs confirm=true. 50 quota units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ncomments.delete (only the author can delete; to remove someone else's comment, moderate it with status=rejected). Needs confirm=true. 50 quota units.",
         "tags": [
           "Platform Integration"
         ],
@@ -25993,14 +26528,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/categories": {
       "get": {
         "operationId": "listYoutubeCategories",
         "summary": "List YouTube video categories",
-        "description": "videoCategories.list of a region (cached for several days).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nvideoCategories.list of a region (cached for several days).",
         "tags": [
           "Platform Integration"
         ],
@@ -26315,14 +26851,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/languages": {
       "get": {
         "operationId": "listYoutubeLanguages",
         "summary": "List YouTube languages",
-        "description": "i18nLanguages.list (cached for several days).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ni18nLanguages.list (cached for several days).",
         "tags": [
           "Platform Integration"
         ],
@@ -26622,14 +27159,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/regions": {
       "get": {
         "operationId": "listYoutubeRegions",
         "summary": "List YouTube regions",
-        "description": "i18nRegions.list (cached for several days).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ni18nRegions.list (cached for several days).",
         "tags": [
           "Platform Integration"
         ],
@@ -26929,14 +27467,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/abuse-reasons": {
       "get": {
         "operationId": "listYoutubeAbuseReasons",
         "summary": "List YouTube abuse report reasons",
-        "description": "videoAbuseReportReasons.list (cached for several days).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nvideoAbuseReportReasons.list (cached for several days).",
         "tags": [
           "Platform Integration"
         ],
@@ -27236,14 +27775,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/search": {
       "get": {
         "operationId": "searchYoutube",
         "summary": "Search YouTube",
-        "description": "search.list, one page per request. Searches have a much smaller daily allowance than other features (see /youtube/quota, bucket search); an identical search within an hour answers from cache and does not use one. forDeveloper and content-owner parameters are not available.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nsearch.list, one page per request. Searches have a much smaller daily allowance than other features (see /youtube/quota, bucket search); an identical search within an hour answers from cache and does not use one. forDeveloper and content-owner parameters are not available.",
         "tags": [
           "Platform Integration"
         ],
@@ -27799,14 +28339,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/subscriptions": {
       "get": {
         "operationId": "listYoutubeSubscriptions",
         "summary": "List YouTube subscriptions or subscribers",
-        "description": "subscriptions.list: exactly one of filter (mine, my_subscribers, my_recent_subscribers), channel_id or ids. 1 quota unit.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nsubscriptions.list: exactly one of filter (mine, my_subscribers, my_recent_subscribers), channel_id or ids. 1 quota unit.",
         "tags": [
           "Platform Integration"
         ],
@@ -28170,12 +28711,13 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "subscribeYoutube",
         "summary": "Subscribe to a YouTube channel",
-        "description": "subscriptions.insert on behalf of the connected channel. 50 quota units; limited per channel and day.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nsubscriptions.insert on behalf of the connected channel. 50 quota units; limited per channel and day.",
         "tags": [
           "Platform Integration"
         ],
@@ -28465,14 +29007,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/subscriptions/{subscription_id}": {
       "delete": {
         "operationId": "unsubscribeYoutube",
         "summary": "Unsubscribe from a YouTube channel",
-        "description": "subscriptions.delete. 50 quota units; limited per channel and day.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nsubscriptions.delete. 50 quota units; limited per channel and day.",
         "tags": [
           "Platform Integration"
         ],
@@ -28758,14 +29301,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/videos/rating": {
       "get": {
         "operationId": "getYoutubeRatings",
         "summary": "Get the channel's rating of videos",
-        "description": "videos.getRating for up to 50 video IDs. 1 quota unit.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nvideos.getRating for up to 50 video IDs. 1 quota unit.",
         "tags": [
           "Platform Integration"
         ],
@@ -29066,14 +29610,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/videos/{video_id}/rate": {
       "post": {
         "operationId": "rateYoutubeVideo",
         "summary": "Like, dislike or clear the rating of a YouTube video",
-        "description": "videos.rate on behalf of the connected channel. 50 quota units; limited per channel and day.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nvideos.rate on behalf of the connected channel. 50 quota units; limited per channel and day.",
         "tags": [
           "Platform Integration"
         ],
@@ -29377,14 +29922,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/videos/{video_id}/report-abuse": {
       "post": {
         "operationId": "reportYoutubeVideo",
         "summary": "Report a YouTube video",
-        "description": "videos.reportAbuse on behalf of the connected channel. reason_id from /youtube/abuse-reasons; needs confirm=true (cannot be withdrawn). 50 quota units; limited per channel and day.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nvideos.reportAbuse on behalf of the connected channel. reason_id from /youtube/abuse-reasons; needs confirm=true (cannot be withdrawn). 50 quota units; limited per channel and day.",
         "tags": [
           "Platform Integration"
         ],
@@ -29697,14 +30243,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/activities": {
       "get": {
         "operationId": "listYoutubeActivities",
         "summary": "List YouTube channel activity",
-        "description": "activities.list of the connected channel (or channel_id). 1 quota unit.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nactivities.list of the connected channel (or channel_id). 1 quota unit.",
         "tags": [
           "Platform Integration"
         ],
@@ -30050,7 +30597,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/analytics/query": {
@@ -30218,7 +30766,8 @@
           "409": {
             "description": "youtube_analytics_query_in_progress"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/analytics/reports": {
@@ -30262,7 +30811,8 @@
           "503": {
             "description": "Feature not enabled right now."
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/analytics/groups": {
@@ -30321,7 +30871,8 @@
           "503": {
             "description": "Feature not enabled right now."
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/analytics/groups/{group_id}/items": {
@@ -30374,14 +30925,15 @@
           "503": {
             "description": "Feature not enabled right now."
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/analytics/usage": {
       "get": {
         "operationId": "getYoutubeAnalyticsUsage",
         "summary": "Daily allowance of YouTube Analytics and bulk reports",
-        "description": "The caller's own usage today of the Analytics and bulk reports allowances. While Analytics and bulk reports are not generally available yet, each service shows enabled: false.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nThe caller's own usage today of the Analytics and bulk reports allowances. While Analytics and bulk reports are not generally available yet, each service shows enabled: false.",
         "tags": [
           "Platform Integration"
         ],
@@ -30408,7 +30960,8 @@
           "503": {
             "description": "Feature not enabled right now."
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/reporting/report-types": {
@@ -30468,7 +31021,8 @@
           "503": {
             "description": "Feature not enabled right now."
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/reporting/jobs": {
@@ -30528,7 +31082,8 @@
           "503": {
             "description": "Feature not enabled right now."
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "createYoutubeReportingJob",
@@ -30590,7 +31145,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/reporting/jobs/{job_id}": {
@@ -30646,7 +31202,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteYoutubeReportingJob",
@@ -30716,7 +31273,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/reporting/jobs/{job_id}/reports": {
@@ -30809,7 +31367,8 @@
           "503": {
             "description": "Feature not enabled right now."
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}": {
@@ -30871,7 +31430,8 @@
           "503": {
             "description": "Feature not enabled right now."
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}/download": {
@@ -30944,14 +31504,15 @@
           "413": {
             "description": "youtube_reporting_report_too_large"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/channel": {
       "get": {
         "operationId": "getYoutubeChannel",
         "summary": "Get the connected YouTube channel",
-        "description": "channels.list of the profile's channel with snippet, brandingSettings, status, statistics, localizations, topicDetails and contentDetails. 1 YouTube unit, cached 5 minutes.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nchannels.list of the profile's channel with snippet, brandingSettings, status, statistics, localizations, topicDetails and contentDetails. 1 YouTube unit, cached 5 minutes.",
         "tags": [
           "Platform Integration"
         ],
@@ -30980,6 +31541,21 @@
           },
           "429": {
             "description": "Daily YouTube allowance used up (see retry_after)."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -30992,12 +31568,13 @@
             },
             "description": "Profile username with a YouTube channel connected."
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "patch": {
         "operationId": "updateYoutubeChannel",
         "summary": "Update YouTube channel settings",
-        "description": "Changes only the fields sent (the rest is read and resent). Empty string = no change, null = clear. Settings and localizations go in separate calls. 51 YouTube units. Text fields must be strings (400 invalid_field). Translation codes accept - or _ and match the channel's real codes (fr matches fr_FR); the answer lists localizations_removed. Untouched settings missing from YouTube's answer, or a default language YouTube kept, come back in warnings. A concurrent change of the same channel answers 409 youtube_channel_busy.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nChanges only the fields sent (the rest is read and resent). Empty string = no change, null = clear. Settings and localizations go in separate calls. 51 YouTube units. Text fields must be strings (400 invalid_field). Translation codes accept - or _ and match the channel's real codes (fr matches fr_FR); the answer lists localizations_removed. Untouched settings missing from YouTube's answer, or a default language YouTube kept, come back in warnings. A concurrent change of the same channel answers 409 youtube_channel_busy.",
         "tags": [
           "Platform Integration"
         ],
@@ -31026,6 +31603,21 @@
           },
           "429": {
             "description": "Daily YouTube allowance used up (see retry_after)."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -31101,14 +31693,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/channel/lookup": {
       "get": {
         "operationId": "lookupYoutubeChannels",
         "summary": "Look up YouTube channels",
-        "description": "Public data of channels by ids (up to 50), for_handle or for_username (exactly one). 1 YouTube unit, cached 1 hour.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nPublic data of channels by ids (up to 50), for_handle or for_username (exactly one). 1 YouTube unit, cached 1 hour.",
         "tags": [
           "Platform Integration"
         ],
@@ -31137,6 +31730,21 @@
           },
           "429": {
             "description": "Daily YouTube allowance used up (see retry_after)."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -31170,14 +31778,15 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/channel/banner": {
       "post": {
         "operationId": "setYoutubeChannelBanner",
         "summary": "Upload the YouTube channel banner",
-        "description": "PNG/JPEG, up to 6 MB, 16:9, at least 2048x1152, as file `image` or `image_url`; or `banner_url` to apply a banner already uploaded. 101 YouTube units. If YouTube does not answer the second step: 502 youtube_write_outcome_unknown with banner_url (check before re-applying).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nPNG/JPEG, up to 6 MB, 16:9, at least 2048x1152, as file `image` or `image_url`; or `banner_url` to apply a banner already uploaded. 101 YouTube units. If YouTube does not answer the second step: 502 youtube_write_outcome_unknown with banner_url (check before re-applying).",
         "tags": [
           "Platform Integration"
         ],
@@ -31206,6 +31815,21 @@
           },
           "429": {
             "description": "Daily YouTube allowance used up (see retry_after)."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -31260,14 +31884,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/channel/sections": {
       "get": {
         "operationId": "listYoutubeChannelSections",
         "summary": "List YouTube channel sections",
-        "description": "channelSections.list (up to 10). 1 YouTube unit.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nchannelSections.list (up to 10). 1 YouTube unit.",
         "tags": [
           "Platform Integration"
         ],
@@ -31296,6 +31921,21 @@
           },
           "429": {
             "description": "Daily YouTube allowance used up (see retry_after)."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -31308,12 +31948,13 @@
             },
             "description": "Profile username with a YouTube channel connected."
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "createYoutubeChannelSection",
         "summary": "Create a YouTube channel section",
-        "description": "channelSections.insert. 50 YouTube units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nchannelSections.insert. 50 YouTube units.",
         "tags": [
           "Platform Integration"
         ],
@@ -31355,6 +31996,21 @@
                       "example": true
                     }
                   }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
                 }
               }
             }
@@ -31415,14 +32071,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/channel/sections/{section_id}": {
       "patch": {
         "operationId": "updateYoutubeChannelSection",
         "summary": "Edit or move a YouTube channel section",
-        "description": "Only what is sent changes. 51 YouTube units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nOnly what is sent changes. 51 YouTube units.",
         "tags": [
           "Platform Integration"
         ],
@@ -31451,6 +32108,21 @@
           },
           "429": {
             "description": "Daily YouTube allowance used up (see retry_after)."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -31517,12 +32189,13 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteYoutubeChannelSection",
         "summary": "Delete a YouTube channel section",
-        "description": "Needs confirm=true. 51 YouTube units (a 1-unit read first: a section of another channel is 404 without the delete).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nNeeds confirm=true. 51 YouTube units (a 1-unit read first: a section of another channel is 404 without the delete).",
         "tags": [
           "Platform Integration"
         ],
@@ -31551,6 +32224,21 @@
           },
           "429": {
             "description": "Daily YouTube allowance used up (see retry_after)."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -31585,14 +32273,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/channel/watermark": {
       "post": {
         "operationId": "setYoutubeChannelWatermark",
         "summary": "Set the YouTube channel watermark",
-        "description": "PNG/JPEG up to 10 MB. Needs confirm=true (it replaces the current watermark). 50 YouTube units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nPNG/JPEG up to 10 MB. Needs confirm=true (it replaces the current watermark). 50 YouTube units.",
         "tags": [
           "Platform Integration"
         ],
@@ -31621,6 +32310,21 @@
           },
           "429": {
             "description": "Daily YouTube allowance used up (see retry_after)."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -31709,12 +32413,13 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "unsetYoutubeChannelWatermark",
         "summary": "Remove the YouTube channel watermark",
-        "description": "Needs confirm=true. 50 YouTube units.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nNeeds confirm=true. 50 YouTube units.",
         "tags": [
           "Platform Integration"
         ],
@@ -31743,6 +32448,21 @@
           },
           "429": {
             "description": "Daily YouTube allowance used up (see retry_after)."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -31767,7 +32487,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/push": {
@@ -31803,6 +32524,21 @@
           },
           "429": {
             "description": "Daily YouTube allowance used up (see retry_after)."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -31815,7 +32551,8 @@
             },
             "description": "Profile username with a YouTube channel connected."
           }
-        ]
+        ],
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "enableYoutubePush",
@@ -31852,6 +32589,21 @@
           },
           "202": {
             "description": "Requested; Google confirms within minutes."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -31872,7 +32624,8 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "disableYoutubePush",
@@ -31906,6 +32659,21 @@
           },
           "429": {
             "description": "Daily YouTube allowance used up (see retry_after)."
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -31926,14 +32694,15 @@
               }
             }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/playlists": {
       "get": {
         "operationId": "listYoutubePlaylists",
         "summary": "List YouTube playlists",
-        "description": "playlists.list, one page per call: the connected channel's own playlists, or `ids`, or another channel's public playlists. 1 YouTube quota unit of the daily allowance for YouTube management features.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nplaylists.list, one page per call: the connected channel's own playlists, or `ids`, or another channel's public playlists. 1 YouTube quota unit of the daily allowance for YouTube management features.",
         "tags": [
           "Platform Integration"
         ],
@@ -32021,13 +32790,29 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "createYoutubePlaylist",
         "summary": "Create a YouTube playlist",
-        "description": "playlists.insert (50 units). podcast_status can only be set when editing.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nplaylists.insert (50 units). podcast_status can only be set when editing.",
         "tags": [
           "Platform Integration"
         ],
@@ -32112,15 +32897,31 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/playlists/{playlist_id}": {
       "patch": {
         "operationId": "updateYoutubePlaylist",
         "summary": "Edit a YouTube playlist",
-        "description": "Read + playlists.update (51 units). Only the fields sent change; translations are merged. An empty string means no change; description: null clears the description (title cannot be null). Language codes match the playlist's real translations (fr matches fr_FR): an ambiguous code is 400 youtube_localization_ambiguous, a removal that matches nothing is 404 youtube_localization_not_found.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nRead + playlists.update (51 units). Only the fields sent change; translations are merged. An empty string means no change; description: null clears the description (title cannot be null). Language codes match the playlist's real translations (fr matches fr_FR): an ambiguous code is 400 youtube_localization_ambiguous, a removal that matches nothing is 404 youtube_localization_not_found.",
         "tags": [
           "Platform Integration"
         ],
@@ -32230,13 +33031,29 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteYoutubePlaylist",
         "summary": "Delete a YouTube playlist",
-        "description": "playlists.delete (51 units). Irreversible: confirm=true. The videos are kept.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nplaylists.delete (51 units). Irreversible: confirm=true. The videos are kept.",
         "tags": [
           "Platform Integration"
         ],
@@ -32294,15 +33111,31 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/playlists/{playlist_id}/items": {
       "get": {
         "operationId": "listYoutubePlaylistItems",
         "summary": "List the videos of a YouTube playlist",
-        "description": "playlistItems.list, one page per call (1 unit).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nplaylistItems.list, one page per call (1 unit).",
         "tags": [
           "Platform Integration"
         ],
@@ -32383,13 +33216,29 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "addYoutubePlaylistItem",
         "summary": "Add a video to a YouTube playlist",
-        "description": "playlistItems.insert (52 units). position only on manually sorted playlists.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nplaylistItems.insert (52 units). position only on manually sorted playlists.",
         "tags": [
           "Platform Integration"
         ],
@@ -32462,15 +33311,31 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/playlists/{playlist_id}/items/{item_id}": {
       "patch": {
         "operationId": "updateYoutubePlaylistItem",
         "summary": "Reorder a video or change its note",
-        "description": "playlistItems.update (52 units). Send position and/or note; the other is kept.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nplaylistItems.update (52 units). Send position and/or note; the other is kept.",
         "tags": [
           "Platform Integration"
         ],
@@ -32547,13 +33412,29 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "removeYoutubePlaylistItem",
         "summary": "Remove a video from a YouTube playlist",
-        "description": "playlistItems.delete (52 units). The video itself is kept. confirm=true.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nplaylistItems.delete (52 units). The video itself is kept. confirm=true.",
         "tags": [
           "Platform Integration"
         ],
@@ -32620,15 +33501,31 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/playlists/{playlist_id}/image": {
       "get": {
         "operationId": "getYoutubePlaylistImage",
         "summary": "Get the YouTube playlist image",
-        "description": "playlistImages.list (1 unit).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nplaylistImages.list (1 unit).",
         "tags": [
           "Platform Integration"
         ],
@@ -32677,13 +33574,29 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "addYoutubePlaylistImage",
         "summary": "Add the YouTube playlist image",
-        "description": "playlistImages.insert (51 units). JPEG/PNG, square, up to 50 MB.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nplaylistImages.insert (51 units). JPEG/PNG, square, up to 50 MB.",
         "tags": [
           "Platform Integration"
         ],
@@ -32751,13 +33664,29 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "put": {
         "operationId": "replaceYoutubePlaylistImage",
         "summary": "Replace the YouTube playlist image",
-        "description": "playlistImages.update (52 units).",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nplaylistImages.update (52 units).",
         "tags": [
           "Platform Integration"
         ],
@@ -32829,13 +33758,29 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteYoutubePlaylistImage",
         "summary": "Delete the YouTube playlist image",
-        "description": "playlistImages.delete (52 units). confirm=true.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\nplaylistImages.delete (52 units). confirm=true.",
         "tags": [
           "Platform Integration"
         ],
@@ -32893,15 +33838,31 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/captions": {
       "get": {
         "operationId": "listYoutubeCaptions",
         "summary": "List the caption tracks of a YouTube video",
-        "description": "captions.list (50 units, +1 the first time for a video). Video of the connected channel.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ncaptions.list (50 units, +1 the first time for a video). Video of the connected channel.",
         "tags": [
           "Platform Integration"
         ],
@@ -32958,13 +33919,29 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "uploadYoutubeCaption",
         "summary": "Add a caption track to a published YouTube video",
-        "description": "captions.insert (400 units). Validated before spending: format, UTF-8, time codes, language, name, allowance, owner.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ncaptions.insert (400 units). Validated before spending: format, UTF-8, time codes, language, name, allowance, owner.",
         "tags": [
           "Platform Integration"
         ],
@@ -33045,15 +34022,31 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/captions/{caption_id}": {
       "put": {
         "operationId": "updateYoutubeCaption",
         "summary": "Replace a caption track or publish a draft",
-        "description": "captions.update (450 units). New file and/or is_draft. For a track not seen through Upload-Post, send video_id too.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ncaptions.update (450 units). New file and/or is_draft. For a track not seen through Upload-Post, send video_id too.",
         "tags": [
           "Platform Integration"
         ],
@@ -33136,13 +34129,29 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteYoutubeCaption",
         "summary": "Delete a caption track",
-        "description": "captions.delete (50 units). confirm=true.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ncaptions.delete (50 units). confirm=true.",
         "tags": [
           "Platform Integration"
         ],
@@ -33208,15 +34217,31 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/youtube/captions/{caption_id}/download": {
       "get": {
         "operationId": "downloadYoutubeCaption",
         "summary": "Download a caption track",
-        "description": "captions.download (200 units; the same download within 10 minutes is free). Own videos only.",
+        "description": "**Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.\n\ncaptions.download (200 units; the same download within 10 minutes is free). Own videos only.",
         "tags": [
           "Platform Integration"
         ],
@@ -33297,8 +34322,24 @@
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "description": "Not generally available yet. error_code: `youtube_feature_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodedError"
+                },
+                "example": {
+                  "success": false,
+                  "error_code": "youtube_feature_disabled",
+                  "message": "Not generally available yet."
+                }
+              }
+            }
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/webhooks/subscriptions": {
@@ -33327,25 +34368,9 @@
                     "type": "array",
                     "minItems": 1,
                     "items": {
-                      "type": "string",
-                      "enum": [
-                        "upload_completed",
-                        "social_account_connected",
-                        "social_account_disconnected",
-                        "social_account_reauth_required",
-                        "dm_received",
-                        "comment_received",
-                        "telegram_update",
-                        "review_received",
-                        "review_updated",
-                        "customer_media_received",
-                        "listing_google_update",
-                        "listing_duplicate",
-                        "listing_control_changed",
-                        "post_analytics_updated"
-                      ]
+                      "$ref": "#/components/schemas/WebhookEventName"
                     },
-                    "description": "Event names (dots are accepted: social_account.connected). Also youtube_video_published / youtube_video_updated and the post approval events (post_approval_requested, post_approved, post_rejected, post_approval_expired) while those features are on."
+                    "description": "Event names. youtube_video_* only while YouTube push is on and post_approval_* only while post approvals are on; otherwise 400 invalid_events with allowed_events."
                   },
                   "profile_username": {
                     "type": "string",
@@ -37915,11 +38940,20 @@
           {
             "name": "user",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             },
-            "description": "Profile username."
+            "description": "Profile username (or use profile)."
+          },
+          {
+            "name": "profile",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Alias of user."
           },
           {
             "name": "refresh",
@@ -37998,7 +39032,8 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           }
-        }
+        },
+        "description": "Send user or profile (one is required: 400 without both)."
       }
     },
     "/uploadposts/pinterest/boards/{board_id}/sections": {
@@ -38085,6 +39120,24 @@
               "type": "string"
             },
             "description": "Board id."
+          },
+          {
+            "name": "profile",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Profile username (alias user); default the first profile with Pinterest."
+          },
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Alias of profile."
           }
         ],
         "requestBody": {
@@ -38095,16 +39148,43 @@
                 "type": "object",
                 "properties": {
                   "user": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Profile username. Also accepted as profile, or as ?profile= / ?user= in the query."
                   },
                   "name": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 180
+                  },
+                  "profile": {
+                    "type": "string",
+                    "description": "Alias of user."
                   }
                 },
                 "required": [
-                  "user",
+                  "name"
+                ]
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user": {
+                    "type": "string",
+                    "description": "Profile username. Also accepted as profile, or as ?profile= / ?user= in the query."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "profile": {
+                    "type": "string",
+                    "description": "Alias of user."
+                  }
+                },
+                "required": [
                   "name"
                 ]
               }
@@ -38123,9 +39203,19 @@
                       "type": "boolean",
                       "example": true
                     },
+                    "board_id": {
+                      "type": "string"
+                    },
                     "section": {
                       "type": "object",
-                      "additionalProperties": true
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
                     }
                   }
                 }
@@ -38138,7 +39228,8 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           }
-        }
+        },
+        "description": "Without a profile the first profile of the account with a Pinterest account is used."
       }
     },
     "/uploadposts/facebook/page-info": {
@@ -39294,7 +40385,7 @@
       "patch": {
         "operationId": "updateGoogleBusinessAccount",
         "summary": "Rename a Google Business account",
-        "description": "Renames a business account (only the name). With `validate_only: true` Google checks the request without changing anything (no `confirm` needed); that mode works today. A real rename is not generally available yet: 403 `ownership_changes_disabled`. `account` must be the account connected to the profile or the owner of one of its saved locations (404 `account_not_found` otherwise).",
+        "description": "**Not generally available yet.** Off by default: answers `403` with `ownership_changes_disabled` until the feature is available.\n\nRenames a business account (only the name). With `validate_only: true` Google checks the request without changing anything (no `confirm` needed); that mode works today. A real rename is not generally available yet: 403 `ownership_changes_disabled`. `account` must be the account connected to the profile or the owner of one of its saved locations (404 `account_not_found` otherwise).",
         "tags": [
           "Google Business"
         ],
@@ -39433,7 +40524,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/google-business/accounts/get": {
@@ -39875,7 +40967,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "patch": {
         "operationId": "updateGoogleBusinessAdmin",
@@ -40032,7 +41125,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "delete": {
         "operationId": "deleteGoogleBusinessAdmin",
@@ -40173,7 +41267,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/google-business/invitations": {
@@ -40452,7 +41547,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/google-business/invitations/decline": {
@@ -40594,7 +41690,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/google-business/locations/transfer": {
@@ -40732,7 +41829,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/google-business/attributes": {
@@ -44161,7 +45259,7 @@
     },
     "/uploadposts/google-business/locations": {
       "get": {
-        "operationId": "listGoogleBusinessLocations",
+        "operationId": "getGoogleBusinessLocations",
         "summary": "Get Google Business locations",
         "description": "Locations of the connected Google Business accounts (all of them, or only the one linked to `profile`), read live and kept about two minutes. Use `name` as `gbp_location_id` in uploads. Connections with many Google accounts are read in parts: `incomplete: true` with `next_cursor` (with `profile`) and `next_cursors` per connection (`reason`: `time`, `max_accounts` or `rate_limited`); call again with `cursor=<next_cursor>`. Errors on this endpoint carry `message` instead of `error_code`.",
         "tags": [
@@ -44295,7 +45393,7 @@
     },
     "/uploadposts/google-business/locations/list": {
       "get": {
-        "operationId": "listGoogleBusinessAccountLocations",
+        "operationId": "listGoogleBusinessLocations",
         "summary": "List locations with filters",
         "description": "Locations of one Google account with Google's filter, ordering and read mask, one page per call.",
         "tags": [
@@ -44629,7 +45727,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/google-business/locations/delete": {
@@ -44775,7 +45874,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "post": {
         "operationId": "deleteGoogleBusinessLocationPost",
@@ -44920,7 +46020,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/google-business/lodging": {
@@ -46656,7 +47757,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "put": {
         "operationId": "updateGoogleBusinessNotificationSettings",
@@ -46867,12 +47969,13 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       },
       "patch": {
         "operationId": "updateGoogleBusinessNotificationSettingsPatch",
         "summary": "Turn real-time notifications on or off (PATCH)",
-        "description": "Not generally available yet: answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Turns notifications on or off for the Google account; webhooks must also list the events (`review_received`, `review_updated`, `customer_media_received`, `listing_google_update`, `listing_duplicate`, `listing_control_changed`) in `webhook_events`. Needs `confirm: true`. If Google does not confirm the change (`outcome_unknown: true`), read the setting before retrying. Same as PUT.",
+        "description": "Alias of PUT on the same path (same handler); prefer PUT.\n\nNot generally available yet: answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Turns notifications on or off for the Google account; webhooks must also list the events (`review_received`, `review_updated`, `customer_media_received`, `listing_google_update`, `listing_duplicate`, `listing_control_changed`) in `webhook_events`. Needs `confirm: true`. If Google does not confirm the change (`outcome_unknown: true`), read the setting before retrying. Same as PUT.",
         "tags": [
           "Google Business"
         ],
@@ -47078,7 +48181,9 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available",
+        "deprecated": true
       }
     },
     "/uploadposts/google-business/performance": {
@@ -49032,7 +50137,7 @@
       "post": {
         "operationId": "batchGetGoogleBusinessReviewsPost",
         "summary": "Batch get reviews (JSON body)",
-        "description": "Reviews of several locations in one call (`locations:batchGetReviews`). Locations of several Google accounts are fetched with one call per account; `nextPageToken` (starting with `up1:`) carries every account's cursor: pass it back unchanged. Google's own errors keep Google's HTTP status (e.g. 409, 412, 500, 503) with details in `google_error`. Some validation errors carry only `error`, without `error_code`. Same as GET, with a JSON body.",
+        "description": "Alias of GET on the same path (same handler); prefer GET.\n\nReviews of several locations in one call (`locations:batchGetReviews`). Locations of several Google accounts are fetched with one call per account; `nextPageToken` (starting with `up1:`) carries every account's cursor: pass it back unchanged. Google's own errors keep Google's HTTP status (e.g. 409, 412, 500, 503) with details in `google_error`. Some validation errors carry only `error`, without `error_code`. Same as GET, with a JSON body.",
         "tags": [
           "Google Business"
         ],
@@ -49179,7 +50284,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/uploadposts/google-business/reviews/get": {
@@ -50917,7 +52023,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/google-business/verification/complete": {
@@ -51062,7 +52169,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/google-business/verification/token": {
@@ -51194,7 +52302,8 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "x-availability": "not_generally_available"
       }
     },
     "/uploadposts/google-business/verifications": {
@@ -51423,7 +52532,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/telegram/credentials": {
@@ -51533,7 +52650,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/slack/credentials": {
@@ -51614,7 +52739,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/mastodon/credentials": {
@@ -51699,7 +52832,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/nostr/credentials": {
@@ -51783,7 +52924,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/lemmy/credentials": {
@@ -51876,7 +53025,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/devto/credentials": {
@@ -51956,7 +53113,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/hashnode/credentials": {
@@ -52040,7 +53205,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/wordpress/credentials": {
@@ -52129,7 +53302,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/whop/credentials": {
@@ -52213,7 +53394,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/listmonk/credentials": {
@@ -52306,7 +53495,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/facebook-page": {
@@ -52435,7 +53632,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "post": {
         "operationId": "setFacebookPage",
@@ -52516,7 +53721,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "operationId": "clearFacebookPage",
@@ -52576,7 +53789,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/linkedin-page": {
@@ -52673,7 +53894,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "post": {
         "operationId": "setLinkedInPage",
@@ -52749,7 +53978,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "operationId": "clearLinkedInPage",
@@ -52809,7 +54046,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/google-business-location": {
@@ -52900,7 +54145,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "post": {
         "operationId": "setGoogleBusinessLocation",
@@ -52976,7 +54229,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       },
       "delete": {
         "operationId": "clearGoogleBusinessLocation",
@@ -53036,7 +54297,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/notifications/test": {
@@ -59918,7 +61187,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/uploadposts/users/youtube/credentials": {
@@ -59998,6 +61275,61 @@
               }
             }
           }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/uploadposts/reddit/detailed-posts/": {
+      "get": {
+        "operationId": "getRedditDetailedPosts",
+        "summary": "Get Reddit detailed posts",
+        "description": "Retrieve detailed posts from a Reddit account connected to a profile, including complete media information. Supports automatic pagination up to 2000 posts. The path ends with a slash (`/detailed-posts/`); without it the API answers a 308 redirect.",
+        "tags": [
+          "Platform Integration"
+        ],
+        "parameters": [
+          {
+            "name": "profile_username",
+            "in": "query",
+            "required": true,
+            "description": "Username of the profile with a connected Reddit account.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reddit posts retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "posts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RedditPost"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
         }
       }
     }
@@ -60014,7 +61346,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "JWT Bearer token authentication. Used for validate-jwt and reddit detailed-posts endpoints."
+        "description": "Profile JWT: the token of the access_url returned by POST /uploadposts/users/generate-jwt (white-label connect page). Accepted where an operation lists it: validate-jwt, the Connect API start, manual credentials, Page/location selection, disconnecting a social account and the end-client approval routes. It only acts on the profile it was issued for."
       }
     },
     "parameters": {
@@ -61114,6 +62446,11 @@
           },
           "queue_settings": {
             "$ref": "#/components/schemas/QueueSettings"
+          },
+          "configured": {
+            "type": "boolean",
+            "description": "true once queue settings were saved for this profile; false means queue_settings shows the defaults because the queue was never configured.",
+            "example": true
           }
         }
       },
@@ -63020,8 +64357,19 @@
         "properties": {
           "channels": {
             "type": "object",
-            "additionalProperties": {
-              "type": "boolean"
+            "properties": {
+              "webhook": {
+                "type": "boolean"
+              },
+              "telegram": {
+                "type": "boolean"
+              },
+              "slack": {
+                "type": "boolean"
+              },
+              "whatsapp": {
+                "type": "boolean"
+              }
             }
           },
           "webhook_url": {
@@ -63034,12 +64382,33 @@
             "description": "Signs every webhook (X-Upload-Post-Signature)."
           },
           "webhook_events": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "boolean"
-            }
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "description": "Event name -> enabled."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WebhookEventName"
+                },
+                "description": "Names of the enabled events."
+              }
+            ],
+            "description": "Which events the account webhook receives: an object {event: true|false} or a list of names; both are stored as sent and returned the same way. Omitted or empty = every event except the opt-in ones."
           },
           "telegram_chat_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "slack_webhook_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "whatsapp_to_phone": {
             "type": "string",
             "nullable": true
           }
@@ -63193,6 +64562,32 @@
             "type": "integer"
           }
         }
+      },
+      "WebhookEventName": {
+        "type": "string",
+        "enum": [
+          "upload_completed",
+          "social_account_connected",
+          "social_account_disconnected",
+          "social_account_reauth_required",
+          "dm_received",
+          "comment_received",
+          "review_received",
+          "review_updated",
+          "customer_media_received",
+          "listing_google_update",
+          "listing_duplicate",
+          "listing_control_changed",
+          "telegram_update",
+          "post_analytics_updated",
+          "youtube_video_published",
+          "youtube_video_updated",
+          "post_approval_requested",
+          "post_approved",
+          "post_rejected",
+          "post_approval_expired"
+        ],
+        "description": "Webhook event name (dots are accepted too: social_account.connected). youtube_video_* are accepted only while YouTube push is on, post_approval_* only while post approvals are on. dm_received, comment_received, telegram_update, the Google Business events, post_analytics_updated and the gated ones are opt-in: they are only sent if listed."
       }
     }
   }

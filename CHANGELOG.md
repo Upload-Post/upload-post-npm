@@ -7,7 +7,7 @@ additions: no existing method changes its name, arguments or result.
 
 ### Added
 
-- 180 methods generated from the OpenAPI spec (`codegen/openapi.json`) by
+- 178 methods generated from the OpenAPI spec (`codegen/openapi.json`) by
   `codegen/generate.py`, with TypeScript types for their options and answers:
   - Webhook subscriptions: `createWebhookSubscription`, `listWebhookSubscriptions`,
     `getWebhookSubscription`, `deleteWebhookSubscription`, `testWebhookSubscription`.
@@ -28,14 +28,29 @@ additions: no existing method changes its name, arguments or result.
     `getUserProfile`, `renameUserProfile`, scheduled post detail, thumbnail and
     preview, resumable media uploads, `analyzeShorts`, `rewriteCaptions`,
     `sendFeedback`, Instagram / Threads publishing limits.
-  - Methods marked *not generally available* in their docs answer HTTP 503 until
+  - Methods whose operation the spec marks `x-availability: not_generally_available`
+    say so in their JSDoc and in the README (generated methods and, in their own
+    table, the hand-written ones): they answer an error (usually HTTP 503) until
     the feature is switched on for the account.
+  - The six deprecated aliases of the spec (POST/PATCH copies of Google Business
+    routes the SDK already calls with the right verb) are left out on purpose.
 - `UploadPost.OPENAPI_OPERATIONS`: HTTP method, path and fields of every generated method.
 - Upload fields the API accepts and the SDK dropped: `redditTitle`,
   `xExcludeReplyUserIds`, `telegramAllowPaidBroadcast`, `telegramSendTitle`,
   `youtubeThumbnail` (a local file, sent as `thumbnail`), and on `uploadDocument`
   `platforms: ['telegram']` (default still LinkedIn only) with the Telegram options.
 - `error.errorType` (the `error_type` of the answer, where the API sends one).
+- `firstCommentMedia` is now in the TypeScript types.
+
+### Fixed
+
+- `firstCommentMedia` URLs: the API reads `first_comment_media[]` from uploaded
+  files only, so a URL was ignored and the post went out without the images.
+  `upload`, `uploadPhotos` and `uploadText` now download each URL (a plain
+  request, without the API key) and send it as a file, so code that passed URLs
+  gets the images it asked for. A URL that cannot be downloaded fails the
+  upload with an error naming it, before anything is sent. Local paths and
+  Buffers work as before.
 
 ### Tests
 
