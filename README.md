@@ -250,22 +250,61 @@ console.log(analytics);
 // ({ age, gender, country, city }):
 console.log(analytics.analytics.instagram.follower_demographics);
 console.log(analytics.analytics.instagram.engaged_audience_demographics);
+
+// A period, compared with the previous one (from stored daily snapshots, no extra network call):
+const period = await client.getAnalytics('my-profile', {
+  platforms: ['instagram', 'youtube'],
+  since: '2026-10-17',
+  until: '2026-11-15',
+  compare: 'previous',
+});
+```
+
+Every analytics answer says how old its numbers are: `as_of` (when the network
+was asked) and `next_refresh_at` (when asking again can return newer numbers),
+plus `missing` with a reason (`not_supported`, `reauth_required`, `quota`,
+`platform_delay`, `not_fetched`) instead of a fake `0`. X and YouTube posts are
+only updated when someone reads them. See
+[Why numbers can differ from the native app](https://docs.upload-post.com/guides/why-analytics-numbers-differ).
+
+### Post Analytics, Daily History and Insights
+
+```javascript
+// Current metrics of a post; `refresh: true` skips a recent stored reading (limited per hour).
+const post = await client.getPostAnalytics('REQUEST_ID', { platform: 'tiktok', refresh: true });
+await client.getPostAnalyticsByPlatformId('7401234567890123456', 'tiktok', 'my-profile', { refresh: true });
+
+// Day by day, from stored readings (no network call). `delta` is what the post gained over `gap_days`.
+const daily = await client.getPostAnalyticsDaily('REQUEST_ID', { platform: 'tiktok' });
+await client.getPostAnalyticsDailyByPlatformId('7401234567890123456', 'tiktok', 'my-profile');
+
+// Each post against the profile's other posts at the same age (1h, 24h, 7d, 30d).
+const insights = await client.getInsights({ user: 'my-profile', platform: 'tiktok' });
+
+// Why is a number missing or old? Connection, last reading, delay, coverage, history.
+const status = await client.getAnalyticsStatus({ user: 'my-profile' });
+
+// `total_impressions` is a legacy mix; `views_total` is what compares with the native apps.
+const { views_total, views_by_platform } = await client.getTotalImpressions('my-profile', { period: 'last_month' });
 ```
 
 ### Cached Post Analytics
 
-Replays per-post metrics already fetched, instead of calling the platforms again. Only contains posts previously fetched through a live per-post endpoint; there is no background refresh, so captured_at is the last time that post was read live. Not subject to the live
-calls, so it is not subject to the live post-analytics rate limit
-(100 requests / 5 minutes). Use it to page through a profile's post history.
+Replays per-post metrics already fetched, instead of calling the platforms again. Rows never refresh by themselves: each row's `as_of` is the last time that post was read from its network. It never calls the platforms, so it is not subject to the per-post analytics rate limit
+(100 requests / 5 minutes). Use it to page through a profile's post history, rank posts
+(`sort: '-views'`) or include posts not published with Upload-Post (`origin: 'external'` or `'all'`).
+Posts published with Upload-Post carry `request_id`, `post_title` and `caption_preview`.
 
 ```javascript
 let cursor;
 do {
   const page = await client.getCachedPostAnalytics('my-profile', {
-    platform: 'youtube',   // optional: instagram, tiktok, youtube, facebook, linkedin, threads, pinterest, reddit
+    platform: 'youtube',   // optional: instagram, tiktok, youtube, facebook, linkedin, x, threads, pinterest, reddit, bluesky
     limit: 50,             // default 50, max 200
     since: '2026-06-01',   // defaults to 30 days ago
     until: '2026-07-01',   // defaults to today
+    sort: '-views',        // optional: views, likes, comments, shares, engagement, published_at, as_of
+    dateField: 'published_at', // optional: filter by publish day instead of reading day
     cursor,
   });
   for (const post of page.posts) {
