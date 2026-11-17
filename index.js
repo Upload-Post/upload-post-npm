@@ -1721,6 +1721,7 @@ export class UploadPost {
    * @param {Object.<string, string>} [options.uiLabels] - Flat map of i18n dot-path keys to replacement strings, e.g. `{ 'connect.title': 'Link your accounts' }`. Max 100 entries; keys must match `^[a-zA-Z0-9_.]+$` and values are strings of up to 300 characters. Returned back in the `profile` object of validateJwt.
    * @param {('light'|'dark'|'auto'|null)} [options.connectTheme] - Force the connection page theme; `'auto'` (or `null`) follows the visitor's preference again.
    * @param {boolean} [options.clientApproval] - Not generally available yet (post approvals). `true` lets the end client approve or reject the pending posts of this profile from the connect page (`listClientPostApprovals`, `approveClientPostApproval`, `rejectClientPostApproval` with this JWT). Stored on the profile; generate again with `false` to turn it off.
+   * @param {boolean} [options.preserveSettings] - `true` mints the link without changing the profile's saved settings (by default every setting not sent here is cleared). `platforms` then applies to this link only. Cannot be combined with the other options, which are stored on the profile (400 `preserve_settings_conflict`). The answer carries `settings_preserved: true`.
    * @returns {Promise<Object>} JWT and connection URL
    */
   async generateJwt(username, options = {}) {
@@ -1737,6 +1738,7 @@ export class UploadPost {
     if (options.uiLabels) body.ui_labels = options.uiLabels;
     if (options.connectTheme !== undefined) body.connect_theme = options.connectTheme;
     if (options.clientApproval !== undefined) body.client_approval = options.clientApproval;
+    if (options.preserveSettings !== undefined) body.preserve_settings = options.preserveSettings;
     return this._request('/uploadposts/users/generate-jwt', 'POST', body);
   }
 

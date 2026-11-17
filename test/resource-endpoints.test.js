@@ -250,6 +250,11 @@ describe('generateJwt', () => {
     assert.equal(JSON.parse(last().data).client_approval, false);
   });
 
+  test('preserveSettings goes as preserve_settings, with the platforms of the link', async () => {
+    await client().generateJwt('p', { preserveSettings: true, platforms: ['pinterest'] });
+    assert.deepEqual(JSON.parse(last().data), { username: 'p', platforms: ['pinterest'], preserve_settings: true });
+  });
+
   test('validateJwt is a GET with the token as Bearer', async () => {
     await client().validateJwt('tok');
     assert.equal(last().method, 'get');

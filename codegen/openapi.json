@@ -9742,7 +9742,7 @@
                         "twitch"
                       ]
                     },
-                    "description": "Platforms to show for connection. Defaults to every publishing platform; `twitch` (read-only: lists the channel's past broadcasts) only appears when named."
+                    "description": "Platforms to show for connection. Defaults to every publishing platform; `twitch` (read-only: lists the channel's past broadcasts) only appears when named. With `preserve_settings: true` the list is not stored: it belongs to the link."
                   },
                   "show_calendar": {
                     "type": "boolean",
@@ -9795,6 +9795,10 @@
                       "auto"
                     ],
                     "description": "Forces the connection page theme; `auto` (or null) follows the visitor's preference."
+                  },
+                  "preserve_settings": {
+                    "type": "boolean",
+                    "description": "Mint a link without changing the profile's saved connect-page settings. Without it, every setting this request does not send (redirect_url, logo_image, redirect_button_text, connect_title, connect_description, platforms, language) is cleared. With `true`, nothing is written to the profile and `platforms` applies to this link only: the link shows those networks, whatever list the profile has saved. Cannot be sent together with a setting that is stored (400 `preserve_settings_conflict`)."
                   }
                 }
               }
@@ -9821,6 +9825,10 @@
                       "type": "string",
                       "description": "JWT validity period.",
                       "example": "48h"
+                    },
+                    "settings_preserved": {
+                      "type": "boolean",
+                      "description": "Present and `true` when the link was minted with `preserve_settings`: the profile was not changed."
                     }
                   }
                 }
@@ -9828,7 +9836,7 @@
             }
           },
           "400": {
-            "description": "Missing username, or an invalid connect_theme, ui_labels or client_approval (true or false; checked while post approvals are on).\nerror_code `invalid_client_approval` for client_approval.",
+            "description": "Missing username, or an invalid connect_theme, ui_labels, client_approval (true or false; checked while post approvals are on) or preserve_settings.\nerror_code `invalid_client_approval` for client_approval; `invalid_preserve_settings` when preserve_settings is not a boolean; `preserve_settings_conflict` when it is sent together with a stored setting; `invalid_platforms` when, with preserve_settings, platforms is not a list of names.",
             "content": {
               "application/json": {
                 "schema": {
