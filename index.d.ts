@@ -3577,14 +3577,27 @@ declare module 'upload-post' {
     limit?: number;
     /** created_at of the last item of the previous page (next_before). */
     before?: string;
+    /** true (or 1): answer only how many items there are per status, with the same filters (status, profile_username, author; limit and before are ignored). Nothing is listed or signed. */
+    countOnly?: boolean;
   }
 
-  /** Answer of `listPostApprovals`. */
-  export interface ListPostApprovalsResponse extends ApiResponse {
+  /** Answer of `listPostApprovals` (shape 1: list). */
+  export interface ListPostApprovalsResponse1 extends ApiResponse {
     success?: boolean;
     items?: ({ approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; author_email?: string; author_role?: "editor" | "contributor"; created_at?: string; updated_at?: string; decided_by?: string; decided_by_role?: string; decided_at?: string; decision_comment?: string; job_id?: string; request_id?: string; external_id?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; fields?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any })[];
     next_before?: string;
   }
+
+  /** Answer of `listPostApprovals` (shape 2: count_only). */
+  export interface ListPostApprovalsResponse2 extends ApiResponse {
+    success?: boolean;
+    /** One key per requested status (default pending_approval and draft). */
+    counts?: Record<string, any>;
+    total?: number;
+  }
+
+  /** Answer of `listPostApprovals`: one of 2 shapes. */
+  export type ListPostApprovalsResponse = ListPostApprovalsResponse1 | ListPostApprovalsResponse2;
 
   /** Options of `getPostApproval` (`GET /api/uploadposts/approvals/{approval_id}`). Any other API field is sent as well. */
   export interface GetPostApprovalOptions extends ApiParams {
@@ -3679,7 +3692,7 @@ declare module 'upload-post' {
   export interface ListClientPostApprovalsResponse extends ApiResponse {
     success?: boolean;
     profile_username?: string;
-    items?: ({ approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; author_email?: string; author_role?: "editor" | "contributor"; created_at?: string; updated_at?: string; decided_by?: string; decided_by_role?: string; decided_at?: string; decision_comment?: string; job_id?: string; request_id?: string; external_id?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; fields?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any })[];
+    items?: ({ approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; created_at?: string; updated_at?: string; decided_at?: string; decision_comment?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any })[];
   }
 
   /** Options of `approveClientPostApproval` (`POST /api/uploadposts/approvals/client/{approval_id}/approve`). Any other API field is sent as well. */
@@ -3695,8 +3708,8 @@ declare module 'upload-post' {
   /** Answer of `approveClientPostApproval`. */
   export interface ApproveClientPostApprovalResponse extends ApiResponse {
     success?: boolean;
-    /** A post waiting for (or past) review. Created when an Editor (pending_approval) or a Contributor (draft) publishes. */
-    item?: { approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; author_email?: string; author_role?: "editor" | "contributor"; created_at?: string; updated_at?: string; decided_by?: string; decided_by_role?: string; decided_at?: string; decision_comment?: string; job_id?: string; request_id?: string; external_id?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; fields?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any };
+    /** A post waiting for approval as the end client sees it (connect page): never the author, who decided, or internal ids (author_email, author_role, decided_by, decided_by_role, request_id, external_id, job_id, fields are le... */
+    item?: { approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; created_at?: string; updated_at?: string; decided_at?: string; decision_comment?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any };
     job_id?: string;
     scheduled_date?: string;
   }
@@ -3713,8 +3726,8 @@ declare module 'upload-post' {
   /** Answer of `rejectClientPostApproval`. */
   export interface RejectClientPostApprovalResponse extends ApiResponse {
     success?: boolean;
-    /** A post waiting for (or past) review. Created when an Editor (pending_approval) or a Contributor (draft) publishes. */
-    item?: { approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; author_email?: string; author_role?: "editor" | "contributor"; created_at?: string; updated_at?: string; decided_by?: string; decided_by_role?: string; decided_at?: string; decision_comment?: string; job_id?: string; request_id?: string; external_id?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; fields?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any };
+    /** A post waiting for approval as the end client sees it (connect page): never the author, who decided, or internal ids (author_email, author_role, decided_by, decided_by_role, request_id, external_id, job_id, fields are le... */
+    item?: { approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; created_at?: string; updated_at?: string; decided_at?: string; decision_comment?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any };
   }
 
   /** Options of `getTeamRoles` (`GET /api/uploadposts/teams/roles`). Any other API field is sent as well. */
@@ -7785,7 +7798,7 @@ declare module 'upload-post' {
      *
      * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
      *
-     * Sends one signed sample now, with the keys of the real event and `test: true`. Logged as a test delivery: never retried and never counted towards disabling the subscription. `ok` tells whether the destination answered 2xx.
+     * Sends one signed sample now, with the keys of the real event and `test: true`. Logged as a test delivery: never retried and never counted towards disabling the subscription. `ok` tells whether the destination answered 2xx. For the post approval events the sample has the shape of the real event ({event, user_email, profile_username, approval: {...}, created_at}).
      *
      * `POST /api/uploadposts/webhooks/subscriptions/{subscription_id}/test`
      */

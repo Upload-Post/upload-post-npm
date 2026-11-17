@@ -34806,7 +34806,7 @@
           "Webhooks"
         ],
         "x-availability": "not_generally_available",
-        "description": "**Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.\n\nSends one signed sample now, with the keys of the real event and `test: true`. Logged as a test delivery: never retried and never counted towards disabling the subscription. `ok` tells whether the destination answered 2xx.",
+        "description": "**Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.\n\nSends one signed sample now, with the keys of the real event and `test: true`. Logged as a test delivery: never retried and never counted towards disabling the subscription. `ok` tells whether the destination answered 2xx. For the post approval events the sample has the shape of the real event ({event, user_email, profile_username, approval: {...}, created_at}).",
         "parameters": [
           {
             "name": "subscription_id",
@@ -34995,31 +34995,70 @@
               "type": "string"
             },
             "description": "created_at of the last item of the previous page (next_before)."
+          },
+          {
+            "name": "count_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "true (or 1): answer only how many items there are per status, with the same filters (status, profile_username, author; limit and before are ignored). Nothing is listed or signed."
           }
         ],
         "responses": {
           "200": {
-            "description": "Items, newest first.",
+            "description": "Items, newest first; or, with count_only, the counts.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/PostApproval"
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "title": "list",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "example": true
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PostApproval"
+                          }
+                        },
+                        "next_before": {
+                          "type": "string",
+                          "nullable": true
+                        }
                       }
                     },
-                    "next_before": {
-                      "type": "string",
-                      "nullable": true
+                    {
+                      "type": "object",
+                      "title": "count_only",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "example": true
+                        },
+                        "counts": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          },
+                          "description": "One key per requested status (default pending_approval and draft).",
+                          "example": {
+                            "pending_approval": 3,
+                            "draft": 1
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "example": 4
+                        }
+                      }
                     }
-                  }
+                  ]
                 }
               }
             }
@@ -35827,7 +35866,7 @@
                     "items": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/PostApproval"
+                        "$ref": "#/components/schemas/ClientPostApproval"
                       }
                     }
                   }
@@ -35943,7 +35982,7 @@
                       "example": true
                     },
                     "item": {
-                      "$ref": "#/components/schemas/PostApproval"
+                      "$ref": "#/components/schemas/ClientPostApproval"
                     },
                     "job_id": {
                       "type": "string"
@@ -36019,7 +36058,7 @@
             }
           },
           "409": {
-            "description": "Already closed; reviewed version is outdated (current_version and item included); an Editor's post whose date already passed (it becomes expired); a draft proposing a past date; changed meanwhile; or no free queue slot. error_code: `approval_closed`, `approval_version_changed`, `approval_expired`, `scheduled_date_in_past`, `approval_state_changed`, `NO_QUEUE_SLOTS`, `QUEUE_BUSY`.",
+            "description": "Already closed; reviewed version is outdated (current_version and item included); an Editor's post whose date already passed (it becomes expired); a draft proposing a past date; changed meanwhile; or no free queue slot. error_code: `approval_closed`, `approval_version_changed`, `approval_expired`, `scheduled_date_in_past`, `approval_state_changed`, `NO_QUEUE_SLOTS`, `QUEUE_BUSY`. With approval_version_changed the body also carries current_version and the current item (ClientPostApproval).",
             "content": {
               "application/json": {
                 "schema": {
@@ -36126,7 +36165,7 @@
                       "example": true
                     },
                     "item": {
-                      "$ref": "#/components/schemas/PostApproval"
+                      "$ref": "#/components/schemas/ClientPostApproval"
                     }
                   }
                 }
@@ -64588,6 +64627,143 @@
           "post_approval_expired"
         ],
         "description": "Webhook event name (dots are accepted too: social_account.connected). youtube_video_* are accepted only while YouTube push is on, post_approval_* only while post approvals are on. dm_received, comment_received, telegram_update, the Google Business events, post_analytics_updated and the gated ones are opt-in: they are only sent if listed."
+      },
+      "ClientPostApproval": {
+        "type": "object",
+        "description": "A post waiting for approval as the end client sees it (connect page): never the author, who decided, or internal ids (author_email, author_role, decided_by, decided_by_role, request_id, external_id, job_id, fields are left out).",
+        "properties": {
+          "approval_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_approval",
+              "draft",
+              "approving",
+              "approved",
+              "rejected",
+              "withdrawn",
+              "expired"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "approval",
+              "draft"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "description": "Goes up by one on every edit; approve sends the version it reviewed."
+          },
+          "profile_username": {
+            "type": "string"
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "post_type": {
+            "type": "string",
+            "example": "video"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "caption": {
+            "type": "string",
+            "nullable": true
+          },
+          "platform_content": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "caption": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "immediate": {
+            "type": "boolean",
+            "description": "Publish as soon as it is approved (no date of its own)."
+          },
+          "queued": {
+            "type": "boolean",
+            "description": "Sent with add_to_queue: the queue slot is picked when it is approved."
+          },
+          "scheduled_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "decision_comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "destinations": {
+            "type": "object",
+            "properties": {
+              "facebook_page_id": {
+                "type": "string",
+                "nullable": true
+              },
+              "linkedin_page_id": {
+                "type": "string",
+                "nullable": true
+              },
+              "pinterest_board_id": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          },
+          "destinations_effective": {
+            "type": "object",
+            "description": "Detail only: the Page actually used when publishing (the one pinned to the profile wins) and its name."
+          },
+          "has_preview": {
+            "type": "boolean",
+            "description": "Listings only."
+          },
+          "preview_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Short-lived signed URL (detail, and the first 50 items of a listing)."
+          },
+          "thumbnail_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Short-lived signed URL."
+          }
+        }
       }
     }
   }

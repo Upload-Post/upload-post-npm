@@ -6112,7 +6112,7 @@ export class UploadPost {
    *
    * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
    *
-   * Sends one signed sample now, with the keys of the real event and `test: true`. Logged as a test delivery: never retried and never counted towards disabling the subscription. `ok` tells whether the destination answered 2xx.
+   * Sends one signed sample now, with the keys of the real event and `test: true`. Logged as a test delivery: never retried and never counted towards disabling the subscription. `ok` tells whether the destination answered 2xx. For the post approval events the sample has the shape of the real event ({event, user_email, profile_username, approval: {...}, created_at}).
    *
    * `POST /api/uploadposts/webhooks/subscriptions/{subscription_id}/test`
    * @param {TestWebhookSubscriptionOptions} options
@@ -7569,7 +7569,7 @@ UploadPost.OPENAPI_OPERATIONS = {
   updateBlueskyFeed: ["PATCH", "/uploadposts/bluesky/feeds/{rkey}", {"b": ["user", "did", "display_name", "description", "avatar", "accepts_interactions", "content_mode"], "f": ["avatar"], "na": 1}],
   deleteBlueskyFeed: ["DELETE", "/uploadposts/bluesky/feeds/{rkey}", {"b": ["user", "confirm"], "na": 1}],
   reportOnBluesky: ["POST", "/uploadposts/bluesky/report", {"b": ["user", "post_id", "actor", "reason_type", "reason", "confirm"], "na": 1}],
-  listPostApprovals: ["GET", "/uploadposts/approvals", {"q": ["status", "profile_username", "author", "limit", "before"], "na": 1}],
+  listPostApprovals: ["GET", "/uploadposts/approvals", {"q": ["status", "profile_username", "author", "limit", "before", "count_only"], "na": 1}],
   getPostApproval: ["GET", "/uploadposts/approvals/{approval_id}", {"na": 1}],
   editPostApproval: ["PATCH", "/uploadposts/approvals/{approval_id}", {"b": ["title", "caption", "description", "platform_content", "fields", "scheduled_date", "timezone", "cover_image_base64", "remove_cover"], "na": 1}],
   withdrawPostApproval: ["DELETE", "/uploadposts/approvals/{approval_id}", {"na": 1}],

@@ -381,8 +381,17 @@ def npm_types(ops):
         out.append(f'  /** Options of `{op["js"]}` (`{endpoint(op)}`). Any other API field is sent as well. */\n'
                    f'  export interface {npm_options_type(op)} extends ApiParams {{\n' + ''.join(body) + '  }\n\n')
         schema = resolve(op['ok_schema'] or {})
-        props, required = merged_props(schema) if schema else ({}, [])
-        if props and not op['raw']:
+        if op['raw'] or not schema:
+            continue
+        # An answer that is one of several shapes (oneOf / anyOf) becomes a union
+        # of one interface per shape: XResponse = XResponseA | XResponseB...
+        variants = schema.get('oneOf') or schema.get('anyOf')
+        shapes = [resolve(v) for v in variants] if variants else [schema]
+        names = []
+        for i, shape in enumerate(shapes):
+            props, _ = merged_props(shape)
+            if not props:
+                continue
             rbody = []
             for k, v in props.items():
                 doc = one_line(resolve(v).get('description', ''))
@@ -390,9 +399,18 @@ def npm_types(ops):
                     rbody.append('    /** ' + doc.replace('*/', '*\\/') + ' */\n')
                 key = k if re.fullmatch(r'[A-Za-z_$][\w$]*', k) else json.dumps(k)
                 rbody.append(f'    {key}?: {ts_type(v)};\n')
-            out.append(f'  /** Answer of `{op["js"]}`. */\n'
-                       f'  export interface {npm_response_type(op)} extends ApiResponse {{\n' + ''.join(rbody) + '  }\n\n')
-            op['_rtype'] = npm_response_type(op)
+            name = npm_response_type(op) + (str(i + 1) if variants else '')
+            what = one_line(shape.get('description') or shape.get('title') or '', 160)
+            label = f'Answer of `{op["js"]}`' + (f' (shape {i + 1}{": " + what if what else ""})' if variants else '')
+            out.append(f'  /** {label.replace("*/", "*\\/")}. */\n'
+                       f'  export interface {name} extends ApiResponse {{\n' + ''.join(rbody) + '  }\n\n')
+            names.append(name)
+        if not names:
+            continue
+        if variants:
+            out.append(f'  /** Answer of `{op["js"]}`: one of {len(names)} shapes. */\n'
+                       f'  export type {npm_response_type(op)} = {" | ".join(names)};\n\n')
+        op['_rtype'] = npm_response_type(op)
     return ''.join(out)
 
 
