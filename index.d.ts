@@ -48,6 +48,12 @@ declare module 'upload-post' {
     /** Post title/caption. Required for YouTube, Reddit, and text posts. Optional for TikTok, Instagram, Facebook, LinkedIn, X, Threads, Bluesky, Pinterest. */
     title?: string;
     /**
+     * Images attached to the first comment (Reddit; not on scheduled or queued
+     * posts): local paths, Buffers or URLs. The API takes files only, so URLs are
+     * downloaded by the SDK and sent as files.
+     */
+    firstCommentMedia?: string | Buffer | Array<string | Buffer>;
+    /**
      * Key the API uses to collapse duplicate uploads within a 24-hour window.
      * Pass the same value when retrying a failed upload, otherwise the retry publishes a second post.
      */
@@ -346,6 +352,8 @@ declare module 'upload-post' {
     youtubePublicStatsViewable?: boolean;
     /** Custom thumbnail URL */
     youtubeThumbnailUrl?: string;
+    /** Custom thumbnail as a file: local path, stream or Buffer (sent as `thumbnail`) */
+    youtubeThumbnail?: string | Buffer | NodeJS.ReadableStream;
     /** Made for kids flag (COPPA) */
     youtubeSelfDeclaredMadeForKids?: boolean;
     /** AI/synthetic content flag */
@@ -560,6 +568,8 @@ declare module 'upload-post' {
     xLongTextAsPost?: boolean;
     /** Paid partnership label on the first post */
     xPaidPartnership?: boolean;
+    /** User ids that may not reply (with replyToId) */
+    xExcludeReplyUserIds?: string[] | string;
     /** ID of the tweet to reply to (alias of the generic replyToId). */
     xReplyToId?: string;
   }
@@ -656,6 +666,8 @@ declare module 'upload-post' {
     redditSendReplies?: boolean;
     /** Custom text for editable flairs */
     redditFlairText?: string;
+    /** Reddit-specific title (falls back to `title`) */
+    redditTitle?: string;
     /** Per-image captions (JSON array or `||`-separated) */
     redditGalleryCaptions?: string | string[];
     /** Per-image outbound URLs (JSON array or `||`-separated) */
@@ -777,6 +789,10 @@ declare module 'upload-post' {
     telegramDuration?: number;
     telegramLength?: number;
     telegramEmoji?: string;
+    /** Allow paid broadcasts (spends the bot's Stars above 30 messages/s) */
+    telegramAllowPaidBroadcast?: boolean;
+    /** Send the text before a video note, sticker, location... (default true) */
+    telegramSendTitle?: boolean;
   }
 
   export interface MastodonOptions {
@@ -1012,11 +1028,15 @@ declare module 'upload-post' {
     platforms: TextPlatform[];
   }
 
-  export interface UploadDocumentOptions {
+  export interface UploadDocumentOptions extends TelegramOptions {
     /** Post title/caption */
     title: string;
     /** User identifier (profile name) */
     user: string;
+    /** `linkedin` (default) and/or `telegram`; any other platform is ignored */
+    platforms?: ('linkedin' | 'telegram')[];
+    /** Telegram: comment sent after the document */
+    telegramFirstComment?: string;
     /** Document description/commentary */
     description?: string;
     /** Visibility setting */
@@ -1048,6 +1068,20 @@ declare module 'upload-post' {
     success: boolean;
     request_id?: string;
     message?: string;
+    /**
+     * Not generally available yet (team roles and post approvals). `true` when the
+     * caller is an Editor or Contributor team member (HTTP 202): nothing is
+     * published or scheduled; the post waits for review (`approval_status:
+     * 'pending_approval'`) or stays as a draft (`'draft'`). Follow it with
+     * `getPostApproval({ approvalId })` or `getStatus(request_id)`.
+     */
+    pending_approval?: boolean;
+    approval_id?: string;
+    approval_status?: 'pending_approval' | 'draft';
+    /** `null` while the post waits for approval. */
+    job_id?: string | null;
+    scheduled_date?: string | null;
+    queued?: boolean;
     data?: {
       status?: string;
       platforms?: Array<{
@@ -1476,6 +1510,10 @@ declare module 'upload-post' {
     /** Only when seat limits are enforced */
     suspended?: boolean;
     suspended_reason?: 'owner_plan_limit' | null;
+    /** With team roles on. */
+    role?: 'admin' | 'editor' | 'contributor' | 'viewer';
+    /** With team roles on: profiles this member can use (`null` = every profile). */
+    profiles?: string[] | null;
     [key: string]: any;
   }
 
@@ -1496,6 +1534,10 @@ declare module 'upload-post' {
       status: string;
       suspended?: boolean;
       suspended_reason?: 'owner_plan_limit' | null;
+      /** With team roles on: your role in that account. */
+      role?: string;
+      /** With team roles on: profiles you can use there (`null` = every profile). */
+      profiles?: string[] | null;
     }>;
   }
 
@@ -1705,6 +1747,3249 @@ declare module 'upload-post' {
    * Supports uploading to: TikTok, Instagram, YouTube, LinkedIn, Facebook,
    * Pinterest, Threads, Reddit, Bluesky, X (Twitter), Discord, Telegram
    */
+  // ==================== Generated from the OpenAPI spec ====================
+  // Options and answers of the generated methods. Written by codegen/generate.py.
+  // <openapi:types>
+  /** Options of `sendTelegramGift` (`POST /api/uploadposts/telegram/gifts`). Any other API field is sent as well. */
+  export interface SendTelegramGiftOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    userId?: number;
+    chatId?: string;
+    giftId: string;
+    maxStarCount: number;
+    payForUpgrade?: boolean;
+    text?: string;
+    textParseMode?: string;
+    textEntities?: (Record<string, any>)[];
+    confirm: boolean;
+    idempotencyKey: string;
+  }
+
+  /** Answer of `sendTelegramGift`. */
+  export interface SendTelegramGiftResponse extends ApiResponse {
+    success?: boolean;
+  }
+
+  /** Options of `giftTelegramPremium` (`POST /api/uploadposts/telegram/gifts/premium`). Any other API field is sent as well. */
+  export interface GiftTelegramPremiumOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    userId: number;
+    monthCount: 3 | 6 | 12;
+    starCount: 1000 | 1500 | 2500;
+    text?: string;
+    confirm: boolean;
+    idempotencyKey: string;
+  }
+
+  /** Answer of `giftTelegramPremium`. */
+  export interface GiftTelegramPremiumResponse extends ApiResponse {
+    success?: boolean;
+  }
+
+  /** Options of `getTelegramPaymentSettings` (`GET /api/uploadposts/telegram/payments/settings`). Any other API field is sent as well. */
+  export interface GetTelegramPaymentSettingsOptions extends ApiParams {
+    /** Profile username with Telegram connected. */
+    user: string;
+  }
+
+  /** Answer of `getTelegramPaymentSettings`. */
+  export interface GetTelegramPaymentSettingsResponse extends ApiResponse {
+    success?: boolean;
+  }
+
+  /** Options of `updateTelegramPaymentSettings` (`PUT /api/uploadposts/telegram/payments/settings`). Any other API field is sent as well. */
+  export interface UpdateTelegramPaymentSettingsOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    preCheckout?: "off" | "approve" | "reject" | (string & {});
+    /** Required for approve: maximum order total per currency, e.g. {"XTR": 500}. Setting pre_checkout to off without it clears the stored value. */
+    maxTotalAmount?: Record<string, any>;
+    allowedPayloadPrefixes?: string[];
+    errorMessage?: string;
+    shipping?: "off" | "static" | (string & {});
+    shippingOptions?: (Record<string, any>)[];
+    shippingCountries?: string[];
+    onlyUploadPostInvoices?: boolean;
+    /** Required to save a rule that answers (approve, reject, shipping static). */
+    confirm?: boolean;
+  }
+
+  /** Answer of `updateTelegramPaymentSettings`. */
+  export interface UpdateTelegramPaymentSettingsResponse extends ApiResponse {
+    success?: boolean;
+  }
+
+  /** Options of `setTelegramUpdates` (`POST /api/uploadposts/telegram/updates`). Any other API field is sent as well. */
+  export interface SetTelegramUpdatesOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    /** true to receive, false to stop. */
+    enabled: boolean;
+    /** Replace a webhook that is not Upload-Post's. */
+    replaceExistingWebhook?: boolean;
+    /** https URL that also gets every raw update, signed with your webhook secret (required), one attempt. */
+    forwardUrl?: string;
+    /** Also receive and keep the chats of the connected Telegram Business account (default false). */
+    businessChats?: boolean;
+    /** Empty answerCallbackQuery if you did not answer a button press in ~8 s. */
+    autoAnswerCallbacks?: boolean;
+    extraUpdates?: ("channel_post" | "edited_channel_post" | "chat_member" | "chat_boost" | "removed_chat_boost" | "managed_bot" | "stopped_message_generation" | (string & {}))[];
+  }
+
+  /** Options of `answerTelegramQuery` (`POST /api/uploadposts/telegram/answer`). Any other API field is sent as well. */
+  export interface AnswerTelegramQueryOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    type: "callback" | "inline" | "join_request" | "join_request_web_app" | "guest" | "widget" | "shipping" | "pre_checkout" | (string & {});
+    /** The query id (or the official field: callback_query_id, inline_query_id...). */
+    queryId?: string;
+    /** callback: 0-200 characters. */
+    text?: string;
+    /** callback. */
+    showAlert?: boolean;
+    /** callback. */
+    url?: string;
+    /** callback / inline. */
+    cacheTime?: number;
+    /** inline: up to 50 InlineQueryResult. */
+    results?: (Record<string, any>)[];
+    /** inline. */
+    isPersonal?: boolean;
+    /** inline. */
+    nextOffset?: string;
+    /** inline: InlineQueryResultsButton. */
+    button?: Record<string, any>;
+    /** join_request: approve|decline|queue. guest: InlineQueryResult. */
+    result?: any;
+    /** join_request_web_app: https URL. */
+    webAppUrl?: string;
+    /** widget: up to 1024 bytes. */
+    data?: string;
+    /** shipping / pre_checkout. */
+    ok?: boolean;
+    shippingOptions?: (Record<string, any>)[];
+    /** shipping / pre_checkout when ok is false. */
+    errorMessage?: string;
+  }
+
+  /** Options of `getTelegramBusinessConnections` (`GET /api/uploadposts/telegram/business-connections`). Any other API field is sent as well. */
+  export interface GetTelegramBusinessConnectionsOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    /** Optional when the bot has one active Business connection. */
+    businessConnectionId?: string;
+  }
+
+  /** Options of `getTelegramBusinessProfile` (`GET /api/uploadposts/telegram/business-profile`). Any other API field is sent as well. */
+  export interface GetTelegramBusinessProfileOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    /** Optional when the bot has one active Business connection. */
+    businessConnectionId?: string;
+  }
+
+  /** Options of `updateTelegramBusinessProfile` (`PATCH /api/uploadposts/telegram/business-profile`). Any other API field is sent as well. */
+  export interface UpdateTelegramBusinessProfileOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    businessConnectionId?: string;
+    /** 1-64. */
+    firstName?: string;
+    /** 0-64. */
+    lastName?: string;
+    /** 0-32. */
+    username?: string;
+    /** 0-140. */
+    bio?: string;
+    /** Public URL of the new photo (JPG) or animation (MP4). */
+    mediaUrl?: string;
+    isPublic?: boolean;
+    removePhoto?: boolean;
+    /** {show_gift_button, accepted_gift_types}. */
+    giftSettings?: Record<string, any>;
+  }
+
+  /** Options of `postTelegramStory` (`POST /api/uploadposts/telegram/business-stories`). Any other API field is sent as well. */
+  export interface PostTelegramStoryOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    businessConnectionId?: string;
+    /** Or a multipart 'file'. */
+    mediaUrl?: string;
+    /** 6, 12, 24 or 48 (hours) or the seconds. */
+    activePeriod?: number;
+    /** 0-2048. */
+    caption?: string;
+    parseMode?: string;
+    captionEntities?: (Record<string, any>)[];
+    areas?: (Record<string, any>)[];
+    postToChatPage?: boolean;
+    protectContent?: boolean;
+    /** PATCH / DELETE. */
+    storyId?: number;
+  }
+
+  /** Options of `editTelegramStory` (`PATCH /api/uploadposts/telegram/business-stories`). Any other API field is sent as well. */
+  export interface EditTelegramStoryOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    businessConnectionId?: string;
+    /** Or a multipart 'file'. */
+    mediaUrl?: string;
+    /** 6, 12, 24 or 48 (hours) or the seconds. */
+    activePeriod?: number;
+    /** 0-2048. */
+    caption?: string;
+    parseMode?: string;
+    captionEntities?: (Record<string, any>)[];
+    areas?: (Record<string, any>)[];
+    postToChatPage?: boolean;
+    protectContent?: boolean;
+    /** PATCH / DELETE. */
+    storyId?: number;
+  }
+
+  /** Options of `deleteTelegramStory` (`DELETE /api/uploadposts/telegram/business-stories`). Any other API field is sent as well. */
+  export interface DeleteTelegramStoryOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    businessConnectionId?: string;
+    /** Or a multipart 'file'. */
+    mediaUrl?: string;
+    /** 6, 12, 24 or 48 (hours) or the seconds. */
+    activePeriod?: number;
+    /** 0-2048. */
+    caption?: string;
+    parseMode?: string;
+    captionEntities?: (Record<string, any>)[];
+    areas?: (Record<string, any>)[];
+    postToChatPage?: boolean;
+    protectContent?: boolean;
+    /** PATCH / DELETE. */
+    storyId: number;
+  }
+
+  /** Options of `repostTelegramStory` (`POST /api/uploadposts/telegram/business-stories/repost`). Any other API field is sent as well. */
+  export interface RepostTelegramStoryOptions extends ApiParams {
+    user: string;
+    businessConnectionId?: string;
+    fromChatId: number;
+    fromStoryId: number;
+    activePeriod: number;
+    postToChatPage?: boolean;
+    protectContent?: boolean;
+  }
+
+  /** Options of `getTelegramBusinessGifts` (`GET /api/uploadposts/telegram/business-gifts`). Any other API field is sent as well. */
+  export interface GetTelegramBusinessGiftsOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    /** Optional when the bot has one active Business connection. */
+    businessConnectionId?: string;
+  }
+
+  /** Options of `manageTelegramBusinessGift` (`POST /api/uploadposts/telegram/business-gifts`). Any other API field is sent as well. */
+  export interface ManageTelegramBusinessGiftOptions extends ApiParams {
+    user: string;
+    businessConnectionId?: string;
+    action: "convert" | "upgrade" | "transfer" | "delete" | (string & {});
+    ownedGiftId: string;
+    /** Must be true. */
+    confirm: boolean;
+    /** upgrade. */
+    keepOriginalDetails?: boolean;
+    /** upgrade / transfer. */
+    starCount?: number;
+    /** Required. Unique string (max 128): a repeat with the same key returns the first answer. */
+    idempotencyKey: string;
+    /** transfer. */
+    newOwnerChatId?: number;
+  }
+
+  /** Options of `getTelegramBusinessStars` (`GET /api/uploadposts/telegram/business-stars`). Any other API field is sent as well. */
+  export interface GetTelegramBusinessStarsOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    /** Optional when the bot has one active Business connection. */
+    businessConnectionId?: string;
+  }
+
+  /** Options of `transferTelegramBusinessStars` (`POST /api/uploadposts/telegram/business-stars/transfer`). Any other API field is sent as well. */
+  export interface TransferTelegramBusinessStarsOptions extends ApiParams {
+    user: string;
+    businessConnectionId?: string;
+    /** 1-10000. */
+    starCount: number;
+    /** Required. Unique string (max 128): a repeat with the same key returns the first answer. */
+    idempotencyKey: string;
+    /** Must be true. */
+    confirm: boolean;
+  }
+
+  /** Options of `analyzeShorts` (`POST /api/uploadposts/analyze-shorts`). Any other API field is sent as well. */
+  export interface AnalyzeShortsOptions extends ApiParams {
+    /** Max 100 MB and 5 minutes. */
+    video: string | Buffer | NodeJS.ReadableStream;
+    /** Comma-separated: youtube, instagram, tiktok, facebook. */
+    platforms?: string;
+    /** Output language (default: the video's). */
+    language?: string;
+  }
+
+  /** Answer of `analyzeShorts`. */
+  export interface AnalyzeShortsResponse extends ApiResponse {
+    success?: boolean;
+    ai_generated?: boolean;
+    remaining_analyses?: number;
+    youtube?: { title?: string; description?: string; [key: string]: any };
+    instagram?: { caption?: string; [key: string]: any };
+    tiktok?: { caption?: string; [key: string]: any };
+    facebook?: { caption?: string; [key: string]: any };
+  }
+
+  /** Options of `rewriteCaptions` (`POST /api/uploadposts/rewrite-captions`). Any other API field is sent as well. */
+  export interface RewriteCaptionsOptions extends ApiParams {
+    content: { youtube?: { title?: string; description?: string; [key: string]: any }; instagram?: { caption?: string; [key: string]: any }; tiktok?: { caption?: string; [key: string]: any }; facebook?: { caption?: string; [key: string]: any }; [key: string]: any };
+    language: string;
+    /** Subset of the platforms in content (default all). */
+    platforms?: string[];
+  }
+
+  /** Answer of `rewriteCaptions`. */
+  export interface RewriteCaptionsResponse extends ApiResponse {
+    success?: boolean;
+    remaining_analyses?: number;
+    youtube?: { title?: string; description?: string; [key: string]: any };
+    instagram?: { caption?: string; [key: string]: any };
+    tiktok?: { caption?: string; [key: string]: any };
+    facebook?: { caption?: string; [key: string]: any };
+  }
+
+  /** Options of `createMediaUpload` (`POST /api/uploadposts/media-uploads`). Any other API field is sent as well. */
+  export interface CreateMediaUploadOptions extends ApiParams {
+    mediaType?: "video" | "image" | "document" | (string & {});
+    /** With an allowed extension (video: mp4, mov, m4v, webm, mpeg, mpg, avi, mkv; image: jpg, jpeg, png, webp, gif; document: pdf, ppt, pptx, doc, docx). */
+    filename: string;
+    /** MIME type matching media_type. */
+    contentType?: string;
+    /** Size in bytes. */
+    contentLength: number;
+    source?: string;
+  }
+
+  /** Answer of `createMediaUpload`. */
+  export interface CreateMediaUploadResponse extends ApiResponse {
+    success?: boolean;
+    upload_id?: string;
+    upload_url?: string;
+    method?: string;
+    headers?: Record<string, any>;
+    put_expires_at?: string;
+    expires_at?: string;
+    max_file_bytes?: number;
+    staging_ttl_hours?: number;
+  }
+
+  /** Options of `completeMediaUpload` (`POST /api/uploadposts/media-uploads/{upload_id}/complete`). Any other API field is sent as well. */
+  export interface CompleteMediaUploadOptions extends ApiParams {
+    /** Upload id. */
+    uploadId: string;
+  }
+
+  /** Answer of `completeMediaUpload`. */
+  export interface CompleteMediaUploadResponse extends ApiResponse {
+    success?: boolean;
+    upload_id?: string;
+    status?: "pending" | "uploaded" | "deleted" | "rejected";
+    media_type?: "video" | "image" | "document";
+    filename?: string;
+    content_type?: string;
+    bytes_expected?: number;
+    bytes_actual?: number;
+    expires_at?: string;
+    created_at?: string;
+    /** Signed URL to pass as the media URL of an upload (when uploaded and include_url). */
+    media_url?: string;
+    media_url_expires_in_seconds?: number;
+    message?: string;
+  }
+
+  /** Options of `getMediaUpload` (`GET /api/uploadposts/media-uploads/{upload_id}`). Any other API field is sent as well. */
+  export interface GetMediaUploadOptions extends ApiParams {
+    /** Upload id. */
+    uploadId: string;
+    /** Include media_url (when uploaded). */
+    includeUrl?: boolean;
+  }
+
+  /** Answer of `getMediaUpload`. */
+  export interface GetMediaUploadResponse extends ApiResponse {
+    success?: boolean;
+    upload_id?: string;
+    status?: "pending" | "uploaded" | "deleted" | "rejected";
+    media_type?: "video" | "image" | "document";
+    filename?: string;
+    content_type?: string;
+    bytes_expected?: number;
+    bytes_actual?: number;
+    expires_at?: string;
+    created_at?: string;
+    /** Signed URL to pass as the media URL of an upload (when uploaded and include_url). */
+    media_url?: string;
+    media_url_expires_in_seconds?: number;
+  }
+
+  /** Options of `deleteMediaUpload` (`DELETE /api/uploadposts/media-uploads/{upload_id}`). Any other API field is sent as well. */
+  export interface DeleteMediaUploadOptions extends ApiParams {
+    /** Upload id. */
+    uploadId: string;
+  }
+
+  /** Answer of `deleteMediaUpload`. */
+  export interface DeleteMediaUploadResponse extends ApiResponse {
+    success?: boolean;
+    upload_id?: string;
+    status?: string;
+    delete_error?: string;
+  }
+
+  /** Options of `getScheduledPost` (`GET /api/uploadposts/schedule/{job_id}`). Any other API field is sent as well. */
+  export interface GetScheduledPostOptions extends ApiParams {
+    /** The unique job identifier. */
+    jobId: string;
+  }
+
+  /** Answer of `getScheduledPost`. */
+  export interface GetScheduledPostResponse extends ApiResponse {
+    success?: boolean;
+    job_id?: string;
+    post_type?: "video" | "photo" | "text" | "document" | "unknown";
+    profile_username?: string;
+    platforms?: string[];
+    scheduled_date?: string;
+    original_timezone?: string;
+    form?: Record<string, any>;
+    media_urls?: string[];
+    thumbnail_url?: string;
+    cover_preview_url?: string;
+    kept_files?: string[];
+    editable?: boolean;
+    not_editable_reason?: string;
+  }
+
+  /** Options of `getScheduledPostThumbnail` (`GET /api/uploadposts/schedule/{job_id}/thumbnail`). Any other API field is sent as well. */
+  export interface GetScheduledPostThumbnailOptions extends ApiParams {
+    /** The unique job identifier. */
+    jobId: string;
+  }
+
+  /** Answer of `getScheduledPostThumbnail`. */
+  export interface GetScheduledPostThumbnailResponse extends ApiResponse {
+    job_id?: string;
+    thumbnail_url?: string;
+    retry_after?: number;
+  }
+
+  /** Options of `getScheduledPostPreview` (`GET /api/uploadposts/schedule/{job_id}/preview`). Any other API field is sent as well. */
+  export interface GetScheduledPostPreviewOptions extends ApiParams {
+    /** The unique job identifier. */
+    jobId: string;
+  }
+
+  /** Answer of `getScheduledPostPreview`. */
+  export interface GetScheduledPostPreviewResponse extends ApiResponse {
+    job_id?: string;
+    preview_url?: string;
+    cover_preview_url?: string;
+    thumbnail_preview_url?: string;
+    external_id?: string;
+    source_filename?: string;
+  }
+
+  /** Options of `createPinterestBoard` (`POST /api/uploadposts/pinterest/boards`). Any other API field is sent as well. */
+  export interface CreatePinterestBoardOptions extends ApiParams {
+    /** Profile username (alias user); default the first profile with Pinterest. */
+    profile?: string;
+    /** Alias of profile. */
+    user?: string;
+    name: string;
+    description?: string;
+    /** SECRET is rejected (400). */
+    privacy?: "PUBLIC" | "PROTECTED" | (string & {});
+  }
+
+  /** Answer of `createPinterestBoard`. */
+  export interface CreatePinterestBoardResponse extends ApiResponse {
+    success?: boolean;
+    board?: { id?: string; name?: string; privacy?: string; description?: string; [key: string]: any };
+  }
+
+  /** Options of `queryYoutubeAnalytics` (`GET /api/uploadposts/youtube/analytics/query`). Any other API field is sent as well. */
+  export interface QueryYoutubeAnalyticsOptions extends ApiParams {
+    /** Profile username with a YouTube channel connected. */
+    user: string;
+    /** YYYY-MM-DD */
+    startDate: string;
+    /** YYYY-MM-DD */
+    endDate: string;
+    /** Comma-separated metrics. */
+    metrics: string;
+    /** Comma-separated dimensions. */
+    dimensions?: string;
+    /** dimension==value joined with ';' (video/playlist accept up to 500 comma-separated IDs). */
+    filters?: string;
+    /** Comma-separated; '-' for descending. */
+    sort?: string;
+    maxResults?: number;
+    startIndex?: number;
+    /** Optional report ID from GET /uploadposts/youtube/analytics/reports. */
+    report?: string;
+  }
+
+  /** Answer of `queryYoutubeAnalytics`. */
+  export interface QueryYoutubeAnalyticsResponse extends ApiResponse {
+    success?: boolean;
+    report?: string;
+    report_name?: string;
+    query?: Record<string, any>;
+    column_headers?: (Record<string, any>)[];
+    rows?: any[][];
+    cached?: boolean;
+    cached_at?: string;
+    expires_at?: string;
+    data_note?: string;
+  }
+
+  /** Options of `listYoutubeAnalyticsReports` (`GET /api/uploadposts/youtube/analytics/reports`). Any other API field is sent as well. */
+  export interface ListYoutubeAnalyticsReportsOptions extends ApiParams {
+    /** Profile username with a YouTube channel connected. */
+    user: string;
+  }
+
+  /** Options of `listYoutubeAnalyticsGroups` (`GET /api/uploadposts/youtube/analytics/groups`). Any other API field is sent as well. */
+  export interface ListYoutubeAnalyticsGroupsOptions extends ApiParams {
+    /** Profile username with a YouTube channel connected. */
+    user: string;
+    /** Up to 50 group IDs, comma separated. */
+    ids?: string;
+    pageToken?: string;
+  }
+
+  /** Options of `listYoutubeAnalyticsGroupItems` (`GET /api/uploadposts/youtube/analytics/groups/{group_id}/items`). Any other API field is sent as well. */
+  export interface ListYoutubeAnalyticsGroupItemsOptions extends ApiParams {
+    /** Group ID. */
+    groupId: string;
+    /** Profile username with a YouTube channel connected. */
+    user: string;
+  }
+
+  /** Options of `getYoutubeAnalyticsUsage` (`GET /api/uploadposts/youtube/analytics/usage`). Any other API field is sent as well. */
+  export interface GetYoutubeAnalyticsUsageOptions extends ApiParams {
+  }
+
+  /** Options of `listYoutubeReportTypes` (`GET /api/uploadposts/youtube/reporting/report-types`). Any other API field is sent as well. */
+  export interface ListYoutubeReportTypesOptions extends ApiParams {
+    /** Profile username with a YouTube channel connected. */
+    user: string;
+    pageToken?: string;
+    pageSize?: number;
+  }
+
+  /** Options of `listYoutubeReportingJobs` (`GET /api/uploadposts/youtube/reporting/jobs`). Any other API field is sent as well. */
+  export interface ListYoutubeReportingJobsOptions extends ApiParams {
+    /** Profile username with a YouTube channel connected. */
+    user: string;
+    pageToken?: string;
+    pageSize?: number;
+  }
+
+  /** Options of `createYoutubeReportingJob` (`POST /api/uploadposts/youtube/reporting/jobs`). Any other API field is sent as well. */
+  export interface CreateYoutubeReportingJobOptions extends ApiParams {
+    user: string;
+    reportTypeId: string;
+    name?: string;
+  }
+
+  /** Options of `getYoutubeReportingJob` (`GET /api/uploadposts/youtube/reporting/jobs/{job_id}`). Any other API field is sent as well. */
+  export interface GetYoutubeReportingJobOptions extends ApiParams {
+    /** Job ID. */
+    jobId: string;
+    /** Profile username with a YouTube channel connected. */
+    user: string;
+  }
+
+  /** Options of `deleteYoutubeReportingJob` (`DELETE /api/uploadposts/youtube/reporting/jobs/{job_id}`). Any other API field is sent as well. */
+  export interface DeleteYoutubeReportingJobOptions extends ApiParams {
+    /** Job ID. */
+    jobId: string;
+    user: string;
+    confirm: boolean;
+  }
+
+  /** Options of `listYoutubeReports` (`GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports`). Any other API field is sent as well. */
+  export interface ListYoutubeReportsOptions extends ApiParams {
+    /** Job ID. */
+    jobId: string;
+    /** Profile username with a YouTube channel connected. */
+    user: string;
+    /** RFC 3339 */
+    createdAfter?: string;
+    /** RFC 3339 */
+    startTimeAtOrAfter?: string;
+    /** RFC 3339 */
+    startTimeBefore?: string;
+    pageToken?: string;
+    pageSize?: number;
+  }
+
+  /** Options of `getYoutubeReport` (`GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}`). Any other API field is sent as well. */
+  export interface GetYoutubeReportOptions extends ApiParams {
+    /** Job ID. */
+    jobId: string;
+    /** Report ID. */
+    reportId: string;
+    /** Profile username with a YouTube channel connected. */
+    user: string;
+  }
+
+  /** Options of `downloadYoutubeReport` (`GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}/download`). Any other API field is sent as well. */
+  export interface DownloadYoutubeReportOptions extends ApiParams {
+    /** Job ID. */
+    jobId: string;
+    /** Report ID. */
+    reportId: string;
+    /** Profile username with a YouTube channel connected. */
+    user: string;
+  }
+
+  /** Options of `getYoutubePush` (`GET /api/uploadposts/youtube/push`). Any other API field is sent as well. */
+  export interface GetYoutubePushOptions extends ApiParams {
+    /** Profile username with a YouTube channel connected. */
+    user: string;
+  }
+
+  /** Answer of `getYoutubePush`. */
+  export interface GetYoutubePushResponse extends ApiResponse {
+    success?: boolean;
+  }
+
+  /** Options of `enableYoutubePush` (`POST /api/uploadposts/youtube/push`). Any other API field is sent as well. */
+  export interface EnableYoutubePushOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+  }
+
+  /** Answer of `enableYoutubePush`. */
+  export interface EnableYoutubePushResponse extends ApiResponse {
+    success?: boolean;
+  }
+
+  /** Options of `disableYoutubePush` (`DELETE /api/uploadposts/youtube/push`). Any other API field is sent as well. */
+  export interface DisableYoutubePushOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+  }
+
+  /** Answer of `disableYoutubePush`. */
+  export interface DisableYoutubePushResponse extends ApiResponse {
+    success?: boolean;
+  }
+
+  /** Options of `getInstagramPublishingLimit` (`GET /api/uploadposts/instagram/publishing_limit`). Any other API field is sent as well. */
+  export interface GetInstagramPublishingLimitOptions extends ApiParams {
+    /** Profile username (alias user). */
+    profile: string;
+    /** Skip the cache. */
+    refresh?: boolean;
+  }
+
+  /** Answer of `getInstagramPublishingLimit`. */
+  export interface GetInstagramPublishingLimitResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    profile?: string;
+    quota_usage?: number;
+    quota_total?: number;
+    quota_duration?: number;
+    remaining?: number;
+    limit_reached?: boolean;
+    fetched_at?: string;
+    cached?: boolean;
+  }
+
+  /** Options of `getThreadsPublishingLimit` (`GET /api/uploadposts/threads/publishing_limit`). Any other API field is sent as well. */
+  export interface GetThreadsPublishingLimitOptions extends ApiParams {
+    /** Profile username (or use profile). */
+    user?: string;
+    /** Alias of user. */
+    profile?: string;
+    /** Skip the cache. */
+    refresh?: boolean;
+  }
+
+  /** Answer of `getThreadsPublishingLimit`. */
+  export interface GetThreadsPublishingLimitResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    posts?: { used?: number; limit?: number; remaining?: number; window_seconds?: number; [key: string]: any };
+    replies?: { used?: number; limit?: number; remaining?: number; window_seconds?: number; [key: string]: any };
+    fetched_at?: string;
+    cached?: boolean;
+  }
+
+  /** Options of `listPinterestBoardSections` (`GET /api/uploadposts/pinterest/boards/{board_id}/sections`). Any other API field is sent as well. */
+  export interface ListPinterestBoardSectionsOptions extends ApiParams {
+    /** Board id. */
+    boardId: string;
+    /** Profile username. */
+    profile?: string;
+  }
+
+  /** Answer of `listPinterestBoardSections`. */
+  export interface ListPinterestBoardSectionsResponse extends ApiResponse {
+    success?: boolean;
+    board_id?: string;
+    sections?: ({ id?: string; name?: string; [key: string]: any })[];
+    profile?: string;
+  }
+
+  /** Options of `createPinterestBoardSection` (`POST /api/uploadposts/pinterest/boards/{board_id}/sections`). Any other API field is sent as well. */
+  export interface CreatePinterestBoardSectionOptions extends ApiParams {
+    /** Board id. */
+    boardId: string;
+    /** Profile username (alias user); default the first profile with Pinterest. */
+    profile?: string;
+    /** Alias of profile. */
+    user?: string;
+    name: string;
+  }
+
+  /** Answer of `createPinterestBoardSection`. */
+  export interface CreatePinterestBoardSectionResponse extends ApiResponse {
+    success?: boolean;
+    board_id?: string;
+    section?: { id?: string; name?: string; [key: string]: any };
+  }
+
+  /** Options of `getFacebookPageInfo` (`GET /api/uploadposts/facebook/page-info`). Any other API field is sent as well. */
+  export interface GetFacebookPageInfoOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    /** Page id (required if the account manages several Pages). */
+    pageId?: string;
+  }
+
+  /** Answer of `getFacebookPageInfo`. */
+  export interface GetFacebookPageInfoResponse extends ApiResponse {
+    success?: boolean;
+    page_id?: string;
+    page?: { id?: string; name?: string; about?: string; description?: string; website?: string; phone?: string; link?: string; category?: string; picture_url?: string; cover_url?: string; emails?: string[]; hours?: Record<string, any>; hours_list?: ({ day?: string; open?: string; close?: string; [key: string]: any })[]; [key: string]: any };
+    partial?: boolean;
+  }
+
+  /** Options of `updateFacebookPageInfo` (`PATCH /api/uploadposts/facebook/page-info`). Any other API field is sent as well. */
+  export interface UpdateFacebookPageInfoOptions extends ApiParams {
+    user: string;
+    pageId?: string;
+    validateOnly?: boolean;
+    about?: string;
+    description?: string;
+    website?: string;
+    phone?: string;
+    emails?: string[] | string;
+    /** At most 2 ranges per day. */
+    hours?: ({ day?: string | string[]; open?: string; close?: string; [key: string]: any })[] | Record<string, any>;
+    pictureUrl?: string;
+    coverUrl?: string;
+  }
+
+  /** Answer of `updateFacebookPageInfo`. */
+  export interface UpdateFacebookPageInfoResponse extends ApiResponse {
+    success?: boolean;
+    page_id?: string;
+    updated_fields?: string[];
+    ignored_fields?: string[];
+    validate_only?: boolean;
+    would_update?: Record<string, any>;
+  }
+
+  /** Options of `listRedditSubreddits` (`GET /api/uploadposts/reddit/subreddits`). Any other API field is sent as well. */
+  export interface ListRedditSubredditsOptions extends ApiParams {
+    /** Profile username. */
+    profile: string;
+  }
+
+  /** Answer of `listRedditSubreddits`. */
+  export interface ListRedditSubredditsResponse extends ApiResponse {
+    success?: boolean;
+    subreddits?: string[];
+  }
+
+  /** Options of `getRedditPostTypes` (`GET /api/uploadposts/reddit/post-types`). Any other API field is sent as well. */
+  export interface GetRedditPostTypesOptions extends ApiParams {
+    /** Profile username. */
+    profile: string;
+    /** Subreddit name without r/. */
+    subreddit: string;
+  }
+
+  /** Answer of `getRedditPostTypes`. */
+  export interface GetRedditPostTypesResponse extends ApiResponse {
+    success?: boolean;
+    allowed_post_types?: string[];
+  }
+
+  /** Options of `listRedditFlairs` (`GET /api/uploadposts/reddit/flairs`). Any other API field is sent as well. */
+  export interface ListRedditFlairsOptions extends ApiParams {
+    /** Profile username. */
+    profile: string;
+    /** Subreddit name without r/. */
+    subreddit: string;
+  }
+
+  /** Answer of `listRedditFlairs`. */
+  export interface ListRedditFlairsResponse extends ApiResponse {
+    success?: boolean;
+    flairs?: ({ id?: string; text?: string; css_class?: string; text_color?: string; mod_only?: boolean; text_editable?: boolean; background_color?: string; type?: string; [key: string]: any })[];
+  }
+
+  /** Options of `getUserProfile` (`GET /api/uploadposts/users/{username}`). Any other API field is sent as well. */
+  export interface GetUserProfileOptions extends ApiParams {
+    /** The username of the profile to retrieve. */
+    username: string;
+  }
+
+  /** Answer of `getUserProfile`. */
+  export interface GetUserProfileResponse extends ApiResponse {
+    success?: boolean;
+    profile?: { username?: string; display_name?: string; created_at?: string; social_accounts?: Record<string, any>; client_approval?: boolean; [key: string]: any };
+  }
+
+  /** Options of `renameUserProfile` (`PATCH /api/uploadposts/users/{username}`). Any other API field is sent as well. */
+  export interface RenameUserProfileOptions extends ApiParams {
+    /** The username of the profile to rename. It is not changed. */
+    username: string;
+    /** New label. Trimmed; no line breaks. Empty string or null clears it. */
+    displayName: string;
+  }
+
+  /** Answer of `renameUserProfile`. */
+  export interface RenameUserProfileResponse extends ApiResponse {
+    success?: boolean;
+    profile?: { username?: string; display_name?: string; [key: string]: any };
+  }
+
+  /** Options of `disconnectSocialAccount` (`DELETE /api/uploadposts/users/social`). Any other API field is sent as well. */
+  export interface DisconnectSocialAccountOptions extends ApiParams {
+    /** The profile to disconnect the account from. */
+    profileUsername: string;
+    /** The platform key as it appears in the profile's `social_accounts` object (e.g. `instagram`, `tiktok`, `facebook`, `youtube`, `linkedin`, `x`). */
+    socialPlatform: string;
+  }
+
+  /** Answer of `disconnectSocialAccount`. */
+  export interface DisconnectSocialAccountResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `connectDiscordCredentials` (`POST /api/uploadposts/users/discord/credentials`). Any other API field is sent as well. */
+  export interface ConnectDiscordCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    /** https://discord.com/api/webhooks/... */
+    webhookUrl: string;
+    /** Display name of the connection. */
+    name?: string;
+  }
+
+  /** Answer of `connectDiscordCredentials`. */
+  export interface ConnectDiscordCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `connectTelegramCredentials` (`POST /api/uploadposts/users/telegram/credentials`). Any other API field is sent as well. */
+  export interface ConnectTelegramCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    botToken: string;
+    /** Public channel @username or numeric chat id. */
+    chatId: string;
+    /** Also receive the bot's DMs and other updates (same options as POST /uploadposts/telegram/updates). */
+    receiveUpdates?: boolean;
+    replaceExistingWebhook?: boolean;
+    forwardUrl?: string;
+    autoAnswerCallbacks?: boolean;
+    extraUpdates?: string[];
+    /** Display name of the connection. */
+    name?: string;
+  }
+
+  /** Answer of `connectTelegramCredentials`. */
+  export interface ConnectTelegramCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+    /** With receive_updates. */
+    updates?: Record<string, any>;
+  }
+
+  /** Options of `connectSlackCredentials` (`POST /api/uploadposts/users/slack/credentials`). Any other API field is sent as well. */
+  export interface ConnectSlackCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    webhookUrl: string;
+    /** Display name of the connection. */
+    name?: string;
+  }
+
+  /** Answer of `connectSlackCredentials`. */
+  export interface ConnectSlackCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `connectMastodonCredentials` (`POST /api/uploadposts/users/mastodon/credentials`). Any other API field is sent as well. */
+  export interface ConnectMastodonCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    instanceUrl: string;
+    accessToken: string;
+    /** Display name of the connection. */
+    name?: string;
+  }
+
+  /** Answer of `connectMastodonCredentials`. */
+  export interface ConnectMastodonCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `connectNostrCredentials` (`POST /api/uploadposts/users/nostr/credentials`). Any other API field is sent as well. */
+  export interface ConnectNostrCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    privateKey: string;
+    /** Comma-separated wss:// relays (defaults used if omitted). */
+    relays?: string;
+    /** Display name of the connection. */
+    name?: string;
+  }
+
+  /** Answer of `connectNostrCredentials`. */
+  export interface ConnectNostrCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `connectLemmyCredentials` (`POST /api/uploadposts/users/lemmy/credentials`). Any other API field is sent as well. */
+  export interface ConnectLemmyCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    instanceUrl: string;
+    username: string;
+    password: string;
+    community: string;
+    /** Display name of the connection. */
+    name?: string;
+  }
+
+  /** Answer of `connectLemmyCredentials`. */
+  export interface ConnectLemmyCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `connectDevtoCredentials` (`POST /api/uploadposts/users/devto/credentials`). Any other API field is sent as well. */
+  export interface ConnectDevtoCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    apiKey: string;
+    /** Display name of the connection. */
+    name?: string;
+  }
+
+  /** Answer of `connectDevtoCredentials`. */
+  export interface ConnectDevtoCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `connectHashnodeCredentials` (`POST /api/uploadposts/users/hashnode/credentials`). Any other API field is sent as well. */
+  export interface ConnectHashnodeCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    pat: string;
+    publicationId: string;
+    /** Display name of the connection. */
+    name?: string;
+  }
+
+  /** Answer of `connectHashnodeCredentials`. */
+  export interface ConnectHashnodeCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `connectWordpressCredentials` (`POST /api/uploadposts/users/wordpress/credentials`). Any other API field is sent as well. */
+  export interface ConnectWordpressCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    siteUrl: string;
+    username: string;
+    applicationPassword: string;
+    /** Display name of the connection. */
+    name?: string;
+  }
+
+  /** Answer of `connectWordpressCredentials`. */
+  export interface ConnectWordpressCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `connectWhopCredentials` (`POST /api/uploadposts/users/whop/credentials`). Any other API field is sent as well. */
+  export interface ConnectWhopCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    apiKey: string;
+    experienceId: string;
+    /** Display name of the connection. */
+    name?: string;
+  }
+
+  /** Answer of `connectWhopCredentials`. */
+  export interface ConnectWhopCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `connectListmonkCredentials` (`POST /api/uploadposts/users/listmonk/credentials`). Any other API field is sent as well. */
+  export interface ConnectListmonkCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    instanceUrl: string;
+    username: string;
+    password: string;
+    listId: string;
+    /** Display name of the connection. */
+    name?: string;
+  }
+
+  /** Answer of `connectListmonkCredentials`. */
+  export interface ConnectListmonkCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `listFacebookPageChoices` (`GET /api/uploadposts/users/facebook-page`). Any other API field is sent as well. */
+  export interface ListFacebookPageChoicesOptions extends ApiParams {
+    /** Profile username. */
+    profileUsername: string;
+  }
+
+  /** Answer of `listFacebookPageChoices`. */
+  export interface ListFacebookPageChoicesResponse extends ApiResponse {
+    success?: boolean;
+    pages?: ({ id?: string; name?: string; picture?: string; [key: string]: any })[];
+    selected_page_id?: string;
+    selected_page_name?: string;
+  }
+
+  /** Options of `setFacebookPage` (`POST /api/uploadposts/users/facebook-page`). Any other API field is sent as well. */
+  export interface SetFacebookPageOptions extends ApiParams {
+    profileUsername: string;
+    facebookPageId: string;
+  }
+
+  /** Answer of `setFacebookPage`. */
+  export interface SetFacebookPageResponse extends ApiResponse {
+    success?: boolean;
+    facebook_page_id?: string;
+    facebook_page_name?: string;
+  }
+
+  /** Options of `clearFacebookPage` (`DELETE /api/uploadposts/users/facebook-page`). Any other API field is sent as well. */
+  export interface ClearFacebookPageOptions extends ApiParams {
+    profileUsername: string;
+  }
+
+  /** Answer of `clearFacebookPage`. */
+  export interface ClearFacebookPageResponse extends ApiResponse {
+    success?: boolean;
+  }
+
+  /** Options of `listLinkedinPageChoices` (`GET /api/uploadposts/users/linkedin-page`). Any other API field is sent as well. */
+  export interface ListLinkedinPageChoicesOptions extends ApiParams {
+    /** Profile username. */
+    profileUsername: string;
+  }
+
+  /** Answer of `listLinkedinPageChoices`. */
+  export interface ListLinkedinPageChoicesResponse extends ApiResponse {
+    success?: boolean;
+    pages?: ({ id?: string; name?: string; picture?: string; vanityName?: string; followers?: number; account_id?: string; [key: string]: any })[];
+    selected_page_id?: string;
+    selected_page_name?: string;
+  }
+
+  /** Options of `setLinkedinPage` (`POST /api/uploadposts/users/linkedin-page`). Any other API field is sent as well. */
+  export interface SetLinkedinPageOptions extends ApiParams {
+    profileUsername: string;
+    linkedinPageId: string;
+  }
+
+  /** Answer of `setLinkedinPage`. */
+  export interface SetLinkedinPageResponse extends ApiResponse {
+    success?: boolean;
+    linkedin_page_id?: string;
+    linkedin_page_name?: string;
+  }
+
+  /** Options of `clearLinkedinPage` (`DELETE /api/uploadposts/users/linkedin-page`). Any other API field is sent as well. */
+  export interface ClearLinkedinPageOptions extends ApiParams {
+    profileUsername: string;
+  }
+
+  /** Answer of `clearLinkedinPage`. */
+  export interface ClearLinkedinPageResponse extends ApiResponse {
+    success?: boolean;
+  }
+
+  /** Options of `connectBlueskyCredentials` (`POST /api/uploadposts/users/bluesky/credentials`). Any other API field is sent as well. */
+  export interface ConnectBlueskyCredentialsOptions extends ApiParams {
+    profileUsername: string;
+    handle: string;
+    /** Bluesky app password (one with DM access to use Bluesky DMs). */
+    password: string;
+  }
+
+  /** Answer of `connectBlueskyCredentials`. */
+  export interface ConnectBlueskyCredentialsResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `setYoutubeOauthClient` (`POST /api/uploadposts/users/youtube/credentials`). Any other API field is sent as well. */
+  export interface SetYoutubeOauthClientOptions extends ApiParams {
+    profileUsername: string;
+    clientId: string;
+    clientSecret: string;
+  }
+
+  /** Answer of `setYoutubeOauthClient`. */
+  export interface SetYoutubeOauthClientResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `getCurrentUser` (`GET /api/uploadposts/me`). Any other API field is sent as well. */
+  export interface GetCurrentUserOptions extends ApiParams {
+  }
+
+  /** Answer of `getCurrentUser`. */
+  export interface GetCurrentUserResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+    email?: string;
+    plan?: string;
+    /** AI Shorts analyses (POST /uploadposts/analyze-shorts) for the current 30-day window. Read-only: calling this endpoint never uses one. Same rules as the analysis itself. null only if the account data cannot be read. */
+    analyze_shorts?: { limit?: number; used?: number; remaining?: number; resets_at?: string; [key: string]: any };
+  }
+
+  /** Options of `startOauthConnection` (`POST /api/uploadposts/oauth/{platform}/start`). Any other API field is sent as well. */
+  export interface StartOauthConnectionOptions extends ApiParams {
+    /** Platform to connect. */
+    platform: "tiktok" | "instagram" | "facebook" | "linkedin" | "youtube" | "x" | "twitter" | "threads" | "pinterest" | "google-business" | "twitch" | "reddit" | (string & {});
+    /** Profile username (API key auth only). */
+    profile?: string;
+    /** Absolute http(s) URL to return to. */
+    redirectUrl?: string;
+  }
+
+  /** Answer of `startOauthConnection`. */
+  export interface StartOauthConnectionResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    authorize_url?: string;
+    state?: string;
+    /** Seconds the state stays valid. */
+    expires_in?: number;
+  }
+
+  /** Options of `createFfmpegJob` (`POST /api/uploadposts/ffmpeg/jobs/upload`). Any other API field is sent as well. */
+  export interface CreateFfmpegJobOptions extends ApiParams {
+    /** Array of input file URLs. Referenced as {input0}, {input1}, etc. */
+    files?: string[];
+    /** FFmpeg command template using {input0}, {input1}, etc. and {output} placeholders. */
+    fullCommand: string;
+    /** Desired output file extension. */
+    outputExtension: string;
+    /** Whether to publish the result. */
+    publish?: boolean;
+    /** Primary media file to process. Referenced as {input} or {input0}. */
+    file?: string | Buffer | NodeJS.ReadableStream;
+    /** Second input file. Referenced as {input1}. */
+    file1?: string | Buffer | NodeJS.ReadableStream;
+    /** Third input file. Referenced as {input2}. */
+    file2?: string | Buffer | NodeJS.ReadableStream;
+  }
+
+  /** Options of `getFfmpegJobStatus` (`GET /api/uploadposts/ffmpeg/jobs/{job_id}`). Any other API field is sent as well. */
+  export interface GetFfmpegJobStatusOptions extends ApiParams {
+    /** The unique job identifier. */
+    jobId: string;
+  }
+
+  /** Answer of `getFfmpegJobStatus`. */
+  export interface GetFfmpegJobStatusResponse extends ApiResponse {
+    job_id?: string;
+    /** Status of an FFmpeg processing job. */
+    status?: "PENDING" | "PROCESSING" | "FINISHED" | "ERROR";
+    /** Duration of the input media in seconds. */
+    duration_seconds?: number;
+    output_extension?: string;
+    /** Present once the job has an output. */
+    result?: { media_url?: string; media_url_expires_in_seconds?: number; media_url_note?: string; download_url?: string; download_auth?: string; [key: string]: any };
+  }
+
+  /** Options of `downloadFfmpegResult` (`GET /api/uploadposts/ffmpeg/jobs/{job_id}/download`). Any other API field is sent as well. */
+  export interface DownloadFfmpegResultOptions extends ApiParams {
+    /** The unique job identifier. */
+    jobId: string;
+  }
+
+  /** Options of `getFfmpegConsumption` (`GET /api/uploadposts/ffmpeg/consumption`). Any other API field is sent as well. */
+  export interface GetFfmpegConsumptionOptions extends ApiParams {
+  }
+
+  /** Answer of `getFfmpegConsumption`. */
+  export interface GetFfmpegConsumptionResponse extends ApiResponse {
+    success?: boolean;
+    consumption?: { used_minutes?: number; remaining_minutes?: number; quota_minutes?: number; usage_percentage?: number; total_requests?: number; current_month?: string; plan?: string; [key: string]: any };
+    history?: ({ duration_seconds?: number; duration_minutes?: number; timestamp?: string; month?: string; type?: string; [key: string]: any })[];
+    quota_info?: { plan?: string; quota_minutes?: number; reset_day?: number; next_reset?: string; [key: string]: any };
+  }
+
+  /** Options of `listWebhookSubscriptions` (`GET /api/uploadposts/webhooks/subscriptions`). Any other API field is sent as well. */
+  export interface ListWebhookSubscriptionsOptions extends ApiParams {
+    /** Only active or disabled ones. */
+    status?: "active" | "disabled" | (string & {});
+    /** Only this source label (e.g. n8n). */
+    source?: string;
+    /** Only this exact URL. */
+    url?: string;
+  }
+
+  /** Answer of `listWebhookSubscriptions`. */
+  export interface ListWebhookSubscriptionsResponse extends ApiResponse {
+    success?: boolean;
+    subscriptions?: ({ id?: string; url?: string; events?: string[]; profile_username?: string; source?: string; name?: string; status?: "active" | "disabled"; disabled_reason?: "endpoint_gone" | "failing_too_long" | "blocked_url" | "profile_removed"; disabled_at?: string; created_at?: string; updated_at?: string; last_delivery_at?: string; health?: { consecutive_failures?: number; last_failure?: string; last_failure_at?: string; paused_until?: string; [key: string]: any }; [key: string]: any })[];
+    /** Maximum active subscriptions per account. */
+    limit?: number;
+    active_count?: number;
+  }
+
+  /** Options of `createWebhookSubscription` (`POST /api/uploadposts/webhooks/subscriptions`). Any other API field is sent as well. */
+  export interface CreateWebhookSubscriptionOptions extends ApiParams {
+    /** Public https URL. */
+    url: string;
+    /** Event names. youtube_video_* only while YouTube push is on and post_approval_* only while post approvals are on; otherwise 400 invalid_events with allowed_events. */
+    events: ("upload_completed" | "social_account_connected" | "social_account_disconnected" | "social_account_reauth_required" | "dm_received" | "comment_received" | "review_received" | "review_updated" | "customer_media_received" | "listing_google_update" | "listing_duplicate" | "listing_control_changed" | "telegram_update" | "post_analytics_updated" | "youtube_video_published" | "youtube_video_updated" | "post_approval_requested" | "post_approved" | "post_rejected" | "post_approval_expired" | (string & {}))[];
+    /** Only events of this profile. */
+    profileUsername?: string;
+    source?: string;
+    name?: string;
+  }
+
+  /** Answer of `createWebhookSubscription`. */
+  export interface CreateWebhookSubscriptionResponse extends ApiResponse {
+    success?: boolean;
+    created?: boolean;
+    reactivated?: boolean;
+    /** One extra webhook destination of the account (n8n trigger, REST hook...). Independent from the account webhook_url. */
+    subscription?: { id?: string; url?: string; events?: string[]; profile_username?: string; source?: string; name?: string; status?: "active" | "disabled"; disabled_reason?: "endpoint_gone" | "failing_too_long" | "blocked_url" | "profile_removed"; disabled_at?: string; created_at?: string; updated_at?: string; last_delivery_at?: string; health?: { consecutive_failures?: number; last_failure?: string; last_failure_at?: string; paused_until?: string; [key: string]: any }; [key: string]: any };
+  }
+
+  /** Options of `getWebhookSubscription` (`GET /api/uploadposts/webhooks/subscriptions/{subscription_id}`). Any other API field is sent as well. */
+  export interface GetWebhookSubscriptionOptions extends ApiParams {
+    /** Subscription id (whsub_...). */
+    subscriptionId: string;
+  }
+
+  /** Answer of `getWebhookSubscription`. */
+  export interface GetWebhookSubscriptionResponse extends ApiResponse {
+    success?: boolean;
+    /** One extra webhook destination of the account (n8n trigger, REST hook...). Independent from the account webhook_url. */
+    subscription?: { id?: string; url?: string; events?: string[]; profile_username?: string; source?: string; name?: string; status?: "active" | "disabled"; disabled_reason?: "endpoint_gone" | "failing_too_long" | "blocked_url" | "profile_removed"; disabled_at?: string; created_at?: string; updated_at?: string; last_delivery_at?: string; health?: { consecutive_failures?: number; last_failure?: string; last_failure_at?: string; paused_until?: string; [key: string]: any }; [key: string]: any };
+  }
+
+  /** Options of `deleteWebhookSubscription` (`DELETE /api/uploadposts/webhooks/subscriptions/{subscription_id}`). Any other API field is sent as well. */
+  export interface DeleteWebhookSubscriptionOptions extends ApiParams {
+    /** Subscription id (whsub_...). */
+    subscriptionId: string;
+  }
+
+  /** Answer of `deleteWebhookSubscription`. */
+  export interface DeleteWebhookSubscriptionResponse extends ApiResponse {
+    success?: boolean;
+    deleted?: boolean;
+    id?: string;
+  }
+
+  /** Options of `testWebhookSubscription` (`POST /api/uploadposts/webhooks/subscriptions/{subscription_id}/test`). Any other API field is sent as well. */
+  export interface TestWebhookSubscriptionOptions extends ApiParams {
+    /** Subscription id (whsub_...). */
+    subscriptionId: string;
+    /** One of the subscription's events; default its first event. */
+    event?: string;
+  }
+
+  /** Answer of `testWebhookSubscription`. */
+  export interface TestWebhookSubscriptionResponse extends ApiResponse {
+    success?: boolean;
+    ok?: boolean;
+    delivery?: { delivery_id?: string; event?: string; status?: "pending" | "delivered" | "failed" | "cancelled"; target?: "account" | "profile" | "subscription"; profile_username?: string; url?: string; request_id?: string; job_id?: string; platform?: string; test?: boolean; attempt_count?: number; max_attempts?: number; last_status_code?: number; last_error?: string; next_attempt_at?: string; created_at?: string; updated_at?: string; delivered_at?: string; redelivery_of?: string; redelivery_count?: number; attempts?: ({ attempt?: number; at?: string; ok?: boolean; status_code?: number; error?: string; duration_ms?: number; [key: string]: any })[]; payload?: Record<string, any>; subscription_id?: string; [key: string]: any };
+  }
+
+  /** Options of `deleteCommentPost` (`POST /api/uploadposts/comments/delete`). Any other API field is sent as well. */
+  export interface DeleteCommentPostOptions extends ApiParams {
+    /** Target platform. */
+    platform: "instagram" | "facebook" | "youtube" | "linkedin" | "tiktok" | (string & {});
+    /** Profile username as configured in Upload-Post. */
+    user: string;
+    /** ID of the comment to delete. */
+    commentId: string;
+    /** Required for LinkedIn only — the post URN (urn:li:ugcPost:...) the comment belongs to. */
+    postId?: string;
+  }
+
+  /** Options of `deleteBlueskyChatAccount` (`POST /api/uploadposts/dms/bluesky/account/delete`). Any other API field is sent as well. */
+  export interface DeleteBlueskyChatAccountOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    confirm: boolean;
+    confirmHandle: string;
+  }
+
+  /** Options of `listBlueskyMutualGroups` (`GET /api/uploadposts/dms/bluesky/groups`). Any other API field is sent as well. */
+  export interface ListBlueskyMutualGroupsOptions extends ApiParams {
+    /** Profile username as configured in Upload-Post. */
+    user: string;
+    subject: string;
+    limit?: number;
+    cursor?: string;
+  }
+
+  /** Options of `createBlueskyGroup` (`POST /api/uploadposts/dms/bluesky/groups`). Any other API field is sent as well. */
+  export interface CreateBlueskyGroupOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    name: string;
+    members: string[];
+    idempotencyKey?: string;
+  }
+
+  /** Options of `editBlueskyGroup` (`PATCH /api/uploadposts/dms/bluesky/groups/{conversation_id}`). Any other API field is sent as well. */
+  export interface EditBlueskyGroupOptions extends ApiParams {
+    conversationId: string;
+    /** Profile username. */
+    user: string;
+    name?: string;
+    locked?: boolean;
+  }
+
+  /** Options of `listBlueskyGroupMembers` (`GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`). Any other API field is sent as well. */
+  export interface ListBlueskyGroupMembersOptions extends ApiParams {
+    conversationId: string;
+    /** Profile username as configured in Upload-Post. */
+    user: string;
+  }
+
+  /** Options of `addBlueskyGroupMembers` (`POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`). Any other API field is sent as well. */
+  export interface AddBlueskyGroupMembersOptions extends ApiParams {
+    conversationId: string;
+    /** Profile username. */
+    user: string;
+    members: string[];
+  }
+
+  /** Options of `removeBlueskyGroupMembers` (`DELETE /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`). Any other API field is sent as well. */
+  export interface RemoveBlueskyGroupMembersOptions extends ApiParams {
+    conversationId: string;
+    /** Profile username. */
+    user: string;
+    members: string[];
+  }
+
+  /** Options of `manageBlueskyJoinLink` (`POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-link`). Any other API field is sent as well. */
+  export interface ManageBlueskyJoinLinkOptions extends ApiParams {
+    conversationId: string;
+    /** Profile username. */
+    user: string;
+    action: "create" | "edit" | "enable" | "disable" | (string & {});
+    requireApproval?: boolean;
+    joinRule?: "anyone" | "followed_by_owner" | (string & {});
+  }
+
+  /** Options of `listBlueskyJoinRequests` (`GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests`). Any other API field is sent as well. */
+  export interface ListBlueskyJoinRequestsOptions extends ApiParams {
+    conversationId: string;
+    /** Profile username as configured in Upload-Post. */
+    user: string;
+  }
+
+  /** Options of `answerBlueskyJoinRequest` (`POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests`). Any other API field is sent as well. */
+  export interface AnswerBlueskyJoinRequestOptions extends ApiParams {
+    conversationId: string;
+    /** Profile username. */
+    user: string;
+    action: "approve" | "reject" | "mark_read" | "withdraw" | (string & {});
+    member?: string;
+  }
+
+  /** Options of `previewBlueskyJoinLinks` (`GET /api/uploadposts/dms/bluesky/join-links`). Any other API field is sent as well. */
+  export interface PreviewBlueskyJoinLinksOptions extends ApiParams {
+    /** Profile username as configured in Upload-Post. */
+    user: string;
+    /** Comma-separated join link codes. */
+    codes: string;
+  }
+
+  /** Options of `joinBlueskyGroup` (`POST /api/uploadposts/dms/bluesky/join-links`). Any other API field is sent as well. */
+  export interface JoinBlueskyGroupOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    code: string;
+  }
+
+  /** Options of `downloadDmMedia` (`GET /api/uploadposts/dms/media`). Any other API field is sent as well. */
+  export interface DownloadDmMediaOptions extends ApiParams {
+    /** Platform of the conversation. */
+    platform: "telegram" | "whatsapp" | (string & {});
+    /** Profile username. */
+    user: string;
+    /** media_id of the attachment (Telegram file_id). */
+    mediaId: string;
+  }
+
+  /** Options of `blueskyGraphAction` (`POST /api/uploadposts/bluesky/graph`). Any other API field is sent as well. */
+  export interface BlueskyGraphActionOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    action: "follow" | "unfollow" | "block" | "unblock" | "mute" | "unmute" | "mute_list" | "unmute_list" | "block_list" | "unblock_list" | "mute_thread" | "unmute_thread" | (string & {});
+    /** Handle, DID or bsky.app profile link. */
+    actor?: string;
+    /** List at:// URI, bsky.app link or own list id. */
+    list?: string;
+    /** First post of the thread. */
+    postId?: string;
+    onlyReposts?: boolean;
+    onlyQuoteposts?: boolean;
+  }
+
+  /** Answer of `blueskyGraphAction`. */
+  export interface BlueskyGraphActionResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `listBlueskyLists` (`GET /api/uploadposts/bluesky/lists`). Any other API field is sent as well. */
+  export interface ListBlueskyListsOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    purposes?: string;
+    cursor?: string;
+  }
+
+  /** Answer of `listBlueskyLists`. */
+  export interface ListBlueskyListsResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `createBlueskyList` (`POST /api/uploadposts/bluesky/lists`). Any other API field is sent as well. */
+  export interface CreateBlueskyListOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    /** Up to 64 bytes. */
+    name: string;
+    purpose: "curatelist" | "modlist" | "referencelist" | (string & {});
+    /** Up to 300 characters. */
+    description?: string;
+    /** PNG or JPEG file, up to 1,000,000 bytes (multipart). */
+    avatar?: string | Buffer | NodeJS.ReadableStream;
+    avatarUrl?: string;
+    removeAvatar?: boolean;
+  }
+
+  /** Answer of `createBlueskyList`. */
+  export interface CreateBlueskyListResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `getBlueskyList` (`GET /api/uploadposts/bluesky/lists/{list_id}`). Any other API field is sent as well. */
+  export interface GetBlueskyListOptions extends ApiParams {
+    /** The list's record key. */
+    listId: string;
+    /** Profile username. */
+    user: string;
+  }
+
+  /** Answer of `getBlueskyList`. */
+  export interface GetBlueskyListResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `updateBlueskyList` (`PATCH /api/uploadposts/bluesky/lists/{list_id}`). Any other API field is sent as well. */
+  export interface UpdateBlueskyListOptions extends ApiParams {
+    /** The list's record key. */
+    listId: string;
+    /** Profile username. */
+    user: string;
+    /** Up to 64 bytes. */
+    name?: string;
+    purpose?: "curatelist" | "modlist" | "referencelist" | (string & {});
+    /** Up to 300 characters. */
+    description?: string;
+    /** PNG or JPEG file, up to 1,000,000 bytes (multipart). */
+    avatar?: string | Buffer | NodeJS.ReadableStream;
+    avatarUrl?: string;
+    removeAvatar?: boolean;
+  }
+
+  /** Answer of `updateBlueskyList`. */
+  export interface UpdateBlueskyListResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `deleteBlueskyList` (`DELETE /api/uploadposts/bluesky/lists/{list_id}`). Any other API field is sent as well. */
+  export interface DeleteBlueskyListOptions extends ApiParams {
+    /** The list's record key. */
+    listId: string;
+    /** Profile username. */
+    user: string;
+    /** Must be true: this cannot be undone. */
+    confirm: boolean;
+  }
+
+  /** Answer of `deleteBlueskyList`. */
+  export interface DeleteBlueskyListResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `listBlueskyListMembers` (`GET /api/uploadposts/bluesky/lists/{list_id}/members`). Any other API field is sent as well. */
+  export interface ListBlueskyListMembersOptions extends ApiParams {
+    /** The list's record key. */
+    listId: string;
+    /** Profile username. */
+    user: string;
+  }
+
+  /** Answer of `listBlueskyListMembers`. */
+  export interface ListBlueskyListMembersResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `addBlueskyListMember` (`POST /api/uploadposts/bluesky/lists/{list_id}/members`). Any other API field is sent as well. */
+  export interface AddBlueskyListMemberOptions extends ApiParams {
+    /** The list's record key. */
+    listId: string;
+    /** Profile username. */
+    user: string;
+    actor: string;
+  }
+
+  /** Answer of `addBlueskyListMember`. */
+  export interface AddBlueskyListMemberResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `removeBlueskyListMember` (`DELETE /api/uploadposts/bluesky/lists/{list_id}/members`). Any other API field is sent as well. */
+  export interface RemoveBlueskyListMemberOptions extends ApiParams {
+    /** The list's record key. */
+    listId: string;
+    /** Profile username. */
+    user: string;
+    actor: string;
+  }
+
+  /** Answer of `removeBlueskyListMember`. */
+  export interface RemoveBlueskyListMemberResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `optOutBlueskyList` (`POST /api/uploadposts/bluesky/lists/opt-out`). Any other API field is sent as well. */
+  export interface OptOutBlueskyListOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    list: string;
+  }
+
+  /** Answer of `optOutBlueskyList`. */
+  export interface OptOutBlueskyListResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `removeOptOutBlueskyList` (`DELETE /api/uploadposts/bluesky/lists/opt-out`). Any other API field is sent as well. */
+  export interface RemoveOptOutBlueskyListOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    list: string;
+  }
+
+  /** Answer of `removeOptOutBlueskyList`. */
+  export interface RemoveOptOutBlueskyListResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `listBlueskyStarterPacks` (`GET /api/uploadposts/bluesky/starter-packs`). Any other API field is sent as well. */
+  export interface ListBlueskyStarterPacksOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+  }
+
+  /** Answer of `listBlueskyStarterPacks`. */
+  export interface ListBlueskyStarterPacksResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `createBlueskyStarterPack` (`POST /api/uploadposts/bluesky/starter-packs`). Any other API field is sent as well. */
+  export interface CreateBlueskyStarterPackOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    /** Up to 50 characters. */
+    name: string;
+    description?: string;
+    /** Up to 3 feed at:// URIs. */
+    feeds?: string[];
+    /** Own list to use. */
+    list?: string;
+    /** Up to 25 accounts per request (a new list is created; add more through /lists/{list_id}/members). */
+    members?: string[];
+  }
+
+  /** Answer of `createBlueskyStarterPack`. */
+  export interface CreateBlueskyStarterPackResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `getBlueskyStarterPack` (`GET /api/uploadposts/bluesky/starter-packs/{pack_id}`). Any other API field is sent as well. */
+  export interface GetBlueskyStarterPackOptions extends ApiParams {
+    /** The starter pack's record key. */
+    packId: string;
+    /** Profile username. */
+    user: string;
+  }
+
+  /** Answer of `getBlueskyStarterPack`. */
+  export interface GetBlueskyStarterPackResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `updateBlueskyStarterPack` (`PATCH /api/uploadposts/bluesky/starter-packs/{pack_id}`). Any other API field is sent as well. */
+  export interface UpdateBlueskyStarterPackOptions extends ApiParams {
+    /** The starter pack's record key. */
+    packId: string;
+    /** Profile username. */
+    user: string;
+    /** Up to 50 characters. */
+    name?: string;
+    description?: string;
+    /** Up to 3 feed at:// URIs. */
+    feeds?: string[];
+    /** Own list to use. */
+    list?: string;
+    /** Up to 25 accounts per request (a new list is created; add more through /lists/{list_id}/members). */
+    members?: string[];
+  }
+
+  /** Answer of `updateBlueskyStarterPack`. */
+  export interface UpdateBlueskyStarterPackResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `deleteBlueskyStarterPack` (`DELETE /api/uploadposts/bluesky/starter-packs/{pack_id}`). Any other API field is sent as well. */
+  export interface DeleteBlueskyStarterPackOptions extends ApiParams {
+    /** The starter pack's record key. */
+    packId: string;
+    /** Profile username. */
+    user: string;
+    /** Must be true: this cannot be undone. */
+    confirm: boolean;
+    deleteList?: boolean;
+  }
+
+  /** Answer of `deleteBlueskyStarterPack`. */
+  export interface DeleteBlueskyStarterPackResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `listBlueskyFeeds` (`GET /api/uploadposts/bluesky/feeds`). Any other API field is sent as well. */
+  export interface ListBlueskyFeedsOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+  }
+
+  /** Answer of `listBlueskyFeeds`. */
+  export interface ListBlueskyFeedsResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `createBlueskyFeed` (`POST /api/uploadposts/bluesky/feeds`). Any other API field is sent as well. */
+  export interface CreateBlueskyFeedOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    /** 1-15 letters, digits or dashes (create only). */
+    rkey: string;
+    /** Feed generator service DID. */
+    did: string;
+    /** Up to 24 characters. */
+    displayName: string;
+    description?: string;
+    /** PNG or JPEG file, up to 1,000,000 bytes (multipart). */
+    avatar?: string | Buffer | NodeJS.ReadableStream;
+    acceptsInteractions?: boolean;
+    contentMode?: "unspecified" | "video" | (string & {});
+  }
+
+  /** Answer of `createBlueskyFeed`. */
+  export interface CreateBlueskyFeedResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `updateBlueskyFeed` (`PATCH /api/uploadposts/bluesky/feeds/{rkey}`). Any other API field is sent as well. */
+  export interface UpdateBlueskyFeedOptions extends ApiParams {
+    /** The feed's record key. */
+    rkey: string;
+    /** Profile username. */
+    user: string;
+    /** Feed generator service DID. */
+    did?: string;
+    /** Up to 24 characters. */
+    displayName?: string;
+    description?: string;
+    /** PNG or JPEG file, up to 1,000,000 bytes (multipart). */
+    avatar?: string | Buffer | NodeJS.ReadableStream;
+    acceptsInteractions?: boolean;
+    contentMode?: "unspecified" | "video" | (string & {});
+  }
+
+  /** Answer of `updateBlueskyFeed`. */
+  export interface UpdateBlueskyFeedResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `deleteBlueskyFeed` (`DELETE /api/uploadposts/bluesky/feeds/{rkey}`). Any other API field is sent as well. */
+  export interface DeleteBlueskyFeedOptions extends ApiParams {
+    /** The feed's record key. */
+    rkey: string;
+    /** Profile username. */
+    user: string;
+    /** Must be true: this cannot be undone. */
+    confirm: boolean;
+  }
+
+  /** Answer of `deleteBlueskyFeed`. */
+  export interface DeleteBlueskyFeedResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `reportOnBluesky` (`POST /api/uploadposts/bluesky/report`). Any other API field is sent as well. */
+  export interface ReportOnBlueskyOptions extends ApiParams {
+    /** Profile username. */
+    user: string;
+    postId?: string;
+    actor?: string;
+    /** spam, violation, misleading, sexual, rude, other, appeal, or tools.ozone.report.defs#reason... values. */
+    reasonType: string;
+    /** Up to 2,000 characters. */
+    reason?: string;
+    /** Must be true: this cannot be undone. */
+    confirm: boolean;
+  }
+
+  /** Answer of `reportOnBluesky`. */
+  export interface ReportOnBlueskyResponse extends ApiResponse {
+    success?: boolean;
+    platform?: string;
+    action?: string;
+    record_uri?: string;
+    changed?: boolean;
+  }
+
+  /** Options of `listPostApprovals` (`GET /api/uploadposts/approvals`). Any other API field is sent as well. */
+  export interface ListPostApprovalsOptions extends ApiParams {
+    /** Comma-separated statuses (default the open ones). */
+    status?: string;
+    /** Only this profile. */
+    profileUsername?: string;
+    /** Only this author email. */
+    author?: string;
+    /** Page size. */
+    limit?: number;
+    /** created_at of the last item of the previous page (next_before). */
+    before?: string;
+    /** true (or 1): answer only how many items there are per status, with the same filters (status, profile_username, author; limit and before are ignored). Nothing is listed or signed. */
+    countOnly?: boolean;
+  }
+
+  /** Answer of `listPostApprovals` (shape 1: list). */
+  export interface ListPostApprovalsResponse1 extends ApiResponse {
+    success?: boolean;
+    items?: ({ approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; author_email?: string; author_role?: "editor" | "contributor"; created_at?: string; updated_at?: string; decided_by?: string; decided_by_role?: string; decided_at?: string; decision_comment?: string; job_id?: string; request_id?: string; external_id?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; fields?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any })[];
+    next_before?: string;
+  }
+
+  /** Answer of `listPostApprovals` (shape 2: count_only). */
+  export interface ListPostApprovalsResponse2 extends ApiResponse {
+    success?: boolean;
+    /** One key per requested status (default pending_approval and draft). */
+    counts?: Record<string, any>;
+    total?: number;
+  }
+
+  /** Answer of `listPostApprovals`: one of 2 shapes. */
+  export type ListPostApprovalsResponse = ListPostApprovalsResponse1 | ListPostApprovalsResponse2;
+
+  /** Options of `getPostApproval` (`GET /api/uploadposts/approvals/{approval_id}`). Any other API field is sent as well. */
+  export interface GetPostApprovalOptions extends ApiParams {
+    /** Approval id. */
+    approvalId: string;
+  }
+
+  /** Answer of `getPostApproval`. */
+  export interface GetPostApprovalResponse extends ApiResponse {
+    success?: boolean;
+    /** A post waiting for (or past) review. Created when an Editor (pending_approval) or a Contributor (draft) publishes. */
+    item?: { approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; author_email?: string; author_role?: "editor" | "contributor"; created_at?: string; updated_at?: string; decided_by?: string; decided_by_role?: string; decided_at?: string; decision_comment?: string; job_id?: string; request_id?: string; external_id?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; fields?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any };
+  }
+
+  /** Options of `editPostApproval` (`PATCH /api/uploadposts/approvals/{approval_id}`). Any other API field is sent as well. */
+  export interface EditPostApprovalOptions extends ApiParams {
+    /** Approval id. */
+    approvalId: string;
+    title?: string;
+    caption?: string;
+    /** Alias of caption. */
+    description?: string;
+    platformContent?: Record<string, any>;
+    fields?: Record<string, any>;
+    scheduledDate?: string;
+    timezone?: string;
+    coverImageBase64?: string;
+    removeCover?: boolean;
+  }
+
+  /** Answer of `editPostApproval`. */
+  export interface EditPostApprovalResponse extends ApiResponse {
+    success?: boolean;
+    /** A post waiting for (or past) review. Created when an Editor (pending_approval) or a Contributor (draft) publishes. */
+    item?: { approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; author_email?: string; author_role?: "editor" | "contributor"; created_at?: string; updated_at?: string; decided_by?: string; decided_by_role?: string; decided_at?: string; decision_comment?: string; job_id?: string; request_id?: string; external_id?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; fields?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any };
+  }
+
+  /** Options of `withdrawPostApproval` (`DELETE /api/uploadposts/approvals/{approval_id}`). Any other API field is sent as well. */
+  export interface WithdrawPostApprovalOptions extends ApiParams {
+    /** Approval id. */
+    approvalId: string;
+  }
+
+  /** Answer of `withdrawPostApproval`. */
+  export interface WithdrawPostApprovalResponse extends ApiResponse {
+    success?: boolean;
+    /** A post waiting for (or past) review. Created when an Editor (pending_approval) or a Contributor (draft) publishes. */
+    item?: { approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; author_email?: string; author_role?: "editor" | "contributor"; created_at?: string; updated_at?: string; decided_by?: string; decided_by_role?: string; decided_at?: string; decision_comment?: string; job_id?: string; request_id?: string; external_id?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; fields?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any };
+  }
+
+  /** Options of `approvePostApproval` (`POST /api/uploadposts/approvals/{approval_id}/approve`). Any other API field is sent as well. */
+  export interface ApprovePostApprovalOptions extends ApiParams {
+    /** Approval id. */
+    approvalId: string;
+    version: number;
+    comment?: string;
+    scheduledDate?: string;
+    timezone?: string;
+    publishNow?: boolean;
+  }
+
+  /** Answer of `approvePostApproval`. */
+  export interface ApprovePostApprovalResponse extends ApiResponse {
+    success?: boolean;
+    /** A post waiting for (or past) review. Created when an Editor (pending_approval) or a Contributor (draft) publishes. */
+    item?: { approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; author_email?: string; author_role?: "editor" | "contributor"; created_at?: string; updated_at?: string; decided_by?: string; decided_by_role?: string; decided_at?: string; decision_comment?: string; job_id?: string; request_id?: string; external_id?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; fields?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any };
+    job_id?: string;
+    scheduled_date?: string;
+  }
+
+  /** Options of `rejectPostApproval` (`POST /api/uploadposts/approvals/{approval_id}/reject`). Any other API field is sent as well. */
+  export interface RejectPostApprovalOptions extends ApiParams {
+    /** Approval id. */
+    approvalId: string;
+    comment: string;
+  }
+
+  /** Answer of `rejectPostApproval`. */
+  export interface RejectPostApprovalResponse extends ApiResponse {
+    success?: boolean;
+    /** A post waiting for (or past) review. Created when an Editor (pending_approval) or a Contributor (draft) publishes. */
+    item?: { approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; author_email?: string; author_role?: "editor" | "contributor"; created_at?: string; updated_at?: string; decided_by?: string; decided_by_role?: string; decided_at?: string; decision_comment?: string; job_id?: string; request_id?: string; external_id?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; fields?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any };
+  }
+
+  /** Options of `listClientPostApprovals` (`GET /api/uploadposts/approvals/client`). Any other API field is sent as well. */
+  export interface ListClientPostApprovalsOptions extends ApiParams {
+    /** Profile JWT (from generateJwt), sent as `Authorization: Bearer`. */
+    token: string;
+  }
+
+  /** Answer of `listClientPostApprovals`. */
+  export interface ListClientPostApprovalsResponse extends ApiResponse {
+    success?: boolean;
+    profile_username?: string;
+    items?: ({ approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; created_at?: string; updated_at?: string; decided_at?: string; decision_comment?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any })[];
+  }
+
+  /** Options of `approveClientPostApproval` (`POST /api/uploadposts/approvals/client/{approval_id}/approve`). Any other API field is sent as well. */
+  export interface ApproveClientPostApprovalOptions extends ApiParams {
+    /** Profile JWT (from generateJwt), sent as `Authorization: Bearer`. */
+    token: string;
+    /** Approval id. */
+    approvalId: string;
+    version: number;
+    comment?: string;
+  }
+
+  /** Answer of `approveClientPostApproval`. */
+  export interface ApproveClientPostApprovalResponse extends ApiResponse {
+    success?: boolean;
+    /** A post waiting for approval as the end client sees it (connect page): never the author, who decided, or internal ids (author_email, author_role, decided_by, decided_by_role, request_id, external_id, job_id, fields are le... */
+    item?: { approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; created_at?: string; updated_at?: string; decided_at?: string; decision_comment?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any };
+    job_id?: string;
+    scheduled_date?: string;
+  }
+
+  /** Options of `rejectClientPostApproval` (`POST /api/uploadposts/approvals/client/{approval_id}/reject`). Any other API field is sent as well. */
+  export interface RejectClientPostApprovalOptions extends ApiParams {
+    /** Profile JWT (from generateJwt), sent as `Authorization: Bearer`. */
+    token: string;
+    /** Approval id. */
+    approvalId: string;
+    comment: string;
+  }
+
+  /** Answer of `rejectClientPostApproval`. */
+  export interface RejectClientPostApprovalResponse extends ApiResponse {
+    success?: boolean;
+    /** A post waiting for approval as the end client sees it (connect page): never the author, who decided, or internal ids (author_email, author_role, decided_by, decided_by_role, request_id, external_id, job_id, fields are le... */
+    item?: { approval_id?: string; status?: "pending_approval" | "draft" | "approving" | "approved" | "rejected" | "withdrawn" | "expired"; kind?: "approval" | "draft"; version?: number; profile_username?: string; platforms?: string[]; post_type?: string; title?: string; caption?: string; platform_content?: Record<string, any>; immediate?: boolean; queued?: boolean; scheduled_date?: string; expires_at?: string; created_at?: string; updated_at?: string; decided_at?: string; decision_comment?: string; destinations?: { facebook_page_id?: string; linkedin_page_id?: string; pinterest_board_id?: string; [key: string]: any }; destinations_effective?: Record<string, any>; has_preview?: boolean; preview_url?: string; thumbnail_url?: string; [key: string]: any };
+  }
+
+  /** Options of `getTeamRoles` (`GET /api/uploadposts/teams/roles`). Any other API field is sent as well. */
+  export interface GetTeamRolesOptions extends ApiParams {
+  }
+
+  /** Answer of `getTeamRoles`. */
+  export interface GetTeamRolesResponse extends ApiResponse {
+    success?: boolean;
+    enabled?: boolean;
+    approvals_enabled?: boolean;
+    roles?: ("owner" | "admin" | "editor" | "contributor" | "viewer")[];
+    permissions?: Record<string, any>;
+    approval_roles?: string[];
+    your_email?: string;
+    your_role?: "owner" | "admin" | "editor" | "contributor" | "viewer";
+    /** null = every profile. */
+    your_profiles?: string[];
+  }
+
+  /** Options of `listTeamAudit` (`GET /api/uploadposts/teams/audit`). Any other API field is sent as well. */
+  export interface ListTeamAuditOptions extends ApiParams {
+    /** Only this member email. */
+    actor?: string;
+    /** Only this action. */
+    action?: "post_created" | "published" | "scheduled_edited" | "scheduled_cancelled" | "approval_requested" | "draft_created" | "approval_edited" | "approved" | "rejected" | "approval_withdrawn" | "approval_expired" | "member_access_changed" | (string & {});
+    /** Only this profile. */
+    profileUsername?: string;
+    /** Only this approval or job id. */
+    targetId?: string;
+    /** ISO 8601, inclusive. */
+    since?: string;
+    /** ISO 8601, exclusive. */
+    until?: string;
+    /** Page size. */
+    limit?: number;
+    /** next_cursor of the previous page. */
+    cursor?: string;
+  }
+
+  /** Answer of `listTeamAudit`. */
+  export interface ListTeamAuditResponse extends ApiResponse {
+    success?: boolean;
+    items?: ({ id?: string; action?: "post_created" | "published" | "scheduled_edited" | "scheduled_cancelled" | "approval_requested" | "draft_created" | "approval_edited" | "approved" | "rejected" | "approval_withdrawn" | "approval_expired" | "member_access_changed"; actor_email?: string; actor_role?: string; target_type?: string; target_id?: string; profile_username?: string; details?: Record<string, any>; at?: string; [key: string]: any })[];
+    next_cursor?: string;
+    retention_days?: number;
+  }
+
+  /** Options of `sendFeedback` (`POST /api/uploadposts/feedback`). Any other API field is sent as well. */
+  export interface SendFeedbackOptions extends ApiParams {
+    message: string;
+    category?: "bug" | "docs" | "error_message" | "feature_request" | "other" | (string & {});
+    endpoint?: string;
+    requestId?: string;
+    /** Name of the agent or tool. */
+    agent?: string;
+  }
+
+  /** Answer of `sendFeedback`. */
+  export interface SendFeedbackResponse extends ApiResponse {
+    success?: boolean;
+    id?: string;
+    duplicate?: boolean;
+    message?: string;
+  }
+
+  /** Options of `updateGoogleBusinessAccount` (`PATCH /api/uploadposts/google-business/accounts`). Any other API field is sent as well. */
+  export interface UpdateGoogleBusinessAccountOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** `accounts/{id}` or a bare id. */
+    account?: string;
+    /** New name. */
+    accountName: string;
+    /** Google validates only; nothing changes. */
+    validateOnly?: boolean;
+    /** Required (`true`) unless `validate_only`. */
+    confirm?: boolean;
+  }
+
+  /** Answer of `updateGoogleBusinessAccount`. */
+  export interface UpdateGoogleBusinessAccountResponse extends ApiResponse {
+    success?: boolean;
+    /** Present when validating only. */
+    validate_only?: boolean;
+    /** Google's Account. */
+    account?: Record<string, any>;
+  }
+
+  /** Options of `createGoogleBusinessAdmin` (`POST /api/uploadposts/google-business/admins`). Any other API field is sent as well. */
+  export interface CreateGoogleBusinessAdminOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** `account` (default) or `location`. */
+    scope?: "account" | "location" | (string & {});
+    /** Target account (`scope=account`). */
+    account?: string;
+    /** Target location (`scope=location`). */
+    locationId?: string;
+    /** Email of the person to invite (one of `admin` / `admin_account`). */
+    admin?: string;
+    /** `accounts/{id}` of a location group to invite to a location (`scope=location` only). */
+    adminAccount?: string;
+    role: "OWNER" | "MANAGER" | "SITE_MANAGER" | (string & {});
+    /** Must be `true`. */
+    confirm: boolean;
+  }
+
+  /** Answer of `createGoogleBusinessAdmin`. */
+  export interface CreateGoogleBusinessAdminResponse extends ApiResponse {
+    success?: boolean;
+    parent?: string;
+    /** Google's new Admin. */
+    admin?: Record<string, any>;
+  }
+
+  /** Options of `updateGoogleBusinessAdmin` (`PATCH /api/uploadposts/google-business/admins`). Any other API field is sent as well. */
+  export interface UpdateGoogleBusinessAdminOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** `accounts/{a}/admins/{id}` or `locations/{l}/admins/{id}` (alias `name`). */
+    adminName: string;
+    role: "PRIMARY_OWNER" | "OWNER" | "MANAGER" | "SITE_MANAGER" | (string & {});
+    /** Must be `true`. */
+    confirm: boolean;
+  }
+
+  /** Answer of `updateGoogleBusinessAdmin`. */
+  export interface UpdateGoogleBusinessAdminResponse extends ApiResponse {
+    success?: boolean;
+    /** Google's Admin. */
+    admin?: Record<string, any>;
+    /** Present when nothing changed. */
+    unchanged?: boolean;
+  }
+
+  /** Options of `deleteGoogleBusinessAdmin` (`DELETE /api/uploadposts/google-business/admins`). Any other API field is sent as well. */
+  export interface DeleteGoogleBusinessAdminOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** Admin resource name from GET /admins (alias `name`). */
+    adminName: string;
+    /** Must be `true`. */
+    confirm: boolean;
+  }
+
+  /** Answer of `deleteGoogleBusinessAdmin`. */
+  export interface DeleteGoogleBusinessAdminResponse extends ApiResponse {
+    success?: boolean;
+    /** Resource name of the removed admin. */
+    removed?: string;
+  }
+
+  /** Options of `acceptGoogleBusinessInvitation` (`POST /api/uploadposts/google-business/invitations/accept`). Any other API field is sent as well. */
+  export interface AcceptGoogleBusinessInvitationOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** `accounts/{a}/invitations/{id}` (alias `invitation_name`). */
+    invitation: string;
+    /** Must be `true`. */
+    confirm: boolean;
+  }
+
+  /** Answer of `acceptGoogleBusinessInvitation`. */
+  export interface AcceptGoogleBusinessInvitationResponse extends ApiResponse {
+    success?: boolean;
+    invitation?: string;
+    action?: "accept" | "decline";
+    role?: string;
+  }
+
+  /** Options of `declineGoogleBusinessInvitation` (`POST /api/uploadposts/google-business/invitations/decline`). Any other API field is sent as well. */
+  export interface DeclineGoogleBusinessInvitationOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** `accounts/{a}/invitations/{id}` (alias `invitation_name`). */
+    invitation: string;
+    /** Must be `true`. */
+    confirm: boolean;
+  }
+
+  /** Answer of `declineGoogleBusinessInvitation`. */
+  export interface DeclineGoogleBusinessInvitationResponse extends ApiResponse {
+    success?: boolean;
+    invitation?: string;
+    action?: "accept" | "decline";
+    role?: string;
+  }
+
+  /** Options of `transferGoogleBusinessLocation` (`POST /api/uploadposts/google-business/locations/transfer`). Any other API field is sent as well. */
+  export interface TransferGoogleBusinessLocationOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** Location: `locations/{id}`, a bare id or `accounts/{a}/locations/{id}`. */
+    locationId: string;
+    /** `accounts/{id}` that receives the location. */
+    destinationAccount: string;
+    /** Must be `true`. */
+    confirm: boolean;
+  }
+
+  /** Answer of `transferGoogleBusinessLocation`. */
+  export interface TransferGoogleBusinessLocationResponse extends ApiResponse {
+    success?: boolean;
+    location_id?: string;
+    destination_account?: string;
+    previous_account?: string;
+  }
+
+  /** Options of `createGoogleBusinessLocation` (`POST /api/uploadposts/google-business/locations/create`). Any other API field is sent as well. */
+  export interface CreateGoogleBusinessLocationOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** Google account, `accounts/{id}` or a bare id. Default: the account saved when Google Business was connected. */
+    account?: string;
+    /** Google Location object (instead of the friendly fields). */
+    location?: Record<string, any>;
+    /** BCP 47; cannot be changed later. */
+    languageCode: string;
+    title?: string;
+    primaryCategory?: string;
+    /** Up to 50 letters, digits, `-` or `_`. Generated if missing. */
+    requestId?: string;
+    /** Validate and return what would be sent, without applying it. */
+    dryRun?: boolean;
+    /** Required (`true`) for a real creation. */
+    confirm?: boolean;
+  }
+
+  /** Answer of `createGoogleBusinessLocation`. */
+  export interface CreateGoogleBusinessLocationResponse extends ApiResponse {
+    success?: boolean;
+    account?: string;
+    dry_run?: boolean;
+    request_id?: string;
+    /** Google's new Location. */
+    location?: Record<string, any>;
+    location_id?: string;
+  }
+
+  /** Options of `deleteGoogleBusinessLocation` (`DELETE /api/uploadposts/google-business/locations/delete`). Any other API field is sent as well. */
+  export interface DeleteGoogleBusinessLocationOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** Location: `locations/{id}`, a bare id or `accounts/{a}/locations/{id}`. */
+    locationId: string;
+    /** Must be `true`. */
+    confirm: boolean;
+  }
+
+  /** Answer of `deleteGoogleBusinessLocation`. */
+  export interface DeleteGoogleBusinessLocationResponse extends ApiResponse {
+    success?: boolean;
+    location_id?: string;
+    deleted?: boolean;
+  }
+
+  /** Options of `getGoogleBusinessNotificationSettings` (`GET /api/uploadposts/google-business/notifications`). Any other API field is sent as well. */
+  export interface GetGoogleBusinessNotificationSettingsOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** Google account, `accounts/{id}` or a bare id. Default: the account saved when Google Business was connected. */
+    account?: string;
+  }
+
+  /** Answer of `getGoogleBusinessNotificationSettings`. */
+  export interface GetGoogleBusinessNotificationSettingsResponse extends ApiResponse {
+    success?: boolean;
+    account?: string;
+    /** Google's NotificationSetting (`name`, `notificationTypes`, `pubsubTopic`). */
+    notification_setting?: Record<string, any>;
+    active?: boolean;
+    managed_by_upload_post?: boolean;
+    other_tool_configured?: boolean;
+    available_types?: string[];
+    /** Google notification type -> webhook event. */
+    webhook_events?: Record<string, any>;
+  }
+
+  /** Options of `updateGoogleBusinessNotificationSettings` (`PUT /api/uploadposts/google-business/notifications`). Any other API field is sent as well. */
+  export interface UpdateGoogleBusinessNotificationSettingsOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** Google account, `accounts/{id}` or a bare id. Default: the account saved when Google Business was connected. */
+    account?: string;
+    /** `true` (default) or `false`. */
+    enabled?: boolean;
+    /** Types to receive (alias `notification_types`). Default: all six. */
+    types?: ("GOOGLE_UPDATE" | "NEW_REVIEW" | "UPDATED_REVIEW" | "NEW_CUSTOMER_MEDIA" | "DUPLICATE_LOCATION" | "VOICE_OF_MERCHANT_UPDATED" | (string & {}))[];
+    /** Must be `true`: this replaces any other tool's setting for this Google account. */
+    confirm: boolean;
+    /** `true` to replace a setting that belongs to another tool. */
+    force?: boolean;
+    /** With `enabled: false` and `force: true` on another tool's setting: switch that tool's notifications off too. */
+    confirmOtherTool?: boolean;
+  }
+
+  /** Answer of `updateGoogleBusinessNotificationSettings`. */
+  export interface UpdateGoogleBusinessNotificationSettingsResponse extends ApiResponse {
+    success?: boolean;
+    account?: string;
+    /** Google's NotificationSetting (`name`, `notificationTypes`, `pubsubTopic`). */
+    notification_setting?: Record<string, any>;
+    active?: boolean;
+    managed_by_upload_post?: boolean;
+    other_tool_configured?: boolean;
+    available_types?: string[];
+    /** Google notification type -> webhook event. */
+    webhook_events?: Record<string, any>;
+    changed?: boolean;
+    google_setting_kept?: boolean;
+    webhook_events_to_subscribe?: string[];
+    notice?: string;
+  }
+
+  /** Options of `startGoogleBusinessVerification` (`POST /api/uploadposts/google-business/verification/start`). Any other API field is sent as well. */
+  export interface StartGoogleBusinessVerificationOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** Location: `locations/{id}`, a bare id or `accounts/{a}/locations/{id}`. */
+    locationId?: string;
+    method: "ADDRESS" | "EMAIL" | "PHONE_CALL" | "SMS" | "AUTO" | "TRUSTED_PARTNER" | (string & {});
+    /** `PHONE_CALL` / `SMS`: one of the numbers in the options. */
+    phoneNumber?: string;
+    /** `EMAIL`: one of the addresses in the options. */
+    emailAddress?: string;
+    /** `ADDRESS`: name the postcard is addressed to. */
+    mailerContact?: string;
+    /** Required for `TRUSTED_PARTNER`. */
+    trustedPartnerToken?: string;
+    /** Vetted partners only. Not with the four fields above. */
+    token?: string;
+    /** BCP-47, default `en`. The methods depend on the language and the country. */
+    languageCode?: string;
+    /** Only for service-area businesses without a storefront: `{"address": {PostalAddress with regionCode}}`. */
+    context?: Record<string, any>;
+    /** Must be `true`. */
+    confirm: boolean;
+  }
+
+  /** Answer of `startGoogleBusinessVerification`. */
+  export interface StartGoogleBusinessVerificationResponse extends ApiResponse {
+    success?: boolean;
+    location_id?: string;
+    verification_name?: string;
+    state?: string;
+    /** Google's Verification. */
+    verification?: Record<string, any>;
+  }
+
+  /** Options of `completeGoogleBusinessVerification` (`POST /api/uploadposts/google-business/verification/complete`). Any other API field is sent as well. */
+  export interface CompleteGoogleBusinessVerificationOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** Location: `locations/{id}`, a bare id or `accounts/{a}/locations/{id}`. */
+    locationId?: string;
+    /** `locations/{l}/verifications/{v}` (one of `verification_name` / `verification_id`). */
+    verificationName?: string;
+    /** Last part of the name, with `location_id`. */
+    verificationId?: string;
+    /** The code Google sent. */
+    pin: string;
+  }
+
+  /** Answer of `completeGoogleBusinessVerification`. */
+  export interface CompleteGoogleBusinessVerificationResponse extends ApiResponse {
+    success?: boolean;
+    location_id?: string;
+    verification_name?: string;
+    state?: string;
+    /** Google's Verification. */
+    verification?: Record<string, any>;
+  }
+
+  /** Options of `generateGoogleBusinessVerificationToken` (`POST /api/uploadposts/google-business/verification/token`). Any other API field is sent as well. */
+  export interface GenerateGoogleBusinessVerificationTokenOptions extends ApiParams {
+    /** Profile username with Google Business connected (alias `profile`). */
+    user: string;
+    /** Location: `locations/{id}`, a bare id or `accounts/{a}/locations/{id}`. */
+    locationId?: string;
+  }
+
+  /** Answer of `generateGoogleBusinessVerificationToken`. */
+  export interface GenerateGoogleBusinessVerificationTokenResponse extends ApiResponse {
+    success?: boolean;
+    location_id?: string;
+    result?: string;
+    instant_verification_token?: string;
+    /** Google's whole answer. */
+    response?: Record<string, any>;
+  }
+
+  /** Options of `connectChatgptAdsAccount` (`POST /api/uploadposts/ads/chatgpt/connect`). Any other API field is sent as well. */
+  export interface ConnectChatgptAdsAccountOptions extends ApiParams {
+    /** Your OpenAI Ads API key (ads.openai.com -> Settings -> API keys). */
+    apiKey: string;
+    /** Link the ad account to this profile. */
+    profileUsername?: string;
+    /** Friendly label. Default: the ad account name reported by OpenAI. */
+    name?: string;
+    /** Make this the account used when a request does not choose one. */
+    default?: boolean;
+  }
+
+  /** Answer of `connectChatgptAdsAccount`. */
+  export interface ConnectChatgptAdsAccountResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+    /** A connected ChatGPT Ads account. The API key is never returned. */
+    account?: { ad_account_id?: string; name?: string; currency_code?: string; timezone?: string; status?: string; url?: string; review_status?: string; default?: boolean; connected_at?: string; updated_at?: string; profiles?: string[]; [key: string]: any };
+  }
+
+  /** Options of `listChatgptAdsAccounts` (`GET /api/uploadposts/ads/chatgpt/accounts`). Any other API field is sent as well. */
+  export interface ListChatgptAdsAccountsOptions extends ApiParams {
+  }
+
+  /** Answer of `listChatgptAdsAccounts`. */
+  export interface ListChatgptAdsAccountsResponse extends ApiResponse {
+    success?: boolean;
+    accounts?: ({ ad_account_id?: string; name?: string; currency_code?: string; timezone?: string; status?: string; url?: string; review_status?: string; default?: boolean; connected_at?: string; updated_at?: string; profiles?: string[]; [key: string]: any })[];
+    count?: number;
+  }
+
+  /** Options of `disconnectChatgptAdsAccount` (`DELETE /api/uploadposts/ads/chatgpt/accounts/{ad_account_id}`). Any other API field is sent as well. */
+  export interface DisconnectChatgptAdsAccountOptions extends ApiParams {
+    /** Connected ad account (`adacct_...`). */
+    adAccountId: string;
+    /** Only unlink this profile. */
+    profileUsername?: string;
+  }
+
+  /** Answer of `disconnectChatgptAdsAccount`. */
+  export interface DisconnectChatgptAdsAccountResponse extends ApiResponse {
+    success?: boolean;
+    message?: string;
+  }
+
+  /** Options of `getChatgptAdsAccount` (`GET /api/uploadposts/ads/chatgpt/account`). Any other API field is sent as well. */
+  export interface GetChatgptAdsAccountOptions extends ApiParams {
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `getChatgptAdsAccount`. */
+  export interface GetChatgptAdsAccountResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad account object, unchanged. */
+    account?: Record<string, any>;
+  }
+
+  /** Options of `listChatgptAdsCampaigns` (`GET /api/uploadposts/ads/chatgpt/campaigns`). Any other API field is sent as well. */
+  export interface ListChatgptAdsCampaignsOptions extends ApiParams {
+    /** 1-500 (default 20). */
+    limit?: number;
+    /** Cursor: `last_id` of the previous page. */
+    after?: string;
+    /** Cursor: `first_id` of the next page. */
+    before?: string;
+    /** Sort order. */
+    order?: "asc" | "desc" | (string & {});
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `listChatgptAdsCampaigns`. */
+  export interface ListChatgptAdsCampaignsResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's campaign objects. */
+    campaigns?: (Record<string, any>)[];
+    has_more?: boolean;
+    first_id?: string;
+    /** Send it as `after` for the next page. */
+    last_id?: string;
+    count?: number;
+  }
+
+  /** Options of `createChatgptAdsCampaign` (`POST /api/uploadposts/ads/chatgpt/campaigns`). Any other API field is sent as well. */
+  export interface CreateChatgptAdsCampaignOptions extends ApiParams {
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+    /** 3-1000 characters. */
+    name: string;
+    /** Lifetime spend limit in the ad account currency. Minimum 1. */
+    budget?: number;
+    /** Same in micros (`25000000` = 25.00). Alternative to `budget`. */
+    budgetMicros?: number;
+    /** Default `paused`: nothing starts spending by accident. */
+    status?: "paused" | "active" | (string & {});
+    description?: string;
+    /** Unix timestamp or ISO-8601 datetime. Empty or null clears it. */
+    startTime?: number | string;
+    /** Unix timestamp or ISO-8601 datetime. Empty or null clears it. */
+    endTime?: number | string;
+    /** Default `impressions`. Cannot be changed later. */
+    biddingType?: "impressions" | "clicks" | "conversions" | (string & {});
+    /** Exactly one active standard event setting; required for `conversions`. */
+    conversionEventSettingIds?: string[];
+    /** Passed to OpenAI as is. */
+    mode?: string;
+    /** Product feed (product-feed campaigns). */
+    productFeedId?: string;
+    /** OpenAI location ids (country, region or DMA). Shorthand for `targeting.locations.include`. */
+    locations?: string[];
+    /** Shorthand for `targeting.custom_audiences.ids`. */
+    customAudienceIds?: string[];
+    /** Shorthand for `targeting.excluded_custom_audiences.ids`. */
+    excludedCustomAudienceIds?: string[];
+    /** Full OpenAI targeting object. Overrides the shorthands. */
+    targeting?: Record<string, any>;
+  }
+
+  /** Answer of `createChatgptAdsCampaign`. */
+  export interface CreateChatgptAdsCampaignResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's campaign object, unchanged. */
+    campaign?: Record<string, any>;
+  }
+
+  /** Options of `getChatgptAdsCampaign` (`GET /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}`). Any other API field is sent as well. */
+  export interface GetChatgptAdsCampaignOptions extends ApiParams {
+    /** Campaign id. */
+    campaignId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `getChatgptAdsCampaign`. */
+  export interface GetChatgptAdsCampaignResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's campaign object, unchanged. */
+    campaign?: Record<string, any>;
+  }
+
+  /** Options of `updateChatgptAdsCampaign` (`POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}`). Any other API field is sent as well. */
+  export interface UpdateChatgptAdsCampaignOptions extends ApiParams {
+    /** Campaign id. */
+    campaignId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+    /** 3-1000 characters. */
+    name?: string;
+    /** Lifetime spend limit in the ad account currency. Minimum 1. */
+    budget?: number;
+    /** Same in micros (`25000000` = 25.00). Alternative to `budget`. */
+    budgetMicros?: number;
+    /** `archived` is irreversible. */
+    status?: "active" | "paused" | "archived" | (string & {});
+    description?: string;
+    /** Unix timestamp or ISO-8601 datetime. Empty or null clears it. */
+    startTime?: number | string;
+    /** Unix timestamp or ISO-8601 datetime. Empty or null clears it. */
+    endTime?: number | string;
+    /** OpenAI location ids (country, region or DMA). Shorthand for `targeting.locations.include`. */
+    locations?: string[];
+    /** Shorthand for `targeting.custom_audiences.ids`. */
+    customAudienceIds?: string[];
+    /** Shorthand for `targeting.excluded_custom_audiences.ids`. */
+    excludedCustomAudienceIds?: string[];
+    /** Full OpenAI targeting object. Overrides the shorthands. */
+    targeting?: Record<string, any>;
+  }
+
+  /** Answer of `updateChatgptAdsCampaign`. */
+  export interface UpdateChatgptAdsCampaignResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's campaign object, unchanged. */
+    campaign?: Record<string, any>;
+  }
+
+  /** Options of `activateChatgptAdsCampaign` (`POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/activate`). Any other API field is sent as well. */
+  export interface ActivateChatgptAdsCampaignOptions extends ApiParams {
+    /** Campaign id. */
+    campaignId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `activateChatgptAdsCampaign`. */
+  export interface ActivateChatgptAdsCampaignResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's campaign object, unchanged. */
+    campaign?: Record<string, any>;
+  }
+
+  /** Options of `pauseChatgptAdsCampaign` (`POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/pause`). Any other API field is sent as well. */
+  export interface PauseChatgptAdsCampaignOptions extends ApiParams {
+    /** Campaign id. */
+    campaignId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `pauseChatgptAdsCampaign`. */
+  export interface PauseChatgptAdsCampaignResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's campaign object, unchanged. */
+    campaign?: Record<string, any>;
+  }
+
+  /** Options of `archiveChatgptAdsCampaign` (`POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/archive`). Any other API field is sent as well. */
+  export interface ArchiveChatgptAdsCampaignOptions extends ApiParams {
+    /** Campaign id. */
+    campaignId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `archiveChatgptAdsCampaign`. */
+  export interface ArchiveChatgptAdsCampaignResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's campaign object, unchanged. */
+    campaign?: Record<string, any>;
+  }
+
+  /** Options of `getChatgptAdsCampaignInsights` (`GET /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/insights`). Any other API field is sent as well. */
+  export interface GetChatgptAdsCampaignInsightsOptions extends ApiParams {
+    /** Campaign id. */
+    campaignId: string;
+    /** `YYYY-MM-DD`, start of a date range in the ad account timezone. */
+    since?: string;
+    /** `YYYY-MM-DD`, end of the date range. */
+    until?: string;
+    /** Default `daily`. */
+    timeGranularity?: "hourly" | "daily" | "monthly" | "none" | (string & {});
+    /** Row entity inside the endpoint's scope. */
+    aggregationLevel?: "ad_account" | "campaign" | "ad_group" | "ad" | (string & {});
+    /** Repeatable (`fields` or `fields[]`). Metrics and metadata: `impressions`, `clicks`, `spend`, `ctr`, `cpc`, `cpm`, `campaign.name`... */
+    fields?: string[];
+    /** Repeatable. One of `product`, `country`, `device`. */
+    segments?: string[];
+    /** Repeatable JSON-encoded objects, passed through to OpenAI. */
+    filters?: string[];
+    /** Repeatable JSON-encoded objects, passed through to OpenAI. */
+    sort?: string[];
+    /** Repeatable JSON-encoded range objects, for windows `since`/`until` cannot express (they win over `since`/`until`). */
+    timeRanges?: string[];
+    /** 1-2000 (default 20). */
+    limit?: number;
+    /** Cursor: `last_id` of the previous page. */
+    after?: string;
+    /** Cursor: `first_id` of the next page. */
+    before?: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `getChatgptAdsCampaignInsights`. */
+  export interface GetChatgptAdsCampaignInsightsResponse extends ApiResponse {
+    success?: boolean;
+    /** Insight rows from OpenAI. */
+    insights?: (Record<string, any>)[];
+    has_more?: boolean;
+    first_id?: string;
+    /** Send it as `after` for the next page. */
+    last_id?: string;
+    count?: number;
+  }
+
+  /** Options of `listChatgptAdsAdGroups` (`GET /api/uploadposts/ads/chatgpt/adgroups`). Any other API field is sent as well. */
+  export interface ListChatgptAdsAdGroupsOptions extends ApiParams {
+    /** Parent campaign. */
+    campaignId: string;
+    /** 1-500 (default 20). */
+    limit?: number;
+    /** Cursor: `last_id` of the previous page. */
+    after?: string;
+    /** Cursor: `first_id` of the next page. */
+    before?: string;
+    /** Sort order. */
+    order?: "asc" | "desc" | (string & {});
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `listChatgptAdsAdGroups`. */
+  export interface ListChatgptAdsAdGroupsResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad group objects. */
+    ad_groups?: (Record<string, any>)[];
+    has_more?: boolean;
+    first_id?: string;
+    /** Send it as `after` for the next page. */
+    last_id?: string;
+    count?: number;
+  }
+
+  /** Options of `createChatgptAdsAdGroup` (`POST /api/uploadposts/ads/chatgpt/adgroups`). Any other API field is sent as well. */
+  export interface CreateChatgptAdsAdGroupOptions extends ApiParams {
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+    /** Parent campaign. */
+    campaignId: string;
+    /** 3-1000 characters. */
+    name: string;
+    /** Max bid per billing event in account currency (`0.06` = a $60 CPM on impression billing). */
+    maxBid?: number;
+    /** Same in micros. Alternative to `max_bid`. */
+    maxBidMicros?: number;
+    /** Default `impression`; `click` for click and conversion campaigns. */
+    billingEventType?: "impression" | "click" | (string & {});
+    /** Full OpenAI bidding config. Overrides `max_bid` / `billing_event_type`. */
+    biddingConfig?: Record<string, any>;
+    /** Default `paused`: nothing starts spending by accident. */
+    status?: "paused" | "active" | (string & {});
+    description?: string;
+    /** When your product or service is useful, in your own words. */
+    contextHints?: string[];
+    /** Product filters for product-feed campaigns. */
+    productSet?: Record<string, any>;
+  }
+
+  /** Answer of `createChatgptAdsAdGroup`. */
+  export interface CreateChatgptAdsAdGroupResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad group object, unchanged. */
+    ad_group?: Record<string, any>;
+  }
+
+  /** Options of `getChatgptAdsAdGroup` (`GET /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}`). Any other API field is sent as well. */
+  export interface GetChatgptAdsAdGroupOptions extends ApiParams {
+    /** Ad group id. */
+    adGroupId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `getChatgptAdsAdGroup`. */
+  export interface GetChatgptAdsAdGroupResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad group object, unchanged. */
+    ad_group?: Record<string, any>;
+  }
+
+  /** Options of `updateChatgptAdsAdGroup` (`POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}`). Any other API field is sent as well. */
+  export interface UpdateChatgptAdsAdGroupOptions extends ApiParams {
+    /** Ad group id. */
+    adGroupId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+    /** 3-1000 characters. */
+    name?: string;
+    /** Max bid per billing event in account currency (`0.06` = a $60 CPM on impression billing). */
+    maxBid?: number;
+    /** Same in micros. Alternative to `max_bid`. */
+    maxBidMicros?: number;
+    /** Default `impression`; `click` for click and conversion campaigns. */
+    billingEventType?: "impression" | "click" | (string & {});
+    /** Full OpenAI bidding config. Overrides `max_bid` / `billing_event_type`. */
+    biddingConfig?: Record<string, any>;
+    /** `archived` is irreversible. */
+    status?: "active" | "paused" | "archived" | (string & {});
+    description?: string;
+    /** When your product or service is useful, in your own words. */
+    contextHints?: string[];
+    /** Product filters for product-feed campaigns. */
+    productSet?: Record<string, any>;
+  }
+
+  /** Answer of `updateChatgptAdsAdGroup`. */
+  export interface UpdateChatgptAdsAdGroupResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad group object, unchanged. */
+    ad_group?: Record<string, any>;
+  }
+
+  /** Options of `activateChatgptAdsAdGroup` (`POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/activate`). Any other API field is sent as well. */
+  export interface ActivateChatgptAdsAdGroupOptions extends ApiParams {
+    /** Ad group id. */
+    adGroupId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `activateChatgptAdsAdGroup`. */
+  export interface ActivateChatgptAdsAdGroupResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad group object, unchanged. */
+    ad_group?: Record<string, any>;
+  }
+
+  /** Options of `pauseChatgptAdsAdGroup` (`POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/pause`). Any other API field is sent as well. */
+  export interface PauseChatgptAdsAdGroupOptions extends ApiParams {
+    /** Ad group id. */
+    adGroupId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `pauseChatgptAdsAdGroup`. */
+  export interface PauseChatgptAdsAdGroupResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad group object, unchanged. */
+    ad_group?: Record<string, any>;
+  }
+
+  /** Options of `archiveChatgptAdsAdGroup` (`POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/archive`). Any other API field is sent as well. */
+  export interface ArchiveChatgptAdsAdGroupOptions extends ApiParams {
+    /** Ad group id. */
+    adGroupId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `archiveChatgptAdsAdGroup`. */
+  export interface ArchiveChatgptAdsAdGroupResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad group object, unchanged. */
+    ad_group?: Record<string, any>;
+  }
+
+  /** Options of `getChatgptAdsAdGroupInsights` (`GET /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/insights`). Any other API field is sent as well. */
+  export interface GetChatgptAdsAdGroupInsightsOptions extends ApiParams {
+    /** Ad group id. */
+    adGroupId: string;
+    /** `YYYY-MM-DD`, start of a date range in the ad account timezone. */
+    since?: string;
+    /** `YYYY-MM-DD`, end of the date range. */
+    until?: string;
+    /** Default `daily`. */
+    timeGranularity?: "hourly" | "daily" | "monthly" | "none" | (string & {});
+    /** Row entity inside the endpoint's scope. */
+    aggregationLevel?: "ad_account" | "campaign" | "ad_group" | "ad" | (string & {});
+    /** Repeatable (`fields` or `fields[]`). Metrics and metadata: `impressions`, `clicks`, `spend`, `ctr`, `cpc`, `cpm`, `campaign.name`... */
+    fields?: string[];
+    /** Repeatable. One of `product`, `country`, `device`. */
+    segments?: string[];
+    /** Repeatable JSON-encoded objects, passed through to OpenAI. */
+    filters?: string[];
+    /** Repeatable JSON-encoded objects, passed through to OpenAI. */
+    sort?: string[];
+    /** Repeatable JSON-encoded range objects, for windows `since`/`until` cannot express (they win over `since`/`until`). */
+    timeRanges?: string[];
+    /** 1-2000 (default 20). */
+    limit?: number;
+    /** Cursor: `last_id` of the previous page. */
+    after?: string;
+    /** Cursor: `first_id` of the next page. */
+    before?: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `getChatgptAdsAdGroupInsights`. */
+  export interface GetChatgptAdsAdGroupInsightsResponse extends ApiResponse {
+    success?: boolean;
+    /** Insight rows from OpenAI. */
+    insights?: (Record<string, any>)[];
+    has_more?: boolean;
+    first_id?: string;
+    /** Send it as `after` for the next page. */
+    last_id?: string;
+    count?: number;
+  }
+
+  /** Options of `listChatgptAdsAds` (`GET /api/uploadposts/ads/chatgpt/ads`). Any other API field is sent as well. */
+  export interface ListChatgptAdsAdsOptions extends ApiParams {
+    /** Parent ad group. */
+    adGroupId: string;
+    /** 1-500 (default 20). */
+    limit?: number;
+    /** Cursor: `last_id` of the previous page. */
+    after?: string;
+    /** Cursor: `first_id` of the next page. */
+    before?: string;
+    /** Sort order. */
+    order?: "asc" | "desc" | (string & {});
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `listChatgptAdsAds`. */
+  export interface ListChatgptAdsAdsResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad objects. */
+    ads?: (Record<string, any>)[];
+    has_more?: boolean;
+    first_id?: string;
+    /** Send it as `after` for the next page. */
+    last_id?: string;
+    count?: number;
+  }
+
+  /** Options of `createChatgptAdsAd` (`POST /api/uploadposts/ads/chatgpt/ads`). Any other API field is sent as well. */
+  export interface CreateChatgptAdsAdOptions extends ApiParams {
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+    /** Parent ad group. */
+    adGroupId: string;
+    /** Internal name, 3-1000 characters. Not shown to users. */
+    name: string;
+    /** Headline, 3-50 characters. */
+    title?: string;
+    /** Copy, up to 100 characters. */
+    body?: string;
+    /** http(s) destination URL. */
+    targetUrl?: string;
+    /** Creative id from POST /creatives. */
+    fileId?: string;
+    price?: string;
+    /** Creative type (flat form). */
+    type?: "chat_card" | "product_ad_template" | (string & {});
+    /** Default `paused`: nothing starts spending by accident. */
+    status?: "paused" | "active" | (string & {});
+    /** Creative. `chat_card` (default) needs `title`, `body`, `target_url` and `file_id`; `product_ad_template` takes image and destination from the feed item. */
+    creative?: { type?: "chat_card" | "product_ad_template" | (string & {}); title?: string; body?: string; target_url?: string; file_id?: string; price?: string; [key: string]: any };
+  }
+
+  /** Answer of `createChatgptAdsAd`. */
+  export interface CreateChatgptAdsAdResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad object, unchanged. */
+    ad?: Record<string, any>;
+  }
+
+  /** Options of `getChatgptAdsAd` (`GET /api/uploadposts/ads/chatgpt/ads/{ad_id}`). Any other API field is sent as well. */
+  export interface GetChatgptAdsAdOptions extends ApiParams {
+    /** Ad id. */
+    adId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `getChatgptAdsAd`. */
+  export interface GetChatgptAdsAdResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad object, unchanged. */
+    ad?: Record<string, any>;
+  }
+
+  /** Options of `updateChatgptAdsAd` (`POST /api/uploadposts/ads/chatgpt/ads/{ad_id}`). Any other API field is sent as well. */
+  export interface UpdateChatgptAdsAdOptions extends ApiParams {
+    /** Ad id. */
+    adId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+    /** 3-1000 characters. */
+    name?: string;
+    /** `archived` is irreversible. */
+    status?: "active" | "paused" | "archived" | (string & {});
+    /** Creative. `chat_card` (default) needs `title`, `body`, `target_url` and `file_id`; `product_ad_template` takes image and destination from the feed item. */
+    creative?: { type?: "chat_card" | "product_ad_template" | (string & {}); title?: string; body?: string; target_url?: string; file_id?: string; price?: string; [key: string]: any };
+  }
+
+  /** Answer of `updateChatgptAdsAd`. */
+  export interface UpdateChatgptAdsAdResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad object, unchanged. */
+    ad?: Record<string, any>;
+  }
+
+  /** Options of `activateChatgptAdsAd` (`POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/activate`). Any other API field is sent as well. */
+  export interface ActivateChatgptAdsAdOptions extends ApiParams {
+    /** Ad id. */
+    adId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `activateChatgptAdsAd`. */
+  export interface ActivateChatgptAdsAdResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad object, unchanged. */
+    ad?: Record<string, any>;
+  }
+
+  /** Options of `pauseChatgptAdsAd` (`POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/pause`). Any other API field is sent as well. */
+  export interface PauseChatgptAdsAdOptions extends ApiParams {
+    /** Ad id. */
+    adId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `pauseChatgptAdsAd`. */
+  export interface PauseChatgptAdsAdResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad object, unchanged. */
+    ad?: Record<string, any>;
+  }
+
+  /** Options of `archiveChatgptAdsAd` (`POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/archive`). Any other API field is sent as well. */
+  export interface ArchiveChatgptAdsAdOptions extends ApiParams {
+    /** Ad id. */
+    adId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `archiveChatgptAdsAd`. */
+  export interface ArchiveChatgptAdsAdResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's ad object, unchanged. */
+    ad?: Record<string, any>;
+  }
+
+  /** Options of `getChatgptAdsAdInsights` (`GET /api/uploadposts/ads/chatgpt/ads/{ad_id}/insights`). Any other API field is sent as well. */
+  export interface GetChatgptAdsAdInsightsOptions extends ApiParams {
+    /** Ad id. */
+    adId: string;
+    /** `YYYY-MM-DD`, start of a date range in the ad account timezone. */
+    since?: string;
+    /** `YYYY-MM-DD`, end of the date range. */
+    until?: string;
+    /** Default `daily`. */
+    timeGranularity?: "hourly" | "daily" | "monthly" | "none" | (string & {});
+    /** Row entity inside the endpoint's scope. */
+    aggregationLevel?: "ad_account" | "campaign" | "ad_group" | "ad" | (string & {});
+    /** Repeatable (`fields` or `fields[]`). Metrics and metadata: `impressions`, `clicks`, `spend`, `ctr`, `cpc`, `cpm`, `campaign.name`... */
+    fields?: string[];
+    /** Repeatable. One of `product`, `country`, `device`. */
+    segments?: string[];
+    /** Repeatable JSON-encoded objects, passed through to OpenAI. */
+    filters?: string[];
+    /** Repeatable JSON-encoded objects, passed through to OpenAI. */
+    sort?: string[];
+    /** Repeatable JSON-encoded range objects, for windows `since`/`until` cannot express (they win over `since`/`until`). */
+    timeRanges?: string[];
+    /** 1-2000 (default 20). */
+    limit?: number;
+    /** Cursor: `last_id` of the previous page. */
+    after?: string;
+    /** Cursor: `first_id` of the next page. */
+    before?: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `getChatgptAdsAdInsights`. */
+  export interface GetChatgptAdsAdInsightsResponse extends ApiResponse {
+    success?: boolean;
+    /** Insight rows from OpenAI. */
+    insights?: (Record<string, any>)[];
+    has_more?: boolean;
+    first_id?: string;
+    /** Send it as `after` for the next page. */
+    last_id?: string;
+    count?: number;
+  }
+
+  /** Options of `previewChatgptAdsAd` (`POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/preview`). Any other API field is sent as well. */
+  export interface PreviewChatgptAdsAdOptions extends ApiParams {
+    /** Ad id. */
+    adId: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `previewChatgptAdsAd`. */
+  export interface PreviewChatgptAdsAdResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's preview object, unchanged. */
+    preview?: Record<string, any>;
+  }
+
+  /** Options of `uploadChatgptAdsCreative` (`POST /api/uploadposts/ads/chatgpt/creatives`). Any other API field is sent as well. */
+  export interface UploadChatgptAdsCreativeOptions extends ApiParams {
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+    /** http(s) image URL. */
+    imageUrl?: string;
+    /** Image, up to 10 MB. */
+    file?: string | Buffer | NodeJS.ReadableStream;
+  }
+
+  /** Answer of `uploadChatgptAdsCreative`. */
+  export interface UploadChatgptAdsCreativeResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's answer. */
+    creative?: { file_id?: string; [key: string]: any };
+  }
+
+  /** Options of `getChatgptAdsAccountInsights` (`GET /api/uploadposts/ads/chatgpt/insights`). Any other API field is sent as well. */
+  export interface GetChatgptAdsAccountInsightsOptions extends ApiParams {
+    /** `YYYY-MM-DD`, start of a date range in the ad account timezone. */
+    since?: string;
+    /** `YYYY-MM-DD`, end of the date range. */
+    until?: string;
+    /** Default `daily`. */
+    timeGranularity?: "hourly" | "daily" | "monthly" | "none" | (string & {});
+    /** Row entity inside the endpoint's scope. */
+    aggregationLevel?: "ad_account" | "campaign" | "ad_group" | "ad" | (string & {});
+    /** Repeatable (`fields` or `fields[]`). Metrics and metadata: `impressions`, `clicks`, `spend`, `ctr`, `cpc`, `cpm`, `campaign.name`... */
+    fields?: string[];
+    /** Repeatable. One of `product`, `country`, `device`. */
+    segments?: string[];
+    /** Repeatable JSON-encoded objects, passed through to OpenAI. */
+    filters?: string[];
+    /** Repeatable JSON-encoded objects, passed through to OpenAI. */
+    sort?: string[];
+    /** Repeatable JSON-encoded range objects, for windows `since`/`until` cannot express (they win over `since`/`until`). */
+    timeRanges?: string[];
+    /** 1-2000 (default 20). */
+    limit?: number;
+    /** Cursor: `last_id` of the previous page. */
+    after?: string;
+    /** Cursor: `first_id` of the next page. */
+    before?: string;
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+  }
+
+  /** Answer of `getChatgptAdsAccountInsights`. */
+  export interface GetChatgptAdsAccountInsightsResponse extends ApiResponse {
+    success?: boolean;
+    /** Insight rows from OpenAI. */
+    insights?: (Record<string, any>)[];
+    has_more?: boolean;
+    first_id?: string;
+    /** Send it as `after` for the next page. */
+    last_id?: string;
+    count?: number;
+  }
+
+  /** Options of `promoteChatgptAds` (`POST /api/uploadposts/ads/chatgpt/promote`). Any other API field is sent as well. */
+  export interface PromoteChatgptAdsOptions extends ApiParams {
+    /** ChatGPT Ads account to use (`adacct_...`). Without it: `X-Ads-Account-Id` header, then `ad_account_id` in the JSON body, then the only or the default connected account (several and no default = 400). */
+    adAccountId?: string;
+    /** Use the ad account linked to this profile, and only that one (404 if the profile has none linked; never falls back to the default account). */
+    profileUsername?: string;
+    /** Ad headline, 3-50 characters. */
+    title: string;
+    /** Ad copy, up to 100 characters. */
+    body: string;
+    /** http(s) destination URL. */
+    targetUrl: string;
+    /** Creative image URL (one of `image_url` / `file_id`). */
+    imageUrl?: string;
+    /** Already uploaded creative id. */
+    fileId?: string;
+    /** Lifetime spend limit in the ad account currency. Minimum 1. */
+    budget?: number;
+    /** Same in micros (`25000000` = 25.00). Alternative to `budget`. */
+    budgetMicros?: number;
+    /** Max bid per billing event in account currency (`0.06` = a $60 CPM on impression billing). */
+    maxBid?: number;
+    /** Same in micros. Alternative to `max_bid`. */
+    maxBidMicros?: number;
+    /** Base name of the three objects. Default: `title`. */
+    name?: string;
+    /** Default `paused`: nothing starts spending by accident. */
+    status?: "paused" | "active" | (string & {});
+    /** Default `impressions`. */
+    biddingType?: "impressions" | "clicks" | "conversions" | (string & {});
+    /** Default: `impression` for impression campaigns, `click` otherwise. */
+    billingEventType?: "impression" | "click" | (string & {});
+    /** Unix timestamp or ISO-8601 datetime. Empty or null clears it. */
+    startTime?: number | string;
+    /** Unix timestamp or ISO-8601 datetime. Empty or null clears it. */
+    endTime?: number | string;
+    /** Campaign description. */
+    description?: string;
+    /** For `conversions` bidding. */
+    conversionEventSettingIds?: string[];
+    /** OpenAI location ids (country, region or DMA). Shorthand for `targeting.locations.include`. */
+    locations?: string[];
+    /** Shorthand for `targeting.custom_audiences.ids`. */
+    customAudienceIds?: string[];
+    /** Shorthand for `targeting.excluded_custom_audiences.ids`. */
+    excludedCustomAudienceIds?: string[];
+    /** Full OpenAI targeting object. Overrides the shorthands. */
+    targeting?: Record<string, any>;
+    /** When the ad is useful, e.g. `["productivity"]`. */
+    contextHints?: string[];
+    /** Creative price. */
+    price?: string;
+    adGroupName?: string;
+    adName?: string;
+  }
+
+  /** Answer of `promoteChatgptAds`. */
+  export interface PromoteChatgptAdsResponse extends ApiResponse {
+    success?: boolean;
+    /** OpenAI's campaign. */
+    campaign?: Record<string, any>;
+    /** OpenAI's ad group. */
+    ad_group?: Record<string, any>;
+    /** OpenAI's ad. */
+    ad?: Record<string, any>;
+    status?: "paused" | "active";
+    message?: string;
+  }
+
+  // </openapi:types>
+
   export class UploadPost {
     /**
      * Create a new Upload-Post client
@@ -1974,10 +5259,12 @@ declare module 'upload-post' {
     listUsers(): Promise<UsersResponse>;
 
     /**
-     * Create a new user/profile
+     * Create a new user/profile. A username that already exists fails with 409
+     * ("Username already in use"); the profile limit of the plan with 403
+     * `PROFILE_LIMIT_REACHED`.
      * @param username - Profile name to create
      */
-    createUser(username: string): Promise<{ success: boolean; username?: string }>;
+    createUser(username: string): Promise<{ success: boolean; profile?: Record<string, any>; [key: string]: any }>;
 
     /**
      * Delete a user/profile
@@ -2007,10 +5294,19 @@ declare module 'upload-post' {
        * Returned back in the `profile` object of validateJwt.
        */
       uiLabels?: Record<string, string>;
+      /** Force the connection page theme; `'auto'` (or `null`) follows the visitor's preference again. */
+      connectTheme?: 'light' | 'dark' | 'auto' | null;
+      /**
+       * Not generally available yet (post approvals). `true` lets the end client
+       * approve or reject the pending posts of this profile from the connect page
+       * (`listClientPostApprovals` and friends, called with this JWT). Stored on
+       * the profile; generate again with `false` to turn it off.
+       */
+      clientApproval?: boolean;
     }): Promise<JwtResponse>;
 
     /**
-     * Validate a JWT token
+     * Validate a JWT token (`GET`, the token goes in `Authorization: Bearer`).
      * @param jwt - JWT token to validate
      */
     validateJwt(jwt: string): Promise<{
@@ -2021,6 +5317,8 @@ declare module 'upload-post' {
         language?: 'en' | 'es' | 'de' | 'fr' | 'pt' | 'pl' | 'tr';
         /** The ui_labels sent to generateJwt, echoed back for the connection page. */
         ui_labels?: Record<string, string>;
+        /** While post approvals are on: whether the end client may approve posts with this JWT. */
+        client_approval?: boolean;
         [key: string]: any;
       };
       [key: string]: any;
@@ -2351,9 +5649,11 @@ declare module 'upload-post' {
 
     /**
      * Queue settings, including `slots_mode`, `auto_slots` and `effective_slots`.
+     * `configured` is `false` while the queue of the profile was never saved
+     * (`queue_settings` then shows the defaults).
      * @see https://docs.upload-post.com/api/queue-system
      */
-    getQueueSettings(options: { profileUsername: string } & ApiParams): Promise<ApiResponse>;
+    getQueueSettings(options: { profileUsername: string } & ApiParams): Promise<ApiResponse & { queue_settings?: Record<string, any>; configured?: boolean }>;
 
     /**
      * Update the queue. `slots: "auto"` (or `slots_mode: "auto"`) fills the best hours automatically (`auto_slots_count`, `auto_platforms`, `refresh`); a `slots` array switches back to fixed slots.
@@ -3734,6 +7034,1755 @@ declare module 'upload-post' {
      * @param profile - Profile username
      */
     getTiktokPublishingSettings(profile: string): Promise<TikTokPublishingSettingsResponse>;
+
+    // ==================== Generated from the OpenAPI spec ====================
+    // Written by codegen/generate.py from codegen/openapi.json: do not edit by hand.
+    // <openapi:methods>
+    // ---- Telegram ----
+
+    /**
+     * Send a gift from the bot's Stars.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_stars_spend_disabled` until the feature is available.
+     *
+     * sendGift. Spends the bot's Stars. Requires confirm=true and max_star_count (checked against the current price).
+     *
+     * `POST /api/uploadposts/telegram/gifts`
+     */
+    sendTelegramGift(options: SendTelegramGiftOptions): Promise<SendTelegramGiftResponse>;
+
+    /**
+     * Gift Telegram Premium from the bot's Stars.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_stars_spend_disabled` until the feature is available.
+     *
+     * Spends the bot's Stars.
+     *
+     * `POST /api/uploadposts/telegram/gifts/premium`
+     */
+    giftTelegramPremium(options: GiftTelegramPremiumOptions): Promise<GiftTelegramPremiumResponse>;
+
+    /**
+     * Automatic pre-checkout rules.
+     *
+     * **The automatic answers need the bot's updates turned on (POST /api/uploadposts/telegram/updates).**
+     *
+     * `GET /api/uploadposts/telegram/payments/settings`
+     */
+    getTelegramPaymentSettings(options: GetTelegramPaymentSettingsOptions): Promise<GetTelegramPaymentSettingsResponse>;
+
+    /**
+     * Set automatic pre-checkout rules.
+     *
+     * **The automatic answers need the bot's updates turned on (POST /api/uploadposts/telegram/updates).**
+     *
+     * `PUT /api/uploadposts/telegram/payments/settings`
+     */
+    updateTelegramPaymentSettings(options: UpdateTelegramPaymentSettingsOptions): Promise<UpdateTelegramPaymentSettingsResponse>;
+
+    /**
+     * Turn Telegram updates on or off.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_updates_unavailable` until the feature is available.
+     *
+     * Opt-in per bot. A webhook that is not Upload-Post's is never replaced without replace_existing_webhook=true (409 telegram_webhook_in_use otherwise). With no webhook, the answer warns that a getUpdates integration stops receiving.
+     *
+     * `POST /api/uploadposts/telegram/updates`
+     */
+    setTelegramUpdates(options: SetTelegramUpdatesOptions): Promise<ApiResponse>;
+
+    /**
+     * Answer a Telegram query.
+     *
+     * Answer a callback_query, inline_query, join request, guest/widget query, shipping or pre-checkout query received as a telegram_update event. 410 telegram_query_expired when Telegram's time is up.
+     *
+     * `POST /api/uploadposts/telegram/answer`
+     */
+    answerTelegramQuery(options: AnswerTelegramQueryOptions): Promise<ApiResponse>;
+
+    /**
+     * Telegram Business connections.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
+     * Connections of the bot with Telegram Business accounts (rights, enabled).
+     *
+     * `GET /api/uploadposts/telegram/business-connections`
+     */
+    getTelegramBusinessConnections(options: GetTelegramBusinessConnectionsOptions): Promise<ApiResponse>;
+
+    /**
+     * Telegram Business account.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
+     * The connected account.
+     *
+     * `GET /api/uploadposts/telegram/business-profile`
+     */
+    getTelegramBusinessProfile(options: GetTelegramBusinessProfileOptions): Promise<ApiResponse>;
+
+    /**
+     * Update the Telegram Business profile.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
+     * first_name/last_name, username, bio, photo (multipart or media_url, is_public), remove_photo, gift_settings.
+     *
+     * `PATCH /api/uploadposts/telegram/business-profile`
+     */
+    updateTelegramBusinessProfile(options: UpdateTelegramBusinessProfileOptions): Promise<ApiResponse>;
+
+    /**
+     * Post a Telegram story.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
+     * postStory on behalf of the Business account. Photos 1080x1920 up to 10 MB; videos 720x1280 H.265 up to 30 MB, 60 s.
+     *
+     * `POST /api/uploadposts/telegram/business-stories`
+     */
+    postTelegramStory(options: PostTelegramStoryOptions): Promise<ApiResponse>;
+
+    /**
+     * Edit a Telegram story.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
+     * editStory.
+     *
+     * `PATCH /api/uploadposts/telegram/business-stories`
+     */
+    editTelegramStory(options: EditTelegramStoryOptions): Promise<ApiResponse>;
+
+    /**
+     * Delete a Telegram story.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
+     * deleteStory.
+     *
+     * `DELETE /api/uploadposts/telegram/business-stories`
+     */
+    deleteTelegramStory(options: DeleteTelegramStoryOptions): Promise<ApiResponse>;
+
+    /**
+     * Repost a Telegram story.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
+     * repostStory from another Business account of the same bot.
+     *
+     * `POST /api/uploadposts/telegram/business-stories/repost`
+     */
+    repostTelegramStory(options: RepostTelegramStoryOptions): Promise<ApiResponse>;
+
+    /**
+     * Telegram Business gifts.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
+     * getBusinessAccountGifts with Telegram's filters.
+     *
+     * `GET /api/uploadposts/telegram/business-gifts`
+     */
+    getTelegramBusinessGifts(options: GetTelegramBusinessGiftsOptions): Promise<ApiResponse>;
+
+    /**
+     * Convert, upgrade, transfer or delete a gift.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
+     * Irreversible: requires confirm=true and an idempotency_key (a repeat with the same key returns the first answer).
+     *
+     * `POST /api/uploadposts/telegram/business-gifts`
+     */
+    manageTelegramBusinessGift(options: ManageTelegramBusinessGiftOptions): Promise<ApiResponse>;
+
+    /**
+     * Telegram Business Stars balance.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
+     * getBusinessAccountStarBalance.
+     *
+     * `GET /api/uploadposts/telegram/business-stars`
+     */
+    getTelegramBusinessStars(options: GetTelegramBusinessStarsOptions): Promise<ApiResponse>;
+
+    /**
+     * Move Stars to the bot.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `telegram_business_unavailable` until the feature is available.
+     *
+     * transferBusinessAccountStars (1-10000). Requires confirm=true and an idempotency_key.
+     *
+     * `POST /api/uploadposts/telegram/business-stars/transfer`
+     */
+    transferTelegramBusinessStars(options: TransferTelegramBusinessStarsOptions): Promise<ApiResponse>;
+
+    // ---- Content Upload ----
+
+    /**
+     * AI titles and captions for a short video.
+     *
+     * Watches the video and writes a title/description (YouTube) and captions (Instagram, TikTok, Facebook). Counts against the monthly AI Shorts quota (a failed analysis is not counted).
+     *
+     * `POST /api/uploadposts/analyze-shorts`
+     */
+    analyzeShorts(options: AnalyzeShortsOptions): Promise<AnalyzeShortsResponse>;
+
+    /**
+     * Translate or rewrite captions with AI.
+     *
+     * Rewrites texts with the same shape analyze-shorts returns into another language. Uses the AI Shorts quota.
+     *
+     * `POST /api/uploadposts/rewrite-captions`
+     */
+    rewriteCaptions(options: RewriteCaptionsOptions): Promise<RewriteCaptionsResponse>;
+
+    /**
+     * Get a signed URL to upload a file.
+     *
+     * For clients that cannot send large files in a multipart request (AI agents, the MCP server): create the upload, PUT the bytes to upload_url with the returned headers, call /complete, then pass media_url to the upload endpoints. Files expire after staging_ttl_hours. Per-file size, files in progress and monthly files/bytes depend on the plan.
+     *
+     * `POST /api/uploadposts/media-uploads`
+     */
+    createMediaUpload(options: CreateMediaUploadOptions): Promise<CreateMediaUploadResponse>;
+
+    /**
+     * Confirm a signed upload.
+     *
+     * Checks the uploaded object (size, type) and returns media_url.
+     *
+     * `POST /api/uploadposts/media-uploads/{upload_id}/complete`
+     */
+    completeMediaUpload(options: CompleteMediaUploadOptions): Promise<CompleteMediaUploadResponse>;
+
+    /**
+     * Get a signed upload.
+     *
+     * `GET /api/uploadposts/media-uploads/{upload_id}`
+     */
+    getMediaUpload(options: GetMediaUploadOptions): Promise<GetMediaUploadResponse>;
+
+    /**
+     * Delete a signed upload.
+     *
+     * `DELETE /api/uploadposts/media-uploads/{upload_id}`
+     */
+    deleteMediaUpload(options: DeleteMediaUploadOptions): Promise<DeleteMediaUploadResponse>;
+
+    // ---- Upload Management ----
+
+    /**
+     * Get a scheduled post.
+     *
+     * The options a scheduled post was scheduled with (limited to what PATCH can change), signed media URLs and whether it can still be edited.
+     *
+     * `GET /api/uploadposts/schedule/{job_id}`
+     */
+    getScheduledPost(options: GetScheduledPostOptions): Promise<GetScheduledPostResponse>;
+
+    /**
+     * Get a scheduled post's thumbnail.
+     *
+     * Signed URL of a small JPEG of the post's video or first image. A post without one gets it built once and kept. Call it only for posts you display; the list already carries most thumbnails.
+     *
+     * `GET /api/uploadposts/schedule/{job_id}/thumbnail`
+     */
+    getScheduledPostThumbnail(options: GetScheduledPostThumbnailOptions): Promise<GetScheduledPostThumbnailResponse>;
+
+    /**
+     * Preview URLs of a scheduled post.
+     *
+     * Signed, short-lived URLs of the media, cover and thumbnail of one scheduled job (the listing only says has_preview).
+     *
+     * `GET /api/uploadposts/schedule/{job_id}/preview`
+     */
+    getScheduledPostPreview(options: GetScheduledPostPreviewOptions): Promise<GetScheduledPostPreviewResponse>;
+
+    // ---- Platform Integration ----
+
+    /**
+     * Create a Pinterest board.
+     *
+     * Without a profile the first profile of the account with a Pinterest account is used.
+     *
+     * `POST /api/uploadposts/pinterest/boards`
+     */
+    createPinterestBoard(options: CreatePinterestBoardOptions): Promise<CreatePinterestBoardResponse>;
+
+    /**
+     * Run a YouTube Analytics channel report.
+     *
+     * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. reports.query for the profile's channel with any dimensions, metrics, filters and sort of YouTube's channel reports. Validated against the official report tables before it reaches YouTube (invalid combinations: 400 youtube_analytics_unsupported_query with hints, nothing spent). Revenue and ad metrics are not available. Answers are cached (12 h; 7 days for ranges that ended more than 5 days ago). Each uncached call counts 1 request of the account's daily Analytics allowance. Data has a 48-72 h delay.
+     *
+     * `GET /api/uploadposts/youtube/analytics/query`
+     */
+    queryYoutubeAnalytics(options: QueryYoutubeAnalyticsOptions): Promise<QueryYoutubeAnalyticsResponse>;
+
+    /**
+     * YouTube Analytics report catalog.
+     *
+     * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. The 47 YouTube channel reports with their dimensions, metrics, filters, sort options and row limits. Does not call YouTube.
+     *
+     * `GET /api/uploadposts/youtube/analytics/reports`
+     */
+    listYoutubeAnalyticsReports(options: ListYoutubeAnalyticsReportsOptions): Promise<ApiResponse>;
+
+    /**
+     * List YouTube Analytics groups.
+     *
+     * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. groups.list of the channel (mine=true, or ids). Cached 30 minutes; 1 request of the Analytics allowance per uncached call.
+     *
+     * `GET /api/uploadposts/youtube/analytics/groups`
+     */
+    listYoutubeAnalyticsGroups(options: ListYoutubeAnalyticsGroupsOptions): Promise<ApiResponse>;
+
+    /**
+     * List the items of a YouTube Analytics group.
+     *
+     * **Not generally available yet.** Answers 503 youtube_analytics_disabled until it is enabled. groupItems.list. Cached 30 minutes.
+     *
+     * `GET /api/uploadposts/youtube/analytics/groups/{group_id}/items`
+     */
+    listYoutubeAnalyticsGroupItems(options: ListYoutubeAnalyticsGroupItemsOptions): Promise<ApiResponse>;
+
+    /**
+     * Daily allowance of YouTube Analytics and bulk reports.
+     *
+     * **Not generally available yet.** Off by default: answers `503` with `youtube_feature_disabled` until the feature is available.
+     *
+     * The caller's own usage today of the Analytics and bulk reports allowances. While Analytics and bulk reports are not generally available yet, each service shows enabled: false.
+     *
+     * `GET /api/uploadposts/youtube/analytics/usage`
+     */
+    getYoutubeAnalyticsUsage(options?: GetYoutubeAnalyticsUsageOptions): Promise<ApiResponse>;
+
+    /**
+     * List YouTube bulk report types.
+     *
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. reportTypes.list for the channel (one page, cached 24 h). can_create_job marks the channel/playlist types that can be scheduled.
+     *
+     * `GET /api/uploadposts/youtube/reporting/report-types`
+     */
+    listYoutubeReportTypes(options: ListYoutubeReportTypesOptions): Promise<ApiResponse>;
+
+    /**
+     * List YouTube reporting jobs.
+     *
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.list of the channel (one page). used_by_upload_post marks the job behind Upload-Post's thumbnail impressions.
+     *
+     * `GET /api/uploadposts/youtube/reporting/jobs`
+     */
+    listYoutubeReportingJobs(options: ListYoutubeReportingJobsOptions): Promise<ApiResponse>;
+
+    /**
+     * Create a YouTube reporting job.
+     *
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.create: YouTube then generates one CSV per day (first ones within ~48 h, covering the previous 30 days). One job per report type and up to 20 per channel.
+     *
+     * `POST /api/uploadposts/youtube/reporting/jobs`
+     */
+    createYoutubeReportingJob(options: CreateYoutubeReportingJobOptions): Promise<ApiResponse>;
+
+    /**
+     * Get a YouTube reporting job.
+     *
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.get.
+     *
+     * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}`
+     */
+    getYoutubeReportingJob(options: GetYoutubeReportingJobOptions): Promise<ApiResponse>;
+
+    /**
+     * Delete a YouTube reporting job.
+     *
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.delete: stops the daily reports. Requires confirm: true. A channel_reach_basic_a1 job (used by Upload-Post for thumbnail impressions) cannot be deleted (409 youtube_reporting_job_in_use). 502 youtube_write_outcome_unknown: list the jobs to check.
+     *
+     * `DELETE /api/uploadposts/youtube/reporting/jobs/{job_id}`
+     */
+    deleteYoutubeReportingJob(options: DeleteYoutubeReportingJobOptions): Promise<ApiResponse>;
+
+    /**
+     * List the reports of a YouTube reporting job.
+     *
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.list (one page). Each item has download_path.
+     *
+     * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports`
+     */
+    listYoutubeReports(options: ListYoutubeReportsOptions): Promise<ApiResponse>;
+
+    /**
+     * Get a YouTube report.
+     *
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. jobs.reports.get (metadata).
+     *
+     * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}`
+     */
+    getYoutubeReport(options: GetYoutubeReportOptions): Promise<ApiResponse>;
+
+    /**
+     * Download a YouTube report (CSV).
+     *
+     * **Not generally available yet.** Answers 503 youtube_reporting_disabled until it is enabled. The report's CSV file, streamed. Up to 100 MB; up to 2 downloads at a time per account. Counts 2 requests of the bulk reports allowance.
+     *
+     * `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}/download`
+     */
+    downloadYoutubeReport(options: DownloadYoutubeReportOptions): Promise<string>;
+
+    /**
+     * YouTube new video notifications status.
+     *
+     * **Not generally available yet.** Answers 503 youtube_feature_disabled until it is enabled. State of the push subscription of the profile's channel (null when off). No YouTube quota.
+     *
+     * `GET /api/uploadposts/youtube/push`
+     */
+    getYoutubePush(options: GetYoutubePushOptions): Promise<GetYoutubePushResponse>;
+
+    /**
+     * Turn on YouTube new video notifications.
+     *
+     * **Not generally available yet.** Answers 503 youtube_feature_disabled until it is enabled. Requires a webhook listing youtube_video_published and/or youtube_video_updated. No YouTube quota.
+     *
+     * `POST /api/uploadposts/youtube/push`
+     */
+    enableYoutubePush(options: EnableYoutubePushOptions): Promise<EnableYoutubePushResponse>;
+
+    /**
+     * Turn off YouTube new video notifications.
+     *
+     * **Not generally available yet.** Answers 503 youtube_feature_disabled until it is enabled. No YouTube quota.
+     *
+     * `DELETE /api/uploadposts/youtube/push`
+     */
+    disableYoutubePush(options: DisableYoutubePushOptions): Promise<DisableYoutubePushResponse>;
+
+    /**
+     * Instagram publishing quota.
+     *
+     * Instagram content publishing usage of the connected account (Instagram allows a limited number of posts per 24 h). Cached; refresh=true skips the cache.
+     *
+     * `GET /api/uploadposts/instagram/publishing_limit`
+     */
+    getInstagramPublishingLimit(options: GetInstagramPublishingLimitOptions): Promise<GetInstagramPublishingLimitResponse>;
+
+    /**
+     * Threads publishing quota.
+     *
+     * Send user or profile (one is required: 400 without both).
+     *
+     * `GET /api/uploadposts/threads/publishing_limit`
+     */
+    getThreadsPublishingLimit(options?: GetThreadsPublishingLimitOptions): Promise<GetThreadsPublishingLimitResponse>;
+
+    /**
+     * List the sections of a Pinterest board.
+     *
+     * `GET /api/uploadposts/pinterest/boards/{board_id}/sections`
+     */
+    listPinterestBoardSections(options: ListPinterestBoardSectionsOptions): Promise<ListPinterestBoardSectionsResponse>;
+
+    /**
+     * Create a section in a Pinterest board.
+     *
+     * Without a profile the first profile of the account with a Pinterest account is used.
+     *
+     * `POST /api/uploadposts/pinterest/boards/{board_id}/sections`
+     */
+    createPinterestBoardSection(options: CreatePinterestBoardSectionOptions): Promise<CreatePinterestBoardSectionResponse>;
+
+    /**
+     * Read a Facebook Page's public info.
+     *
+     * `GET /api/uploadposts/facebook/page-info`
+     */
+    getFacebookPageInfo(options: GetFacebookPageInfoOptions): Promise<GetFacebookPageInfoResponse>;
+
+    /**
+     * Update a Facebook Page's public info.
+     *
+     * Only the fields sent change. validate_only: true checks without writing. Needs Meta's pages_manage_metadata permission (pending App Review: 403 facebook_permission_missing until then). POST is accepted as an alias.
+     *
+     * `PATCH /api/uploadposts/facebook/page-info`
+     */
+    updateFacebookPageInfo(options: UpdateFacebookPageInfoOptions): Promise<UpdateFacebookPageInfoResponse>;
+
+    /**
+     * Subreddits the Reddit account belongs to.
+     *
+     * `GET /api/uploadposts/reddit/subreddits`
+     */
+    listRedditSubreddits(options: ListRedditSubredditsOptions): Promise<ListRedditSubredditsResponse>;
+
+    /**
+     * Post types a subreddit allows.
+     *
+     * `GET /api/uploadposts/reddit/post-types`
+     */
+    getRedditPostTypes(options: GetRedditPostTypesOptions): Promise<GetRedditPostTypesResponse>;
+
+    /**
+     * Post flairs of a subreddit.
+     *
+     * Pass the id as reddit_flair_id when publishing; editable flairs take reddit_flair_text.
+     *
+     * `GET /api/uploadposts/reddit/flairs`
+     */
+    listRedditFlairs(options: ListRedditFlairsOptions): Promise<ListRedditFlairsResponse>;
+
+    // ---- User Management ----
+
+    /**
+     * Get a specific user profile.
+     *
+     * Retrieve information for a single user profile by username.
+     *
+     * `GET /api/uploadposts/users/{username}`
+     */
+    getUserProfile(options: GetUserProfileOptions): Promise<GetUserProfileResponse>;
+
+    /**
+     * Rename a user profile.
+     *
+     * Set the profile's display_name, the label shown in the dashboard. The username does not change: it stays the `user` value of every API call, so history, scheduled posts, analytics and existing integrations keep working. An empty string or null removes the display name. display_name is the only editable field; any other field returns 400 FIELD_NOT_EDITABLE.
+     *
+     * `PATCH /api/uploadposts/users/{username}`
+     */
+    renameUserProfile(options: RenameUserProfileOptions): Promise<RenameUserProfileResponse>;
+
+    /**
+     * Disconnect a social account from a profile.
+     *
+     * Unlink one social platform from a user profile. Other platforms connected to the same profile are not touched. The stored credentials are deleted only if no other profile of your account still uses that social account. Fires the `social_account_disconnected` webhook with `reason: "manual_disconnect"`. Disconnecting a platform that is already disconnected returns 200.
+     *
+     * `DELETE /api/uploadposts/users/social`
+     */
+    disconnectSocialAccount(options: DisconnectSocialAccountOptions): Promise<DisconnectSocialAccountResponse>;
+
+    /**
+     * Connect Discord with credentials.
+     *
+     * Discord channel incoming webhook (no OAuth). No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+     *
+     * `POST /api/uploadposts/users/discord/credentials`
+     */
+    connectDiscordCredentials(options: ConnectDiscordCredentialsOptions): Promise<ConnectDiscordCredentialsResponse>;
+
+    /**
+     * Connect Telegram with credentials.
+     *
+     * Telegram bot token + target chat. Upload-Post validates both (getMe, getChat) and stores the token encrypted. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+     *
+     * `POST /api/uploadposts/users/telegram/credentials`
+     */
+    connectTelegramCredentials(options: ConnectTelegramCredentialsOptions): Promise<ConnectTelegramCredentialsResponse>;
+
+    /**
+     * Connect Slack with credentials.
+     *
+     * Slack channel Incoming Webhook URL (text only). No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+     *
+     * `POST /api/uploadposts/users/slack/credentials`
+     */
+    connectSlackCredentials(options: ConnectSlackCredentialsOptions): Promise<ConnectSlackCredentialsResponse>;
+
+    /**
+     * Connect Mastodon with credentials.
+     *
+     * Mastodon instance access token. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+     *
+     * `POST /api/uploadposts/users/mastodon/credentials`
+     */
+    connectMastodonCredentials(options: ConnectMastodonCredentialsOptions): Promise<ConnectMastodonCredentialsResponse>;
+
+    /**
+     * Connect Nostr with credentials.
+     *
+     * Nostr private key (nsec or hex) and optional relays. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+     *
+     * `POST /api/uploadposts/users/nostr/credentials`
+     */
+    connectNostrCredentials(options: ConnectNostrCredentialsOptions): Promise<ConnectNostrCredentialsResponse>;
+
+    /**
+     * Connect Lemmy with credentials.
+     *
+     * Lemmy instance, login and target community. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+     *
+     * `POST /api/uploadposts/users/lemmy/credentials`
+     */
+    connectLemmyCredentials(options: ConnectLemmyCredentialsOptions): Promise<ConnectLemmyCredentialsResponse>;
+
+    /**
+     * Connect Dev.to with credentials.
+     *
+     * Dev.to API key. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+     *
+     * `POST /api/uploadposts/users/devto/credentials`
+     */
+    connectDevtoCredentials(options: ConnectDevtoCredentialsOptions): Promise<ConnectDevtoCredentialsResponse>;
+
+    /**
+     * Connect Hashnode with credentials.
+     *
+     * Hashnode Personal Access Token and publication id. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+     *
+     * `POST /api/uploadposts/users/hashnode/credentials`
+     */
+    connectHashnodeCredentials(options: ConnectHashnodeCredentialsOptions): Promise<ConnectHashnodeCredentialsResponse>;
+
+    /**
+     * Connect WordPress with credentials.
+     *
+     * Self-hosted WordPress site, username and Application Password. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+     *
+     * `POST /api/uploadposts/users/wordpress/credentials`
+     */
+    connectWordpressCredentials(options: ConnectWordpressCredentialsOptions): Promise<ConnectWordpressCredentialsResponse>;
+
+    /**
+     * Connect Whop with credentials.
+     *
+     * Whop API key (forum:post:create) and experience id. No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+     *
+     * `POST /api/uploadposts/users/whop/credentials`
+     */
+    connectWhopCredentials(options: ConnectWhopCredentialsOptions): Promise<ConnectWhopCredentialsResponse>;
+
+    /**
+     * Connect Listmonk with credentials.
+     *
+     * Listmonk instance, login and list id (each post sends a campaign). No OAuth and no browser redirect: Upload-Post validates the credentials, encrypts the secret and links the account to the profile. Also accepted with the profile JWT of the white-label connect page.
+     *
+     * `POST /api/uploadposts/users/listmonk/credentials`
+     */
+    connectListmonkCredentials(options: ConnectListmonkCredentialsOptions): Promise<ConnectListmonkCredentialsResponse>;
+
+    /**
+     * List the Facebook Pages a profile can publish to.
+     *
+     * Every Facebook Page of the profile's connected account and the one selected for publishing.
+     *
+     * `GET /api/uploadposts/users/facebook-page`
+     */
+    listFacebookPageChoices(options: ListFacebookPageChoicesOptions): Promise<ListFacebookPageChoicesResponse>;
+
+    /**
+     * Select the Facebook Page used when publishing.
+     *
+     * `POST /api/uploadposts/users/facebook-page`
+     */
+    setFacebookPage(options: SetFacebookPageOptions): Promise<SetFacebookPageResponse>;
+
+    /**
+     * Clear the selected Facebook Page.
+     *
+     * Back to the default (the first one of the account).
+     *
+     * `DELETE /api/uploadposts/users/facebook-page`
+     */
+    clearFacebookPage(options: ClearFacebookPageOptions): Promise<ClearFacebookPageResponse>;
+
+    /**
+     * List the LinkedIn Pages a profile can publish to.
+     *
+     * Every LinkedIn Page of the profile's connected account and the one selected for publishing.
+     *
+     * `GET /api/uploadposts/users/linkedin-page`
+     */
+    listLinkedinPageChoices(options: ListLinkedinPageChoicesOptions): Promise<ListLinkedinPageChoicesResponse>;
+
+    /**
+     * Select the LinkedIn Page used when publishing.
+     *
+     * `POST /api/uploadposts/users/linkedin-page`
+     */
+    setLinkedinPage(options: SetLinkedinPageOptions): Promise<SetLinkedinPageResponse>;
+
+    /**
+     * Clear the selected LinkedIn Page.
+     *
+     * Back to the default (the first one of the account).
+     *
+     * `DELETE /api/uploadposts/users/linkedin-page`
+     */
+    clearLinkedinPage(options: ClearLinkedinPageOptions): Promise<ClearLinkedinPageResponse>;
+
+    /**
+     * Connect Bluesky with an app password.
+     *
+     * Logs in to Bluesky with the handle and an app password, stores the password encrypted and links the account to the profile. Also accepted with the profile JWT of the connect page.
+     *
+     * `POST /api/uploadposts/users/bluesky/credentials`
+     */
+    connectBlueskyCredentials(options: ConnectBlueskyCredentialsOptions): Promise<ConnectBlueskyCredentialsResponse>;
+
+    /**
+     * Use your own Google OAuth client for a profile's YouTube.
+     *
+     * Stores (encrypted) the client_id and client_secret of your own Google Cloud OAuth client; that profile then authorizes YouTube against it (its own API quota).
+     *
+     * `POST /api/uploadposts/users/youtube/credentials`
+     */
+    setYoutubeOauthClient(options: SetYoutubeOauthClientOptions): Promise<SetYoutubeOauthClientResponse>;
+
+    // ---- Authentication ----
+
+    /**
+     * Get current user.
+     *
+     * Verify the validity of your API key and retrieve basic account information including email and subscription plan.
+     *
+     * `GET /api/uploadposts/me`
+     */
+    getCurrentUser(options?: GetCurrentUserOptions): Promise<GetCurrentUserResponse>;
+
+    /**
+     * Connect API: start connecting a social account.
+     *
+     * Build your own connect page: returns the platform's authorize_url for a profile. Send the user there; Upload-Post finishes the OAuth and sends them back to redirect_url. Authenticate with the API key (then `profile` is required) or with the profile JWT of POST /uploadposts/users/generate-jwt (profile taken from the token). The state is single-use: a retry needs a new start.
+     *
+     * `POST /api/uploadposts/oauth/{platform}/start`
+     */
+    startOauthConnection(options: StartOauthConnectionOptions): Promise<StartOauthConnectionResponse>;
+
+    // ---- FFmpeg Editor ----
+
+    /**
+     * Create FFmpeg job.
+     *
+     * Submit a media processing job using an FFmpeg command template. Supports single or multiple input files via multipart upload or JSON with URLs. Jobs are asynchronous — poll the status endpoint until finished.
+     *
+     * `POST /api/uploadposts/ffmpeg/jobs/upload`
+     */
+    createFfmpegJob(options: CreateFfmpegJobOptions): Promise<ApiResponse>;
+
+    /**
+     * Get FFmpeg job status.
+     *
+     * Poll the status of an FFmpeg processing job. Statuses: PENDING, PROCESSING, FINISHED, ERROR.
+     *
+     * `GET /api/uploadposts/ffmpeg/jobs/{job_id}`
+     */
+    getFfmpegJobStatus(options: GetFfmpegJobStatusOptions): Promise<GetFfmpegJobStatusResponse>;
+
+    /**
+     * Download FFmpeg result.
+     *
+     * Download the processed file when job status is FINISHED. Returns binary media with appropriate Content-Type and Content-Disposition headers.
+     *
+     * `GET /api/uploadposts/ffmpeg/jobs/{job_id}/download`
+     */
+    downloadFfmpegResult(options: DownloadFfmpegResultOptions): Promise<Buffer>;
+
+    /**
+     * Get FFmpeg consumption.
+     *
+     * Check your current FFmpeg usage, remaining quota, and processing history for the current month.
+     *
+     * `GET /api/uploadposts/ffmpeg/consumption`
+     */
+    getFfmpegConsumption(options?: GetFfmpegConsumptionOptions): Promise<GetFfmpegConsumptionResponse>;
+
+    // ---- Webhooks ----
+
+    /**
+     * List webhook subscriptions.
+     *
+     * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
+     *
+     * Newest first, active and disabled. An n8n trigger checks whether its subscription exists with `?url=<its url>&status=active`.
+     *
+     * `GET /api/uploadposts/webhooks/subscriptions`
+     */
+    listWebhookSubscriptions(options?: ListWebhookSubscriptionsOptions): Promise<ListWebhookSubscriptionsResponse>;
+
+    /**
+     * Create a webhook subscription.
+     *
+     * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
+     *
+     * Adds a destination that receives the listed events, besides the account webhook. Idempotent: the same url + events + profile_username returns the existing subscription (200, `created: false`) and reactivates it if it was disabled (`reactivated: true`); `name` and `source` are updated when sent. At most 10 active subscriptions per account. Team members (X-Act-As-User) cannot create them.
+     *
+     * `POST /api/uploadposts/webhooks/subscriptions`
+     */
+    createWebhookSubscription(options: CreateWebhookSubscriptionOptions): Promise<CreateWebhookSubscriptionResponse>;
+
+    /**
+     * Get a webhook subscription.
+     *
+     * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
+     *
+     * `GET /api/uploadposts/webhooks/subscriptions/{subscription_id}`
+     */
+    getWebhookSubscription(options: GetWebhookSubscriptionOptions): Promise<GetWebhookSubscriptionResponse>;
+
+    /**
+     * Delete a webhook subscription.
+     *
+     * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
+     *
+     * Stops sending to it right away. A second DELETE answers 404 (an integration can treat 404 as already deleted).
+     *
+     * `DELETE /api/uploadposts/webhooks/subscriptions/{subscription_id}`
+     */
+    deleteWebhookSubscription(options: DeleteWebhookSubscriptionOptions): Promise<DeleteWebhookSubscriptionResponse>;
+
+    /**
+     * Send a test event to a subscription.
+     *
+     * **Not generally available yet.** While webhook subscriptions are switched off for your account every route of this group answers `503` with `reason: webhook_subscriptions_disabled`.
+     *
+     * Sends one signed sample now, with the keys of the real event and `test: true`. Logged as a test delivery: never retried and never counted towards disabling the subscription. `ok` tells whether the destination answered 2xx. For the post approval events the sample has the shape of the real event ({event, user_email, profile_username, approval: {...}, created_at}).
+     *
+     * `POST /api/uploadposts/webhooks/subscriptions/{subscription_id}/test`
+     */
+    testWebhookSubscription(options: TestWebhookSubscriptionOptions): Promise<TestWebhookSubscriptionResponse>;
+
+    // ---- Instagram Interactions ----
+
+    /**
+     * Delete a comment (POST alias).
+     *
+     * POST alias of DELETE /uploadposts/comments/delete, for clients that cannot send a body with DELETE. Same body and behavior.
+     *
+     * `POST /api/uploadposts/comments/delete`
+     */
+    deleteCommentPost(options: DeleteCommentPostOptions): Promise<ApiResponse>;
+
+    /**
+     * Delete the Bluesky chat account.
+     *
+     * **Not generally available yet.** Answers `403` `bluesky_chat_delete_disabled`.
+     *
+     * Deletes every conversation and message of the account's Bluesky chat account (not the Bluesky account). Needs confirm: true and confirm_handle; not enabled yet (403 bluesky_chat_delete_disabled). Account owner only; every attempt is recorded.
+     *
+     * `POST /api/uploadposts/dms/bluesky/account/delete`
+     */
+    deleteBlueskyChatAccount(options: DeleteBlueskyChatAccountOptions): Promise<ApiResponse>;
+
+    /**
+     * Bluesky groups shared with someone.
+     *
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
+     *
+     * `GET /api/uploadposts/dms/bluesky/groups`
+     */
+    listBlueskyMutualGroups(options: ListBlueskyMutualGroupsOptions): Promise<ApiResponse>;
+
+    /**
+     * Create a Bluesky group chat.
+     *
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Members get a request to accept. Every invited member counts as one DM (all or nothing); at most 10 members by handle per request. Idempotent for 10 minutes per idempotency_key (or name + members). Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
+     *
+     * `POST /api/uploadposts/dms/bluesky/groups`
+     */
+    createBlueskyGroup(options: CreateBlueskyGroupOptions): Promise<ApiResponse>;
+
+    /**
+     * Rename, lock or unlock a Bluesky group.
+     *
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Owner only. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
+     *
+     * `PATCH /api/uploadposts/dms/bluesky/groups/{conversation_id}`
+     */
+    editBlueskyGroup(options: EditBlueskyGroupOptions): Promise<ApiResponse>;
+
+    /**
+     * Bluesky group members.
+     *
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
+     *
+     * `GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
+     */
+    listBlueskyGroupMembers(options: ListBlueskyGroupMembersOptions): Promise<ApiResponse>;
+
+    /**
+     * Add members to a Bluesky group.
+     *
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Owner only. One DM of quota per added member. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
+     *
+     * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
+     */
+    addBlueskyGroupMembers(options: AddBlueskyGroupMembersOptions): Promise<ApiResponse>;
+
+    /**
+     * Remove members from a Bluesky group.
+     *
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Owner only. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
+     *
+     * `DELETE /api/uploadposts/dms/bluesky/groups/{conversation_id}/members`
+     */
+    removeBlueskyGroupMembers(options: RemoveBlueskyGroupMembersOptions): Promise<ApiResponse>;
+
+    /**
+     * Manage a Bluesky group join link.
+     *
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * action: create, edit, enable or disable. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
+     *
+     * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-link`
+     */
+    manageBlueskyJoinLink(options: ManageBlueskyJoinLinkOptions): Promise<ApiResponse>;
+
+    /**
+     * Pending requests to join a Bluesky group.
+     *
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Owner only. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
+     *
+     * `GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests`
+     */
+    listBlueskyJoinRequests(options: ListBlueskyJoinRequestsOptions): Promise<ApiResponse>;
+
+    /**
+     * Answer or withdraw a Bluesky join request.
+     *
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * action: approve / reject (with member), mark_read, or withdraw (your own request). Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
+     *
+     * `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests`
+     */
+    answerBlueskyJoinRequest(options: AnswerBlueskyJoinRequestOptions): Promise<ApiResponse>;
+
+    /**
+     * Preview Bluesky join links.
+     *
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * Up to 50 codes; status active, disabled or invalid. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
+     *
+     * `GET /api/uploadposts/dms/bluesky/join-links`
+     */
+    previewBlueskyJoinLinks(options: PreviewBlueskyJoinLinksOptions): Promise<ApiResponse>;
+
+    /**
+     * Ask to join a Bluesky group.
+     *
+     * **Not generally available yet.** Group chats answer `403` `bluesky_dm_experimental_disabled` until they are turned on.
+     *
+     * status is joined or pending. Experimental on Bluesky: answers carry experimental: true; 403 bluesky_dm_experimental_disabled while not enabled.
+     *
+     * `POST /api/uploadposts/dms/bluesky/join-links`
+     */
+    joinBlueskyGroup(options: JoinBlueskyGroupOptions): Promise<ApiResponse>;
+
+    /**
+     * Download a DM attachment.
+     *
+     * Returns the file of an attachment received in a DM (the media_id in dm_received). Telegram: bots download up to 20 MB.
+     *
+     * `GET /api/uploadposts/dms/media`
+     */
+    downloadDmMedia(options: DownloadDmMediaOptions): Promise<Buffer>;
+
+    // ---- Bluesky ----
+
+    /**
+     * Follow, block or mute (one target per call).
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * follow/unfollow (daily limit), block/unblock, mute/unmute (only_reposts, only_quoteposts), mute_list/unmute_list, block_list/unblock_list (moderation lists), mute_thread/unmute_thread.
+     *
+     * `POST /api/uploadposts/bluesky/graph`
+     */
+    blueskyGraphAction(options: BlueskyGraphActionOptions): Promise<BlueskyGraphActionResponse>;
+
+    /**
+     * The account's lists.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * getLists for the account.
+     *
+     * `GET /api/uploadposts/bluesky/lists`
+     */
+    listBlueskyLists(options: ListBlueskyListsOptions): Promise<ListBlueskyListsResponse>;
+
+    /**
+     * Create a list.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Curated, moderation or reference list.
+     *
+     * `POST /api/uploadposts/bluesky/lists`
+     */
+    createBlueskyList(options: CreateBlueskyListOptions): Promise<CreateBlueskyListResponse>;
+
+    /**
+     * A list and its members.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * getList.
+     *
+     * `GET /api/uploadposts/bluesky/lists/{list_id}`
+     */
+    getBlueskyList(options: GetBlueskyListOptions): Promise<GetBlueskyListResponse>;
+
+    /**
+     * Update a list.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Merges the fields sent.
+     *
+     * `PATCH /api/uploadposts/bluesky/lists/{list_id}`
+     */
+    updateBlueskyList(options: UpdateBlueskyListOptions): Promise<UpdateBlueskyListResponse>;
+
+    /**
+     * Delete a list and its members.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Needs confirm=true.
+     *
+     * `DELETE /api/uploadposts/bluesky/lists/{list_id}`
+     */
+    deleteBlueskyList(options: DeleteBlueskyListOptions): Promise<DeleteBlueskyListResponse>;
+
+    /**
+     * List members.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * getList items.
+     *
+     * `GET /api/uploadposts/bluesky/lists/{list_id}/members`
+     */
+    listBlueskyListMembers(options: ListBlueskyListMembersOptions): Promise<ListBlueskyListMembersResponse>;
+
+    /**
+     * Add a member.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * One account per call.
+     *
+     * `POST /api/uploadposts/bluesky/lists/{list_id}/members`
+     */
+    addBlueskyListMember(options: AddBlueskyListMemberOptions): Promise<AddBlueskyListMemberResponse>;
+
+    /**
+     * Remove a member.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * One account per call.
+     *
+     * `DELETE /api/uploadposts/bluesky/lists/{list_id}/members`
+     */
+    removeBlueskyListMember(options: RemoveBlueskyListMemberOptions): Promise<RemoveBlueskyListMemberResponse>;
+
+    /**
+     * Ask not to appear in a reference list.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * referencelistoptout.
+     *
+     * `POST /api/uploadposts/bluesky/lists/opt-out`
+     */
+    optOutBlueskyList(options: OptOutBlueskyListOptions): Promise<OptOutBlueskyListResponse>;
+
+    /**
+     * Withdraw the opt-out.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * `DELETE /api/uploadposts/bluesky/lists/opt-out`
+     */
+    removeOptOutBlueskyList(options: RemoveOptOutBlueskyListOptions): Promise<RemoveOptOutBlueskyListResponse>;
+
+    /**
+     * The account's starter packs.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * `GET /api/uploadposts/bluesky/starter-packs`
+     */
+    listBlueskyStarterPacks(options: ListBlueskyStarterPacksOptions): Promise<ListBlueskyStarterPacksResponse>;
+
+    /**
+     * Create a starter pack.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * `POST /api/uploadposts/bluesky/starter-packs`
+     */
+    createBlueskyStarterPack(options: CreateBlueskyStarterPackOptions): Promise<CreateBlueskyStarterPackResponse>;
+
+    /**
+     * A starter pack.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * `GET /api/uploadposts/bluesky/starter-packs/{pack_id}`
+     */
+    getBlueskyStarterPack(options: GetBlueskyStarterPackOptions): Promise<GetBlueskyStarterPackResponse>;
+
+    /**
+     * Update a starter pack.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * name, description, feeds.
+     *
+     * `PATCH /api/uploadposts/bluesky/starter-packs/{pack_id}`
+     */
+    updateBlueskyStarterPack(options: UpdateBlueskyStarterPackOptions): Promise<UpdateBlueskyStarterPackResponse>;
+
+    /**
+     * Delete a starter pack.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Needs confirm=true; delete_list=true also deletes its list.
+     *
+     * `DELETE /api/uploadposts/bluesky/starter-packs/{pack_id}`
+     */
+    deleteBlueskyStarterPack(options: DeleteBlueskyStarterPackOptions): Promise<DeleteBlueskyStarterPackResponse>;
+
+    /**
+     * Feeds declared by the account.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * `GET /api/uploadposts/bluesky/feeds`
+     */
+    listBlueskyFeeds(options: ListBlueskyFeedsOptions): Promise<ListBlueskyFeedsResponse>;
+
+    /**
+     * Declare a custom feed.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Points to a feed generator service run by someone else.
+     *
+     * `POST /api/uploadposts/bluesky/feeds`
+     */
+    createBlueskyFeed(options: CreateBlueskyFeedOptions): Promise<CreateBlueskyFeedResponse>;
+
+    /**
+     * Update a feed declaration.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * `PATCH /api/uploadposts/bluesky/feeds/{rkey}`
+     */
+    updateBlueskyFeed(options: UpdateBlueskyFeedOptions): Promise<UpdateBlueskyFeedResponse>;
+
+    /**
+     * Delete a feed declaration.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Needs confirm=true.
+     *
+     * `DELETE /api/uploadposts/bluesky/feeds/{rkey}`
+     */
+    deleteBlueskyFeed(options: DeleteBlueskyFeedOptions): Promise<DeleteBlueskyFeedResponse>;
+
+    /**
+     * Report a post or account to Bluesky moderation.
+     *
+     * **Not generally available yet.** Answers `503` `bluesky_feature_disabled` until it is turned on.
+     *
+     * Needs confirm=true. Up to 20 reports per account per UTC day.
+     *
+     * `POST /api/uploadposts/bluesky/report`
+     */
+    reportOnBluesky(options: ReportOnBlueskyOptions): Promise<ReportOnBlueskyResponse>;
+
+    // ---- Teams and Approvals ----
+
+    /**
+     * List posts awaiting approval.
+     *
+     * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+     *
+     * Open items by default (pending_approval and draft). Editors and Contributors only see their own; members limited to some profiles only see those. Page with `before` = the previous `next_before`.
+     *
+     * `GET /api/uploadposts/approvals`
+     */
+    listPostApprovals(options?: ListPostApprovalsOptions): Promise<ListPostApprovalsResponse>;
+
+    /**
+     * Get a post awaiting approval.
+     *
+     * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+     *
+     * The author or a reviewer (owner or Admin). Adds fields, preview_url, thumbnail_url and destinations_effective.
+     *
+     * `GET /api/uploadposts/approvals/{approval_id}`
+     */
+    getPostApproval(options: GetPostApprovalOptions): Promise<GetPostApprovalResponse>;
+
+    /**
+     * Edit a post awaiting approval.
+     *
+     * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+     *
+     * The author or a reviewer, while it is open. Same body and validations as `PATCH /uploadposts/schedule/{job_id}`. Every edit raises `version` by one.
+     *
+     * `PATCH /api/uploadposts/approvals/{approval_id}`
+     */
+    editPostApproval(options: EditPostApprovalOptions): Promise<EditPostApprovalResponse>;
+
+    /**
+     * Withdraw or discard a post awaiting approval.
+     *
+     * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+     *
+     * The author withdraws it or a reviewer discards it: status withdrawn; its media is deleted.
+     *
+     * `DELETE /api/uploadposts/approvals/{approval_id}`
+     */
+    withdrawPostApproval(options: WithdrawPostApprovalOptions): Promise<WithdrawPostApprovalResponse>;
+
+    /**
+     * Approve a post.
+     *
+     * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+     *
+     * Reviewer only (owner or Admin). `version` is required: the `item.version` you reviewed. Date used: the one in the body; else now (immediate posts or `publish_now`); else the next free queue slot (posts sent with add_to_queue); else the post's own date if it is more than 60 s away. Monthly credits are reserved now; if creating the job fails the item reopens and the credits come back (500 approval_failed).
+     *
+     * `POST /api/uploadposts/approvals/{approval_id}/approve`
+     */
+    approvePostApproval(options: ApprovePostApprovalOptions): Promise<ApprovePostApprovalResponse>;
+
+    /**
+     * Reject a post.
+     *
+     * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+     *
+     * Reviewer only. `comment` is required (max 2000 characters) and is shown to the author.
+     *
+     * `POST /api/uploadposts/approvals/{approval_id}/reject`
+     */
+    rejectPostApproval(options: RejectPostApprovalOptions): Promise<RejectPostApprovalResponse>;
+
+    /**
+     * End client: list posts to approve.
+     *
+     * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+     *
+     * Called with the **profile JWT** of the white-label connect page (`Authorization: Bearer <access_url token>`), generated with `client_approval: true` (`POST /uploadposts/users/generate-jwt`). Only the `pending_approval` posts of that profile; the end client cannot change the date. The account owner turns it off by generating the JWT again with `client_approval: false`. Items come without author or internal ids.
+     *
+     * `GET /api/uploadposts/approvals/client`
+     * Authenticated with the profile JWT (`token`), not the API key.
+     */
+    listClientPostApprovals(options: ListClientPostApprovalsOptions): Promise<ListClientPostApprovalsResponse>;
+
+    /**
+     * End client: approve a post.
+     *
+     * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+     *
+     * Called with the **profile JWT** of the white-label connect page (`Authorization: Bearer <access_url token>`), generated with `client_approval: true` (`POST /uploadposts/users/generate-jwt`). Only the `pending_approval` posts of that profile; the end client cannot change the date. The account owner turns it off by generating the JWT again with `client_approval: false`. `version` is required, as for reviewers. Recorded as decided_by `client:<profile>`, decided_by_role `client`.
+     *
+     * `POST /api/uploadposts/approvals/client/{approval_id}/approve`
+     * Authenticated with the profile JWT (`token`), not the API key.
+     */
+    approveClientPostApproval(options: ApproveClientPostApprovalOptions): Promise<ApproveClientPostApprovalResponse>;
+
+    /**
+     * End client: reject a post.
+     *
+     * **Not generally available yet.** While post approvals are switched off every route of this group answers `503` with `error_code: post_approvals_disabled`.
+     *
+     * Called with the **profile JWT** of the white-label connect page (`Authorization: Bearer <access_url token>`), generated with `client_approval: true` (`POST /uploadposts/users/generate-jwt`). Only the `pending_approval` posts of that profile; the end client cannot change the date. The account owner turns it off by generating the JWT again with `client_approval: false`. `comment` is required.
+     *
+     * `POST /api/uploadposts/approvals/client/{approval_id}/reject`
+     * Authenticated with the profile JWT (`token`), not the API key.
+     */
+    rejectClientPostApproval(options: RejectClientPostApprovalOptions): Promise<RejectClientPostApprovalResponse>;
+
+    /**
+     * Team roles and your role.
+     *
+     * The role matrix and the caller's role. `enabled: false` while team roles are not available: then every member is treated as Admin with every profile. Roles and profile lists are changed by the account owner from the dashboard.
+     *
+     * `GET /api/uploadposts/teams/roles`
+     */
+    getTeamRoles(options?: GetTeamRolesOptions): Promise<GetTeamRolesResponse>;
+
+    /**
+     * Team activity log.
+     *
+     * What team members did on the account (posts created, published, edited or cancelled, approvals and decisions, access changes), newest first. Owner and Admin members only. Rows are kept `retention_days` days.
+     *
+     * `GET /api/uploadposts/teams/audit`
+     */
+    listTeamAudit(options?: ListTeamAuditOptions): Promise<ListTeamAuditResponse>;
+
+    // ---- Feedback ----
+
+    /**
+     * Send feedback to the Upload-Post team.
+     *
+     * For AI agents and developers. Never include credentials or personal data (they are redacted anyway). A repeated report returns duplicate: true.
+     *
+     * `POST /api/uploadposts/feedback`
+     */
+    sendFeedback(options: SendFeedbackOptions): Promise<SendFeedbackResponse>;
+
+    // ---- Google Business ----
+
+    /**
+     * Rename a Google Business account.
+     *
+     * **Not generally available yet.** Off by default: answers `403` with `ownership_changes_disabled` until the feature is available.
+     *
+     * Renames a business account (only the name). With `validate_only: true` Google checks the request without changing anything (no `confirm` needed); that mode works today. A real rename is not generally available yet: 403 `ownership_changes_disabled`. `account` must be the account connected to the profile or the owner of one of its saved locations (404 `account_not_found` otherwise).
+     *
+     * `PATCH /api/uploadposts/google-business/accounts`
+     */
+    updateGoogleBusinessAccount(options: UpdateGoogleBusinessAccountOptions): Promise<UpdateGoogleBusinessAccountResponse>;
+
+    /**
+     * Invite an admin.
+     *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+     *
+     * Google emails the invitation; the person gets access once they accept. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+     *
+     * `POST /api/uploadposts/google-business/admins`
+     */
+    createGoogleBusinessAdmin(options: CreateGoogleBusinessAdminOptions): Promise<CreateGoogleBusinessAdminResponse>;
+
+    /**
+     * Change an admin's role.
+     *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+     *
+     * Changes the role of an admin (`admin_name` from GET /admins). If the role is already that one, the answer has `unchanged: true` and nothing is sent. Refused with 409 `last_owner` if it would demote the last owner and 409 `connected_identity` if it would demote the Google account connected to Upload-Post. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+     *
+     * `PATCH /api/uploadposts/google-business/admins`
+     */
+    updateGoogleBusinessAdmin(options: UpdateGoogleBusinessAdminOptions): Promise<UpdateGoogleBusinessAdminResponse>;
+
+    /**
+     * Remove an admin.
+     *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+     *
+     * Removes an admin at once (they would have to be invited again). Refused with 409 `last_owner` / `connected_identity` like the role change. JSON body. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+     *
+     * `DELETE /api/uploadposts/google-business/admins`
+     */
+    deleteGoogleBusinessAdmin(options: DeleteGoogleBusinessAdminOptions): Promise<DeleteGoogleBusinessAdminResponse>;
+
+    /**
+     * Accept an invitation.
+     *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+     *
+     * Accepts a pending invitation (404 `invitation_not_found` otherwise). Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+     *
+     * `POST /api/uploadposts/google-business/invitations/accept`
+     */
+    acceptGoogleBusinessInvitation(options: AcceptGoogleBusinessInvitationOptions): Promise<AcceptGoogleBusinessInvitationResponse>;
+
+    /**
+     * Decline an invitation.
+     *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+     *
+     * Declines a pending invitation (404 `invitation_not_found` otherwise). Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+     *
+     * `POST /api/uploadposts/google-business/invitations/decline`
+     */
+    declineGoogleBusinessInvitation(options: DeclineGoogleBusinessInvitationOptions): Promise<DeclineGoogleBusinessInvitationResponse>;
+
+    /**
+     * Transfer a location to another account.
+     *
+     * **Not generally available yet.** The API answers HTTP 503 until it is switched on.
+     *
+     * Moves a location to another Google account. Google only allows it when the connected user owns the location and manages the destination account. Not generally available yet: answers 403 `ownership_changes_disabled` (do it in Google Business Profile). When enabled, only the owner of the Upload-Post account can do it (a team member gets 403 `owner_only`). Needs `"confirm": true`. Every change is audited. On 502 `google_result_unknown`, check with the matching GET before resending.
+     *
+     * `POST /api/uploadposts/google-business/locations/transfer`
+     */
+    transferGoogleBusinessLocation(options: TransferGoogleBusinessLocationOptions): Promise<TransferGoogleBusinessLocationResponse>;
+
+    /**
+     * Create a location.
+     *
+     * **Not generally available yet.** Answers 503 `gbp_feature_disabled` before anything else is checked. Send `location` (a Google Location object) or the friendly fields of location info, plus `language_code`. `title`, `primary_category` and `language_code` are required. Needs `confirm: true` (not with `dry_run`). `request_id` comes back in every answer: on 502 `google_result_unknown` repeat with the same `request_id` and Google never creates it twice. Search first with google-locations/search. Daily creation limits: 429 `daily_limit_reached` / `google_daily_quota_exhausted`.
+     *
+     * `POST /api/uploadposts/google-business/locations/create`
+     */
+    createGoogleBusinessLocation(options: CreateGoogleBusinessLocationOptions): Promise<CreateGoogleBusinessLocationResponse>;
+
+    /**
+     * Delete a location.
+     *
+     * **Not generally available yet.** Answers 503 `gbp_feature_disabled` before anything else is checked. Irreversible. Needs `confirm: true`. If Google does not allow deleting it through the API: 409 `location_cannot_be_deleted` (delete it from business.google.com).
+     *
+     * `DELETE /api/uploadposts/google-business/locations/delete`
+     */
+    deleteGoogleBusinessLocation(options: DeleteGoogleBusinessLocationOptions): Promise<DeleteGoogleBusinessLocationResponse>;
+
+    /**
+     * Get real-time notification settings.
+     *
+     * **Not generally available yet.** Answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Google keeps one notification setting per Google account; when another tool owns it, `other_tool_configured` is `true`.
+     *
+     * `GET /api/uploadposts/google-business/notifications`
+     */
+    getGoogleBusinessNotificationSettings(options: GetGoogleBusinessNotificationSettingsOptions): Promise<GetGoogleBusinessNotificationSettingsResponse>;
+
+    /**
+     * Turn real-time notifications on or off.
+     *
+     * **Not generally available yet.** Answers 503 `gbp_notifications_unavailable` and no Google Business event is sent to webhooks. Turns notifications on or off for the Google account; webhooks must also list the events (`review_received`, `review_updated`, `customer_media_received`, `listing_google_update`, `listing_duplicate`, `listing_control_changed`) in `webhook_events`. Needs `confirm: true`. If Google does not confirm the change (`outcome_unknown: true`), read the setting before retrying.
+     *
+     * `PUT /api/uploadposts/google-business/notifications`
+     */
+    updateGoogleBusinessNotificationSettings(options: UpdateGoogleBusinessNotificationSettingsOptions): Promise<UpdateGoogleBusinessNotificationSettingsResponse>;
+
+    /**
+     * Start a verification.
+     *
+     * **Not generally available yet.** Answers 503 `gbp_feature_disabled`. Google contacts the business (postcard, SMS, call or email), so `confirm: true` is required. 3 verifications a day per location (429 `daily_limit_reached`, `scope: location`). `AUTO` verifications are `COMPLETED` at once; the others wait for the code. On 502 `google_result_unknown`, check the list before trying again.
+     *
+     * `POST /api/uploadposts/google-business/verification/start`
+     */
+    startGoogleBusinessVerification(options: StartGoogleBusinessVerificationOptions): Promise<StartGoogleBusinessVerificationResponse>;
+
+    /**
+     * Enter the verification code.
+     *
+     * **Not generally available yet.** Answers 503 `gbp_feature_disabled`. Sends the code Google sent. 10 attempts a day per account and location (429 `daily_limit_reached`); only codes Google actually checked count. `state: COMPLETED` when Google accepts it.
+     *
+     * `POST /api/uploadposts/google-business/verification/complete`
+     */
+    completeGoogleBusinessVerification(options: CompleteGoogleBusinessVerificationOptions): Promise<CompleteGoogleBusinessVerificationResponse>;
+
+    /**
+     * Get an instant verification token.
+     *
+     * **Not generally available yet.** Answers 503 `gbp_feature_disabled`. Asks Google for an instant verification token. When Google reserves it to its vetted partners, 403 `partner_only`: use verification/start instead.
+     *
+     * `POST /api/uploadposts/google-business/verification/token`
+     */
+    generateGoogleBusinessVerificationToken(options: GenerateGoogleBusinessVerificationTokenOptions): Promise<GenerateGoogleBusinessVerificationTokenResponse>;
+
+    // ---- ChatGPT Ads ----
+
+    /**
+     * Connect a ChatGPT Ads account.
+     *
+     * Stores an OpenAI Ads API key after validating it live against OpenAI. Each key is scoped to one ad account. The key is encrypted at rest and never returned. Posting the same account again replaces the stored key (key rotation). The first account connected becomes the default. Spend runs on your own OpenAI billing.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/connect`
+     */
+    connectChatgptAdsAccount(options: ConnectChatgptAdsAccountOptions): Promise<ConnectChatgptAdsAccountResponse>;
+
+    /**
+     * List connected ChatGPT Ads accounts.
+     *
+     * Connected ad accounts (never the credentials), default first, each with the `profiles` it is linked to.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/accounts`
+     */
+    listChatgptAdsAccounts(options?: ListChatgptAdsAccountsOptions): Promise<ListChatgptAdsAccountsResponse>;
+
+    /**
+     * Disconnect a ChatGPT Ads account.
+     *
+     * Without `profile_username`: forgets the stored key and unlinks every profile (if it was the default, another connected account becomes the default). With `profile_username`: only unlinks that profile and keeps the key for the others. Campaigns keep running in Ads Manager either way.
+     *
+     * `DELETE /api/uploadposts/ads/chatgpt/accounts/{ad_account_id}`
+     */
+    disconnectChatgptAdsAccount(options: DisconnectChatgptAdsAccountOptions): Promise<DisconnectChatgptAdsAccountResponse>;
+
+    /**
+     * Get live ad account metadata.
+     *
+     * The selected ad account's metadata, read live from OpenAI. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/account`
+     */
+    getChatgptAdsAccount(options?: GetChatgptAdsAccountOptions): Promise<GetChatgptAdsAccountResponse>;
+
+    /**
+     * List campaigns.
+     *
+     * Campaigns of the ad account. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/campaigns`
+     */
+    listChatgptAdsCampaigns(options?: ListChatgptAdsCampaignsOptions): Promise<ListChatgptAdsCampaignsResponse>;
+
+    /**
+     * Create a campaign.
+     *
+     * Creates a campaign (budget, schedule, location and audience targeting). One of `budget` / `budget_micros` is required. Created `paused` unless `status: active` is sent. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/campaigns`
+     */
+    createChatgptAdsCampaign(options: CreateChatgptAdsCampaignOptions): Promise<CreateChatgptAdsCampaignResponse>;
+
+    /**
+     * Get a campaign.
+     *
+     * One campaign. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}`
+     */
+    getChatgptAdsCampaign(options: GetChatgptAdsCampaignOptions): Promise<GetChatgptAdsCampaignResponse>;
+
+    /**
+     * Update a campaign.
+     *
+     * Updates a campaign. Every field is optional; at least one is required (400 `No updatable fields supplied`). Archiving is irreversible. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}`
+     */
+    updateChatgptAdsCampaign(options: UpdateChatgptAdsCampaignOptions): Promise<UpdateChatgptAdsCampaignResponse>;
+
+    /**
+     * Activate a campaign.
+     *
+     * Sets the campaign `active`. An ad only serves when its campaign, ad group and ad are all active and the ad passed OpenAI's review. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/activate`
+     */
+    activateChatgptAdsCampaign(options: ActivateChatgptAdsCampaignOptions): Promise<ActivateChatgptAdsCampaignResponse>;
+
+    /**
+     * Pause a campaign.
+     *
+     * Sets the campaign `paused`. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/pause`
+     */
+    pauseChatgptAdsCampaign(options: PauseChatgptAdsCampaignOptions): Promise<PauseChatgptAdsCampaignResponse>;
+
+    /**
+     * Archive a campaign.
+     *
+     * Archives the campaign. Irreversible. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/archive`
+     */
+    archiveChatgptAdsCampaign(options: ArchiveChatgptAdsCampaignOptions): Promise<ArchiveChatgptAdsCampaignResponse>;
+
+    /**
+     * Get campaign insights.
+     *
+     * Performance of one campaign; rows per `aggregation_level` inside it. Repeatable parameters accept `key` or `key[]` and are forwarded to OpenAI. Page forward with `after=<last_id>`. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/insights`
+     */
+    getChatgptAdsCampaignInsights(options: GetChatgptAdsCampaignInsightsOptions): Promise<GetChatgptAdsCampaignInsightsResponse>;
+
+    /**
+     * List ad groups.
+     *
+     * Ad groups of a campaign. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/adgroups`
+     */
+    listChatgptAdsAdGroups(options: ListChatgptAdsAdGroupsOptions): Promise<ListChatgptAdsAdGroupsResponse>;
+
+    /**
+     * Create an ad group.
+     *
+     * Creates an ad group (the bid) under a campaign. One of `max_bid` / `max_bid_micros` is required unless `bidding_config` is sent. Created `paused` unless `status: active` is sent. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/adgroups`
+     */
+    createChatgptAdsAdGroup(options: CreateChatgptAdsAdGroupOptions): Promise<CreateChatgptAdsAdGroupResponse>;
+
+    /**
+     * Get an ad group.
+     *
+     * One ad group. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}`
+     */
+    getChatgptAdsAdGroup(options: GetChatgptAdsAdGroupOptions): Promise<GetChatgptAdsAdGroupResponse>;
+
+    /**
+     * Update an ad group.
+     *
+     * Updates an ad group. Every field is optional; at least one is required (400 `No updatable fields supplied`). Archiving is irreversible. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}`
+     */
+    updateChatgptAdsAdGroup(options: UpdateChatgptAdsAdGroupOptions): Promise<UpdateChatgptAdsAdGroupResponse>;
+
+    /**
+     * Activate an ad group.
+     *
+     * Sets the ad group `active`. An ad only serves when its campaign, ad group and ad are all active and the ad passed OpenAI's review. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/activate`
+     */
+    activateChatgptAdsAdGroup(options: ActivateChatgptAdsAdGroupOptions): Promise<ActivateChatgptAdsAdGroupResponse>;
+
+    /**
+     * Pause an ad group.
+     *
+     * Sets the ad group `paused`. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/pause`
+     */
+    pauseChatgptAdsAdGroup(options: PauseChatgptAdsAdGroupOptions): Promise<PauseChatgptAdsAdGroupResponse>;
+
+    /**
+     * Archive an ad group.
+     *
+     * Archives the ad group. Irreversible. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/archive`
+     */
+    archiveChatgptAdsAdGroup(options: ArchiveChatgptAdsAdGroupOptions): Promise<ArchiveChatgptAdsAdGroupResponse>;
+
+    /**
+     * Get ad group insights.
+     *
+     * Performance of one ad group; rows per `aggregation_level` inside it. Repeatable parameters accept `key` or `key[]` and are forwarded to OpenAI. Page forward with `after=<last_id>`. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/insights`
+     */
+    getChatgptAdsAdGroupInsights(options: GetChatgptAdsAdGroupInsightsOptions): Promise<GetChatgptAdsAdGroupInsightsResponse>;
+
+    /**
+     * List ads.
+     *
+     * Ads of an ad group. `review_status` is `in_review`, `approved` or `rejected`. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/ads`
+     */
+    listChatgptAdsAds(options: ListChatgptAdsAdsOptions): Promise<ListChatgptAdsAdsResponse>;
+
+    /**
+     * Create an ad.
+     *
+     * Creates an ad (the creative) under an ad group: send `title`, `body`, `target_url` and `file_id` at the top level, or a full `creative` object (needed for `product_ad_template`). It starts serving after OpenAI's review (`review_status: approved`). Created `paused` unless `status: active` is sent. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/ads`
+     */
+    createChatgptAdsAd(options: CreateChatgptAdsAdOptions): Promise<CreateChatgptAdsAdResponse>;
+
+    /**
+     * Get an ad.
+     *
+     * One ad. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/ads/{ad_id}`
+     */
+    getChatgptAdsAd(options: GetChatgptAdsAdOptions): Promise<GetChatgptAdsAdResponse>;
+
+    /**
+     * Update an ad.
+     *
+     * Updates an ad. Only `name`, `status` and `creative` are read; an edited ad goes back into review. Every field is optional; at least one is required (400 `No updatable fields supplied`). Archiving is irreversible. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}`
+     */
+    updateChatgptAdsAd(options: UpdateChatgptAdsAdOptions): Promise<UpdateChatgptAdsAdResponse>;
+
+    /**
+     * Activate an ad.
+     *
+     * Sets the ad `active`. An ad only serves when its campaign, ad group and ad are all active and the ad passed OpenAI's review. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/activate`
+     */
+    activateChatgptAdsAd(options: ActivateChatgptAdsAdOptions): Promise<ActivateChatgptAdsAdResponse>;
+
+    /**
+     * Pause an ad.
+     *
+     * Sets the ad `paused`. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/pause`
+     */
+    pauseChatgptAdsAd(options: PauseChatgptAdsAdOptions): Promise<PauseChatgptAdsAdResponse>;
+
+    /**
+     * Archive an ad.
+     *
+     * Archives the ad. Irreversible. No body: choose the ad account with the query parameter or the header. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/archive`
+     */
+    archiveChatgptAdsAd(options: ArchiveChatgptAdsAdOptions): Promise<ArchiveChatgptAdsAdResponse>;
+
+    /**
+     * Get ad insights.
+     *
+     * Performance of one ad; rows per `aggregation_level` inside it. Repeatable parameters accept `key` or `key[]` and are forwarded to OpenAI. Page forward with `after=<last_id>`. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/ads/{ad_id}/insights`
+     */
+    getChatgptAdsAdInsights(options: GetChatgptAdsAdInsightsOptions): Promise<GetChatgptAdsAdInsightsResponse>;
+
+    /**
+     * Preview an ad.
+     *
+     * A temporary iframe preview of the ad (expires in 24 h). No body. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/preview`
+     */
+    previewChatgptAdsAd(options: PreviewChatgptAdsAdOptions): Promise<PreviewChatgptAdsAdResponse>;
+
+    /**
+     * Upload a creative image.
+     *
+     * Uploads the image an ad uses; reuse the returned `file_id`. JSON with `image_url` (OpenAI fetches it) or multipart with a binary `file` (up to 10 MB). A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/creatives`
+     */
+    uploadChatgptAdsCreative(options?: UploadChatgptAdsCreativeOptions): Promise<UploadChatgptAdsCreativeResponse>;
+
+    /**
+     * Get ad account insights.
+     *
+     * Performance of the whole ad account; rows per `aggregation_level`. Repeatable parameters accept `key` or `key[]` and are forwarded to OpenAI. Page forward with `after=<last_id>`. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `GET /api/uploadposts/ads/chatgpt/insights`
+     */
+    getChatgptAdsAccountInsights(options?: GetChatgptAdsAccountInsightsOptions): Promise<GetChatgptAdsAccountInsightsResponse>;
+
+    /**
+     * Launch an ad in one call.
+     *
+     * Creates the campaign, ad group and ad, and uploads the creative from `image_url` (or reuses `file_id`), in one request. Every payload is validated before the first write; everything is created paused and only activated (`status: active`) once all three exist. If a later step fails, the error carries `details.created` with the ids already created so you can finish or archive them. A 401 can also mean OpenAI rejected the stored key (revoked): reconnect the account with POST /connect.
+     *
+     * `POST /api/uploadposts/ads/chatgpt/promote`
+     */
+    promoteChatgptAds(options: PromoteChatgptAdsOptions): Promise<PromoteChatgptAdsResponse>;
+
+    // </openapi:methods>
+
+    /** Operations behind the generated methods: [HTTP method, path, details]. */
+    static OPENAPI_OPERATIONS: Record<string, [string, string, Record<string, any>]>;
   }
 
   export default UploadPost;

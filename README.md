@@ -151,6 +151,9 @@ const response = await client.uploadDocument('./presentation.pdf', {
   linkedinVisibility: 'PUBLIC',
   targetLinkedinPageId: 'company-page-id', // Optional: post to company page
 });
+
+// Any file up to 50 MB to Telegram (or both, with platforms: ['linkedin', 'telegram'])
+await client.uploadDocument('./archive.zip', { title: 'Files', user: 'my-profile', platforms: ['telegram'] });
 ```
 
 ### Check Upload Status
@@ -214,7 +217,8 @@ await client.cancelScheduled('job-id');
 // List all profiles
 const users = await client.listUsers();
 
-// Create a new profile
+// Create a new profile (409 "Username already in use" if it exists,
+// 403 PROFILE_LIMIT_REACHED at the plan's profile limit)
 await client.createUser('new-profile');
 
 // Delete a profile
@@ -558,8 +562,9 @@ Asking a platform a question it cannot answer fails with
 
 `sendDm()` and `getDmConversations()` cover Instagram, Facebook Messenger
 (`platform: 'facebook'`), WhatsApp and Bluesky. `sendDm()` also sends from your
-own Telegram bot (`platform: 'telegram'`) to people who started it; reading
-Telegram conversations is not available yet. Options are camelCase; any other
+own Telegram bot (`platform: 'telegram'`) to people who started it, and
+`getDmConversations({ platform: 'telegram' })` reads them once the bot's updates
+are turned on. Options are camelCase; any other
 key is sent to the API as given.
 
 ```javascript
@@ -743,6 +748,40 @@ downgrade), the last invited members are **suspended, not removed**: their
 requests fail with HTTP 403 and `error.code === 'TEAM_SEAT_SUSPENDED'` until the
 owner upgrades or removes someone. `listTeamMembers()` (owner) and
 `listSharedAccounts()` (member) show `suspended` and `suspended_reason`.
+
+#### Roles and post approvals (not generally available yet)
+
+Team roles (admin, editor, contributor, viewer) and the approval queue are
+**not generally available yet**: while they are switched off the approval
+methods answer HTTP 503 (`post_approvals_disabled`) and every member acts as an
+Admin. The owner invites members and sets their role and profiles in the
+dashboard; that is not done with the API key. With the API you can read them:
+`getTeamRoles()` (roles and your own), `listTeamMembers()` and
+`listSharedAccounts()` (each entry adds `role` and `profiles`, `null` = every
+profile) and `listTeamAudit()` (owner and Admins).
+
+When an Editor uploads, the post is **not** published or scheduled: the upload
+answers HTTP 202 with `pending_approval: true`, `approval_id`,
+`approval_status: 'pending_approval'` and `job_id: null` (a Contributor gets
+`approval_status: 'draft'`). A reviewer (owner or Admin) decides:
+
+```javascript
+const { items } = await client.listPostApprovals({ status: 'pending_approval' });
+const { counts, total } = await client.listPostApprovals({ countOnly: true });
+
+const { item } = await client.getPostApproval({ approvalId: items[0].approval_id });
+// version is required: the item.version you reviewed (409 approval_version_changed otherwise)
+await client.approvePostApproval({ approvalId: item.approval_id, version: item.version });
+// or: comment is required to reject
+await client.rejectPostApproval({ approvalId: item.approval_id, comment: 'Fix the caption' });
+```
+
+`editPostApproval()` and `withdrawPostApproval()` change or withdraw an open
+item. The end client of a white-label profile can decide too: generate the
+profile JWT with `generateJwt(username, { clientApproval: true })` and call
+`listClientPostApprovals({ token })`, `approveClientPostApproval({ token,
+approvalId, version })` or `rejectClientPostApproval({ token, approvalId,
+comment })` with that JWT instead of the API key.
 
 ### Post actions, best times, queue, Telegram, Bluesky and Google Business
 
@@ -1140,6 +1179,340 @@ with YouTube's own names (`privacyStatus`, `categoryId`, `publishAt`,
 | [`banYoutubeLiveChatUser`](https://docs.upload-post.com/api/youtube-live-chat) | `POST /api/uploadposts/youtube/live/bans` | Ban a user from the chat (`permanent` or `temporary` with `ban_duration_seconds`; needs `confirm: true`). |
 | [`unbanYoutubeLiveChatUser`](https://docs.upload-post.com/api/youtube-live-chat) | `DELETE /api/uploadposts/youtube/live/bans/{ban_id}` | Lift a ban. |
 | [`listYoutubeSuperChats`](https://docs.upload-post.com/api/youtube-live-chat) | `GET /api/uploadposts/youtube/live/super-chats` | Super Chats and Super Stickers received. |
+
+### Not generally available yet
+
+<!-- openapi:availability -->
+These hand-written methods call operations that are **not generally available yet**: they answer an error (usually HTTP 503) until the feature is switched on for your account. Generated from `codegen/openapi.json`.
+
+| Method | Endpoint | Until it is switched on |
+| :-- | :-- | :-- |
+| `listYoutubeBroadcasts` | `GET /api/uploadposts/youtube/live/broadcasts` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `createYoutubeBroadcast` | `POST /api/uploadposts/youtube/live/broadcasts` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `getYoutubeBroadcast` | `GET /api/uploadposts/youtube/live/broadcasts/{broadcast_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `updateYoutubeBroadcast` | `PATCH /api/uploadposts/youtube/live/broadcasts/{broadcast_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `deleteYoutubeBroadcast` | `DELETE /api/uploadposts/youtube/live/broadcasts/{broadcast_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `bindYoutubeBroadcast` | `POST /api/uploadposts/youtube/live/broadcasts/{broadcast_id}/bind` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `transitionYoutubeBroadcast` | `POST /api/uploadposts/youtube/live/broadcasts/{broadcast_id}/transition` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `insertYoutubeCuepoint` | `POST /api/uploadposts/youtube/live/broadcasts/{broadcast_id}/cuepoint` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `listYoutubeStreams` | `GET /api/uploadposts/youtube/live/streams` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `createYoutubeStream` | `POST /api/uploadposts/youtube/live/streams` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `getYoutubeStream` | `GET /api/uploadposts/youtube/live/streams/{stream_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `updateYoutubeStream` | `PATCH /api/uploadposts/youtube/live/streams/{stream_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `deleteYoutubeStream` | `DELETE /api/uploadposts/youtube/live/streams/{stream_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `getYoutubeLiveChat` | `GET /api/uploadposts/youtube/live/chat` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `sendYoutubeLiveChatMessage` | `POST /api/uploadposts/youtube/live/chat` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `closeYoutubeLiveChatPoll` | `POST /api/uploadposts/youtube/live/chat/polls/{message_id}/close` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `deleteYoutubeLiveChatMessage` | `DELETE /api/uploadposts/youtube/live/chat/messages/{message_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `listYoutubeLiveModerators` | `GET /api/uploadposts/youtube/live/moderators` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `addYoutubeLiveModerator` | `POST /api/uploadposts/youtube/live/moderators` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `removeYoutubeLiveModerator` | `DELETE /api/uploadposts/youtube/live/moderators/{moderator_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `banYoutubeLiveChatUser` | `POST /api/uploadposts/youtube/live/bans` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `unbanYoutubeLiveChatUser` | `DELETE /api/uploadposts/youtube/live/bans/{ban_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `listYoutubeSuperChats` | `GET /api/uploadposts/youtube/live/super-chats` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `listYoutubeComments` | `GET /api/uploadposts/youtube/comments` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `createYoutubeComment` | `POST /api/uploadposts/youtube/comments` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `listYoutubeCommentReplies` | `GET /api/uploadposts/youtube/comments/replies` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `moderateYoutubeComments` | `POST /api/uploadposts/youtube/comments/moderate` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `updateYoutubeComment` | `PATCH /api/uploadposts/youtube/comments/{comment_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `deleteYoutubeComment` | `DELETE /api/uploadposts/youtube/comments/{comment_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `getYoutubeCategories` | `GET /api/uploadposts/youtube/categories` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `getYoutubeLanguages` | `GET /api/uploadposts/youtube/languages` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `getYoutubeRegions` | `GET /api/uploadposts/youtube/regions` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `getYoutubeAbuseReasons` | `GET /api/uploadposts/youtube/abuse-reasons` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `searchYoutube` | `GET /api/uploadposts/youtube/search` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `listYoutubeSubscriptions` | `GET /api/uploadposts/youtube/subscriptions` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `subscribeYoutubeChannel` | `POST /api/uploadposts/youtube/subscriptions` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `unsubscribeYoutubeChannel` | `DELETE /api/uploadposts/youtube/subscriptions/{subscription_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `getYoutubeRating` | `GET /api/uploadposts/youtube/videos/rating` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `rateYoutubeVideo` | `POST /api/uploadposts/youtube/videos/{video_id}/rate` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `reportYoutubeVideoAbuse` | `POST /api/uploadposts/youtube/videos/{video_id}/report-abuse` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `getYoutubeActivities` | `GET /api/uploadposts/youtube/activities` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `getYoutubeChannel` | `GET /api/uploadposts/youtube/channel` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `updateYoutubeChannel` | `PATCH /api/uploadposts/youtube/channel` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `lookupYoutubeChannel` | `GET /api/uploadposts/youtube/channel/lookup` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `setYoutubeChannelBanner` | `POST /api/uploadposts/youtube/channel/banner` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `listYoutubeChannelSections` | `GET /api/uploadposts/youtube/channel/sections` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `createYoutubeChannelSection` | `POST /api/uploadposts/youtube/channel/sections` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `updateYoutubeChannelSection` | `PATCH /api/uploadposts/youtube/channel/sections/{section_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `deleteYoutubeChannelSection` | `DELETE /api/uploadposts/youtube/channel/sections/{section_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `setYoutubeWatermark` | `POST /api/uploadposts/youtube/channel/watermark` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `removeYoutubeWatermark` | `DELETE /api/uploadposts/youtube/channel/watermark` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `listYoutubePlaylists` | `GET /api/uploadposts/youtube/playlists` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `createYoutubePlaylist` | `POST /api/uploadposts/youtube/playlists` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `updateYoutubePlaylist` | `PATCH /api/uploadposts/youtube/playlists/{playlist_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `deleteYoutubePlaylist` | `DELETE /api/uploadposts/youtube/playlists/{playlist_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `listYoutubePlaylistItems` | `GET /api/uploadposts/youtube/playlists/{playlist_id}/items` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `addYoutubePlaylistItem` | `POST /api/uploadposts/youtube/playlists/{playlist_id}/items` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `updateYoutubePlaylistItem` | `PATCH /api/uploadposts/youtube/playlists/{playlist_id}/items/{item_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `deleteYoutubePlaylistItem` | `DELETE /api/uploadposts/youtube/playlists/{playlist_id}/items/{item_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `getYoutubePlaylistImage` | `GET /api/uploadposts/youtube/playlists/{playlist_id}/image` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `setYoutubePlaylistImage` | `POST /api/uploadposts/youtube/playlists/{playlist_id}/image` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `replaceYoutubePlaylistImage` | `PUT /api/uploadposts/youtube/playlists/{playlist_id}/image` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `deleteYoutubePlaylistImage` | `DELETE /api/uploadposts/youtube/playlists/{playlist_id}/image` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `listYoutubeCaptions` | `GET /api/uploadposts/youtube/captions` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `uploadYoutubeCaption` | `POST /api/uploadposts/youtube/captions` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `updateYoutubeCaption` | `PUT /api/uploadposts/youtube/captions/{caption_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `deleteYoutubeCaption` | `DELETE /api/uploadposts/youtube/captions/{caption_id}` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+| `downloadYoutubeCaption` | `GET /api/uploadposts/youtube/captions/{caption_id}/download` | Off by default: answers `503` with `youtube_feature_disabled` until the feature is available. |
+<!-- /openapi:availability -->
+
+### Everything else in the API
+
+Every operation of the [API reference](https://docs.upload-post.com) has a method. The ones below are generated from the OpenAPI spec, so they stay in step with it.
+
+<!-- openapi:methods -->
+Generated from the OpenAPI spec (`codegen/openapi.json`) by `codegen/generate.py`. Each method takes one options object (camelCase or API names; any other API field is sent as well) and its TypeScript type lists the fields.
+Methods marked *not generally available* answer HTTP 503 until the feature is switched on for your account.
+
+#### Telegram
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `sendTelegramGift` | `POST /api/uploadposts/telegram/gifts` | Send a gift from the bot's Stars. *Not generally available.* |
+| `giftTelegramPremium` | `POST /api/uploadposts/telegram/gifts/premium` | Gift Telegram Premium from the bot's Stars. *Not generally available.* |
+| `getTelegramPaymentSettings` | `GET /api/uploadposts/telegram/payments/settings` | Automatic pre-checkout rules. |
+| `updateTelegramPaymentSettings` | `PUT /api/uploadposts/telegram/payments/settings` | Set automatic pre-checkout rules. |
+| `setTelegramUpdates` | `POST /api/uploadposts/telegram/updates` | Turn Telegram updates on or off. *Not generally available.* |
+| `answerTelegramQuery` | `POST /api/uploadposts/telegram/answer` | Answer a Telegram query. |
+| `getTelegramBusinessConnections` | `GET /api/uploadposts/telegram/business-connections` | Telegram Business connections. *Not generally available.* |
+| `getTelegramBusinessProfile` | `GET /api/uploadposts/telegram/business-profile` | Telegram Business account. *Not generally available.* |
+| `updateTelegramBusinessProfile` | `PATCH /api/uploadposts/telegram/business-profile` | Update the Telegram Business profile. *Not generally available.* |
+| `postTelegramStory` | `POST /api/uploadposts/telegram/business-stories` | Post a Telegram story. *Not generally available.* |
+| `editTelegramStory` | `PATCH /api/uploadposts/telegram/business-stories` | Edit a Telegram story. *Not generally available.* |
+| `deleteTelegramStory` | `DELETE /api/uploadposts/telegram/business-stories` | Delete a Telegram story. *Not generally available.* |
+| `repostTelegramStory` | `POST /api/uploadposts/telegram/business-stories/repost` | Repost a Telegram story. *Not generally available.* |
+| `getTelegramBusinessGifts` | `GET /api/uploadposts/telegram/business-gifts` | Telegram Business gifts. *Not generally available.* |
+| `manageTelegramBusinessGift` | `POST /api/uploadposts/telegram/business-gifts` | Convert, upgrade, transfer or delete a gift. *Not generally available.* |
+| `getTelegramBusinessStars` | `GET /api/uploadposts/telegram/business-stars` | Telegram Business Stars balance. *Not generally available.* |
+| `transferTelegramBusinessStars` | `POST /api/uploadposts/telegram/business-stars/transfer` | Move Stars to the bot. *Not generally available.* |
+
+#### Content Upload
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `analyzeShorts` | `POST /api/uploadposts/analyze-shorts` | AI titles and captions for a short video. |
+| `rewriteCaptions` | `POST /api/uploadposts/rewrite-captions` | Translate or rewrite captions with AI. |
+| `createMediaUpload` | `POST /api/uploadposts/media-uploads` | Get a signed URL to upload a file. |
+| `completeMediaUpload` | `POST /api/uploadposts/media-uploads/{upload_id}/complete` | Confirm a signed upload. |
+| `getMediaUpload` | `GET /api/uploadposts/media-uploads/{upload_id}` | Get a signed upload. |
+| `deleteMediaUpload` | `DELETE /api/uploadposts/media-uploads/{upload_id}` | Delete a signed upload. |
+
+#### Upload Management
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `getScheduledPost` | `GET /api/uploadposts/schedule/{job_id}` | Get a scheduled post. |
+| `getScheduledPostThumbnail` | `GET /api/uploadposts/schedule/{job_id}/thumbnail` | Get a scheduled post's thumbnail. |
+| `getScheduledPostPreview` | `GET /api/uploadposts/schedule/{job_id}/preview` | Preview URLs of a scheduled post. |
+
+#### Platform Integration
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `createPinterestBoard` | `POST /api/uploadposts/pinterest/boards` | Create a Pinterest board. |
+| `queryYoutubeAnalytics` | `GET /api/uploadposts/youtube/analytics/query` | Run a YouTube Analytics channel report. *Not generally available.* |
+| `listYoutubeAnalyticsReports` | `GET /api/uploadposts/youtube/analytics/reports` | YouTube Analytics report catalog. *Not generally available.* |
+| `listYoutubeAnalyticsGroups` | `GET /api/uploadposts/youtube/analytics/groups` | List YouTube Analytics groups. *Not generally available.* |
+| `listYoutubeAnalyticsGroupItems` | `GET /api/uploadposts/youtube/analytics/groups/{group_id}/items` | List the items of a YouTube Analytics group. *Not generally available.* |
+| `getYoutubeAnalyticsUsage` | `GET /api/uploadposts/youtube/analytics/usage` | Daily allowance of YouTube Analytics and bulk reports. *Not generally available.* |
+| `listYoutubeReportTypes` | `GET /api/uploadposts/youtube/reporting/report-types` | List YouTube bulk report types. *Not generally available.* |
+| `listYoutubeReportingJobs` | `GET /api/uploadposts/youtube/reporting/jobs` | List YouTube reporting jobs. *Not generally available.* |
+| `createYoutubeReportingJob` | `POST /api/uploadposts/youtube/reporting/jobs` | Create a YouTube reporting job. *Not generally available.* |
+| `getYoutubeReportingJob` | `GET /api/uploadposts/youtube/reporting/jobs/{job_id}` | Get a YouTube reporting job. *Not generally available.* |
+| `deleteYoutubeReportingJob` | `DELETE /api/uploadposts/youtube/reporting/jobs/{job_id}` | Delete a YouTube reporting job. *Not generally available.* |
+| `listYoutubeReports` | `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports` | List the reports of a YouTube reporting job. *Not generally available.* |
+| `getYoutubeReport` | `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}` | Get a YouTube report. *Not generally available.* |
+| `downloadYoutubeReport` | `GET /api/uploadposts/youtube/reporting/jobs/{job_id}/reports/{report_id}/download` | Download a YouTube report (CSV). *Not generally available.* |
+| `getYoutubePush` | `GET /api/uploadposts/youtube/push` | YouTube new video notifications status. *Not generally available.* |
+| `enableYoutubePush` | `POST /api/uploadposts/youtube/push` | Turn on YouTube new video notifications. *Not generally available.* |
+| `disableYoutubePush` | `DELETE /api/uploadposts/youtube/push` | Turn off YouTube new video notifications. *Not generally available.* |
+| `getInstagramPublishingLimit` | `GET /api/uploadposts/instagram/publishing_limit` | Instagram publishing quota. |
+| `getThreadsPublishingLimit` | `GET /api/uploadposts/threads/publishing_limit` | Threads publishing quota. |
+| `listPinterestBoardSections` | `GET /api/uploadposts/pinterest/boards/{board_id}/sections` | List the sections of a Pinterest board. |
+| `createPinterestBoardSection` | `POST /api/uploadposts/pinterest/boards/{board_id}/sections` | Create a section in a Pinterest board. |
+| `getFacebookPageInfo` | `GET /api/uploadposts/facebook/page-info` | Read a Facebook Page's public info. |
+| `updateFacebookPageInfo` | `PATCH /api/uploadposts/facebook/page-info` | Update a Facebook Page's public info. |
+| `listRedditSubreddits` | `GET /api/uploadposts/reddit/subreddits` | Subreddits the Reddit account belongs to. |
+| `getRedditPostTypes` | `GET /api/uploadposts/reddit/post-types` | Post types a subreddit allows. |
+| `listRedditFlairs` | `GET /api/uploadposts/reddit/flairs` | Post flairs of a subreddit. |
+
+#### User Management
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `getUserProfile` | `GET /api/uploadposts/users/{username}` | Get a specific user profile. |
+| `renameUserProfile` | `PATCH /api/uploadposts/users/{username}` | Rename a user profile. |
+| `disconnectSocialAccount` | `DELETE /api/uploadposts/users/social` | Disconnect a social account from a profile. |
+| `connectDiscordCredentials` | `POST /api/uploadposts/users/discord/credentials` | Connect Discord with credentials. |
+| `connectTelegramCredentials` | `POST /api/uploadposts/users/telegram/credentials` | Connect Telegram with credentials. |
+| `connectSlackCredentials` | `POST /api/uploadposts/users/slack/credentials` | Connect Slack with credentials. |
+| `connectMastodonCredentials` | `POST /api/uploadposts/users/mastodon/credentials` | Connect Mastodon with credentials. |
+| `connectNostrCredentials` | `POST /api/uploadposts/users/nostr/credentials` | Connect Nostr with credentials. |
+| `connectLemmyCredentials` | `POST /api/uploadposts/users/lemmy/credentials` | Connect Lemmy with credentials. |
+| `connectDevtoCredentials` | `POST /api/uploadposts/users/devto/credentials` | Connect Dev.to with credentials. |
+| `connectHashnodeCredentials` | `POST /api/uploadposts/users/hashnode/credentials` | Connect Hashnode with credentials. |
+| `connectWordpressCredentials` | `POST /api/uploadposts/users/wordpress/credentials` | Connect WordPress with credentials. |
+| `connectWhopCredentials` | `POST /api/uploadposts/users/whop/credentials` | Connect Whop with credentials. |
+| `connectListmonkCredentials` | `POST /api/uploadposts/users/listmonk/credentials` | Connect Listmonk with credentials. |
+| `listFacebookPageChoices` | `GET /api/uploadposts/users/facebook-page` | List the Facebook Pages a profile can publish to. |
+| `setFacebookPage` | `POST /api/uploadposts/users/facebook-page` | Select the Facebook Page used when publishing. |
+| `clearFacebookPage` | `DELETE /api/uploadposts/users/facebook-page` | Clear the selected Facebook Page. |
+| `listLinkedinPageChoices` | `GET /api/uploadposts/users/linkedin-page` | List the LinkedIn Pages a profile can publish to. |
+| `setLinkedinPage` | `POST /api/uploadposts/users/linkedin-page` | Select the LinkedIn Page used when publishing. |
+| `clearLinkedinPage` | `DELETE /api/uploadposts/users/linkedin-page` | Clear the selected LinkedIn Page. |
+| `connectBlueskyCredentials` | `POST /api/uploadposts/users/bluesky/credentials` | Connect Bluesky with an app password. |
+| `setYoutubeOauthClient` | `POST /api/uploadposts/users/youtube/credentials` | Use your own Google OAuth client for a profile's YouTube. |
+
+#### Authentication
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `getCurrentUser` | `GET /api/uploadposts/me` | Get current user. |
+| `startOauthConnection` | `POST /api/uploadposts/oauth/{platform}/start` | Connect API: start connecting a social account. |
+
+#### FFmpeg Editor
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `createFfmpegJob` | `POST /api/uploadposts/ffmpeg/jobs/upload` | Create FFmpeg job. |
+| `getFfmpegJobStatus` | `GET /api/uploadposts/ffmpeg/jobs/{job_id}` | Get FFmpeg job status. |
+| `downloadFfmpegResult` | `GET /api/uploadposts/ffmpeg/jobs/{job_id}/download` | Download FFmpeg result. |
+| `getFfmpegConsumption` | `GET /api/uploadposts/ffmpeg/consumption` | Get FFmpeg consumption. |
+
+#### Webhooks
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `listWebhookSubscriptions` | `GET /api/uploadposts/webhooks/subscriptions` | List webhook subscriptions. *Not generally available.* |
+| `createWebhookSubscription` | `POST /api/uploadposts/webhooks/subscriptions` | Create a webhook subscription. *Not generally available.* |
+| `getWebhookSubscription` | `GET /api/uploadposts/webhooks/subscriptions/{subscription_id}` | Get a webhook subscription. *Not generally available.* |
+| `deleteWebhookSubscription` | `DELETE /api/uploadposts/webhooks/subscriptions/{subscription_id}` | Delete a webhook subscription. *Not generally available.* |
+| `testWebhookSubscription` | `POST /api/uploadposts/webhooks/subscriptions/{subscription_id}/test` | Send a test event to a subscription. *Not generally available.* |
+
+#### Instagram Interactions
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `deleteCommentPost` | `POST /api/uploadposts/comments/delete` | Delete a comment (POST alias). |
+| `deleteBlueskyChatAccount` | `POST /api/uploadposts/dms/bluesky/account/delete` | Delete the Bluesky chat account. *Not generally available.* |
+| `listBlueskyMutualGroups` | `GET /api/uploadposts/dms/bluesky/groups` | Bluesky groups shared with someone. *Not generally available.* |
+| `createBlueskyGroup` | `POST /api/uploadposts/dms/bluesky/groups` | Create a Bluesky group chat. *Not generally available.* |
+| `editBlueskyGroup` | `PATCH /api/uploadposts/dms/bluesky/groups/{conversation_id}` | Rename, lock or unlock a Bluesky group. *Not generally available.* |
+| `listBlueskyGroupMembers` | `GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/members` | Bluesky group members. *Not generally available.* |
+| `addBlueskyGroupMembers` | `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/members` | Add members to a Bluesky group. *Not generally available.* |
+| `removeBlueskyGroupMembers` | `DELETE /api/uploadposts/dms/bluesky/groups/{conversation_id}/members` | Remove members from a Bluesky group. *Not generally available.* |
+| `manageBlueskyJoinLink` | `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-link` | Manage a Bluesky group join link. *Not generally available.* |
+| `listBlueskyJoinRequests` | `GET /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests` | Pending requests to join a Bluesky group. *Not generally available.* |
+| `answerBlueskyJoinRequest` | `POST /api/uploadposts/dms/bluesky/groups/{conversation_id}/join-requests` | Answer or withdraw a Bluesky join request. *Not generally available.* |
+| `previewBlueskyJoinLinks` | `GET /api/uploadposts/dms/bluesky/join-links` | Preview Bluesky join links. *Not generally available.* |
+| `joinBlueskyGroup` | `POST /api/uploadposts/dms/bluesky/join-links` | Ask to join a Bluesky group. *Not generally available.* |
+| `downloadDmMedia` | `GET /api/uploadposts/dms/media` | Download a DM attachment. |
+
+#### Bluesky
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `blueskyGraphAction` | `POST /api/uploadposts/bluesky/graph` | Follow, block or mute (one target per call). *Not generally available.* |
+| `listBlueskyLists` | `GET /api/uploadposts/bluesky/lists` | The account's lists. *Not generally available.* |
+| `createBlueskyList` | `POST /api/uploadposts/bluesky/lists` | Create a list. *Not generally available.* |
+| `getBlueskyList` | `GET /api/uploadposts/bluesky/lists/{list_id}` | A list and its members. *Not generally available.* |
+| `updateBlueskyList` | `PATCH /api/uploadposts/bluesky/lists/{list_id}` | Update a list. *Not generally available.* |
+| `deleteBlueskyList` | `DELETE /api/uploadposts/bluesky/lists/{list_id}` | Delete a list and its members. *Not generally available.* |
+| `listBlueskyListMembers` | `GET /api/uploadposts/bluesky/lists/{list_id}/members` | List members. *Not generally available.* |
+| `addBlueskyListMember` | `POST /api/uploadposts/bluesky/lists/{list_id}/members` | Add a member. *Not generally available.* |
+| `removeBlueskyListMember` | `DELETE /api/uploadposts/bluesky/lists/{list_id}/members` | Remove a member. *Not generally available.* |
+| `optOutBlueskyList` | `POST /api/uploadposts/bluesky/lists/opt-out` | Ask not to appear in a reference list. *Not generally available.* |
+| `removeOptOutBlueskyList` | `DELETE /api/uploadposts/bluesky/lists/opt-out` | Withdraw the opt-out. *Not generally available.* |
+| `listBlueskyStarterPacks` | `GET /api/uploadposts/bluesky/starter-packs` | The account's starter packs. *Not generally available.* |
+| `createBlueskyStarterPack` | `POST /api/uploadposts/bluesky/starter-packs` | Create a starter pack. *Not generally available.* |
+| `getBlueskyStarterPack` | `GET /api/uploadposts/bluesky/starter-packs/{pack_id}` | A starter pack. *Not generally available.* |
+| `updateBlueskyStarterPack` | `PATCH /api/uploadposts/bluesky/starter-packs/{pack_id}` | Update a starter pack. *Not generally available.* |
+| `deleteBlueskyStarterPack` | `DELETE /api/uploadposts/bluesky/starter-packs/{pack_id}` | Delete a starter pack. *Not generally available.* |
+| `listBlueskyFeeds` | `GET /api/uploadposts/bluesky/feeds` | Feeds declared by the account. *Not generally available.* |
+| `createBlueskyFeed` | `POST /api/uploadposts/bluesky/feeds` | Declare a custom feed. *Not generally available.* |
+| `updateBlueskyFeed` | `PATCH /api/uploadposts/bluesky/feeds/{rkey}` | Update a feed declaration. *Not generally available.* |
+| `deleteBlueskyFeed` | `DELETE /api/uploadposts/bluesky/feeds/{rkey}` | Delete a feed declaration. *Not generally available.* |
+| `reportOnBluesky` | `POST /api/uploadposts/bluesky/report` | Report a post or account to Bluesky moderation. *Not generally available.* |
+
+#### Teams and Approvals
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `listPostApprovals` | `GET /api/uploadposts/approvals` | List posts awaiting approval. *Not generally available.* |
+| `getPostApproval` | `GET /api/uploadposts/approvals/{approval_id}` | Get a post awaiting approval. *Not generally available.* |
+| `editPostApproval` | `PATCH /api/uploadposts/approvals/{approval_id}` | Edit a post awaiting approval. *Not generally available.* |
+| `withdrawPostApproval` | `DELETE /api/uploadposts/approvals/{approval_id}` | Withdraw or discard a post awaiting approval. *Not generally available.* |
+| `approvePostApproval` | `POST /api/uploadposts/approvals/{approval_id}/approve` | Approve a post. *Not generally available.* |
+| `rejectPostApproval` | `POST /api/uploadposts/approvals/{approval_id}/reject` | Reject a post. *Not generally available.* |
+| `listClientPostApprovals` | `GET /api/uploadposts/approvals/client` | End client: list posts to approve. *Not generally available.* |
+| `approveClientPostApproval` | `POST /api/uploadposts/approvals/client/{approval_id}/approve` | End client: approve a post. *Not generally available.* |
+| `rejectClientPostApproval` | `POST /api/uploadposts/approvals/client/{approval_id}/reject` | End client: reject a post. *Not generally available.* |
+| `getTeamRoles` | `GET /api/uploadposts/teams/roles` | Team roles and your role. |
+| `listTeamAudit` | `GET /api/uploadposts/teams/audit` | Team activity log. |
+
+#### Feedback
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `sendFeedback` | `POST /api/uploadposts/feedback` | Send feedback to the Upload-Post team. |
+
+#### Google Business
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `updateGoogleBusinessAccount` | `PATCH /api/uploadposts/google-business/accounts` | Rename a Google Business account. *Not generally available.* |
+| `createGoogleBusinessAdmin` | `POST /api/uploadposts/google-business/admins` | Invite an admin. *Not generally available.* |
+| `updateGoogleBusinessAdmin` | `PATCH /api/uploadposts/google-business/admins` | Change an admin's role. *Not generally available.* |
+| `deleteGoogleBusinessAdmin` | `DELETE /api/uploadposts/google-business/admins` | Remove an admin. *Not generally available.* |
+| `acceptGoogleBusinessInvitation` | `POST /api/uploadposts/google-business/invitations/accept` | Accept an invitation. *Not generally available.* |
+| `declineGoogleBusinessInvitation` | `POST /api/uploadposts/google-business/invitations/decline` | Decline an invitation. *Not generally available.* |
+| `transferGoogleBusinessLocation` | `POST /api/uploadposts/google-business/locations/transfer` | Transfer a location to another account. *Not generally available.* |
+| `createGoogleBusinessLocation` | `POST /api/uploadposts/google-business/locations/create` | Create a location. *Not generally available.* |
+| `deleteGoogleBusinessLocation` | `DELETE /api/uploadposts/google-business/locations/delete` | Delete a location. *Not generally available.* |
+| `getGoogleBusinessNotificationSettings` | `GET /api/uploadposts/google-business/notifications` | Get real-time notification settings. *Not generally available.* |
+| `updateGoogleBusinessNotificationSettings` | `PUT /api/uploadposts/google-business/notifications` | Turn real-time notifications on or off. *Not generally available.* |
+| `startGoogleBusinessVerification` | `POST /api/uploadposts/google-business/verification/start` | Start a verification. *Not generally available.* |
+| `completeGoogleBusinessVerification` | `POST /api/uploadposts/google-business/verification/complete` | Enter the verification code. *Not generally available.* |
+| `generateGoogleBusinessVerificationToken` | `POST /api/uploadposts/google-business/verification/token` | Get an instant verification token. *Not generally available.* |
+
+#### ChatGPT Ads
+
+| Method | Endpoint | What it does |
+| :-- | :-- | :-- |
+| `connectChatgptAdsAccount` | `POST /api/uploadposts/ads/chatgpt/connect` | Connect a ChatGPT Ads account. |
+| `listChatgptAdsAccounts` | `GET /api/uploadposts/ads/chatgpt/accounts` | List connected ChatGPT Ads accounts. |
+| `disconnectChatgptAdsAccount` | `DELETE /api/uploadposts/ads/chatgpt/accounts/{ad_account_id}` | Disconnect a ChatGPT Ads account. |
+| `getChatgptAdsAccount` | `GET /api/uploadposts/ads/chatgpt/account` | Get live ad account metadata. |
+| `listChatgptAdsCampaigns` | `GET /api/uploadposts/ads/chatgpt/campaigns` | List campaigns. |
+| `createChatgptAdsCampaign` | `POST /api/uploadposts/ads/chatgpt/campaigns` | Create a campaign. |
+| `getChatgptAdsCampaign` | `GET /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}` | Get a campaign. |
+| `updateChatgptAdsCampaign` | `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}` | Update a campaign. |
+| `activateChatgptAdsCampaign` | `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/activate` | Activate a campaign. |
+| `pauseChatgptAdsCampaign` | `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/pause` | Pause a campaign. |
+| `archiveChatgptAdsCampaign` | `POST /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/archive` | Archive a campaign. |
+| `getChatgptAdsCampaignInsights` | `GET /api/uploadposts/ads/chatgpt/campaigns/{campaign_id}/insights` | Get campaign insights. |
+| `listChatgptAdsAdGroups` | `GET /api/uploadposts/ads/chatgpt/adgroups` | List ad groups. |
+| `createChatgptAdsAdGroup` | `POST /api/uploadposts/ads/chatgpt/adgroups` | Create an ad group. |
+| `getChatgptAdsAdGroup` | `GET /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}` | Get an ad group. |
+| `updateChatgptAdsAdGroup` | `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}` | Update an ad group. |
+| `activateChatgptAdsAdGroup` | `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/activate` | Activate an ad group. |
+| `pauseChatgptAdsAdGroup` | `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/pause` | Pause an ad group. |
+| `archiveChatgptAdsAdGroup` | `POST /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/archive` | Archive an ad group. |
+| `getChatgptAdsAdGroupInsights` | `GET /api/uploadposts/ads/chatgpt/adgroups/{ad_group_id}/insights` | Get ad group insights. |
+| `listChatgptAdsAds` | `GET /api/uploadposts/ads/chatgpt/ads` | List ads. |
+| `createChatgptAdsAd` | `POST /api/uploadposts/ads/chatgpt/ads` | Create an ad. |
+| `getChatgptAdsAd` | `GET /api/uploadposts/ads/chatgpt/ads/{ad_id}` | Get an ad. |
+| `updateChatgptAdsAd` | `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}` | Update an ad. |
+| `activateChatgptAdsAd` | `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/activate` | Activate an ad. |
+| `pauseChatgptAdsAd` | `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/pause` | Pause an ad. |
+| `archiveChatgptAdsAd` | `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/archive` | Archive an ad. |
+| `getChatgptAdsAdInsights` | `GET /api/uploadposts/ads/chatgpt/ads/{ad_id}/insights` | Get ad insights. |
+| `previewChatgptAdsAd` | `POST /api/uploadposts/ads/chatgpt/ads/{ad_id}/preview` | Preview an ad. |
+| `uploadChatgptAdsCreative` | `POST /api/uploadposts/ads/chatgpt/creatives` | Upload a creative image. |
+| `getChatgptAdsAccountInsights` | `GET /api/uploadposts/ads/chatgpt/insights` | Get ad account insights. |
+| `promoteChatgptAds` | `POST /api/uploadposts/ads/chatgpt/promote` | Launch an ad in one call. |
+<!-- /openapi:methods -->
 
 ## What a TikTok connection can do (`capabilities`)
 
@@ -1582,7 +1955,8 @@ try {
   // Machine-readable details:
   console.error(error.status);     // HTTP status
   console.error(error.code);       // `code` / `error_code` of the body, e.g. 'TEAM_SEAT_SUSPENDED'
-  console.error(error.reason);     // e.g. 'webhook_removed'
+  console.error(error.reason);     // e.g. 'webhook_removed', 'webhook_subscriptions_disabled'
+  console.error(error.errorType);  // `error_type` of the body, where the API sends one
   console.error(error.retryAfter); // seconds, on rate limits
   console.error(error.response);   // the full error body
 }
@@ -1591,6 +1965,32 @@ try {
 `unpublishPost()` cannot delete Instagram posts (Meta only allows it through
 Facebook Login, and Upload-Post connects Instagram with Instagram Login), TikTok
 posts (no delete API) or Reddit posts: they fail with a 400 that says so.
+
+Error bodies differ by area of the API (`error_code`, `reason`, `code` or
+`error_type`); the [error code catalogue](https://docs.upload-post.com) lists
+them. Methods marked *not generally available* answer HTTP 503 (for example
+`reason: 'webhook_subscriptions_disabled'` or `error_code: 'post_approvals_disabled'`)
+until the feature is switched on for your account.
+
+## Development: methods generated from the OpenAPI spec
+
+`codegen/openapi.json` is a copy of the API's OpenAPI spec. Every operation in it
+either has a hand-written method (listed in `codegen/sdk-map.json` under
+`existing`), is left out on purpose (`excluded`, with the reason), or gets a
+generated method from `codegen/generate.py` (Python 3, standard library only):
+
+```bash
+cp <spec> codegen/openapi.json        # the API's openapi/openapi.json
+python3 codegen/generate.py           # rewrites the generated parts of index.js, index.d.ts and this README
+python3 codegen/generate.py --check   # fails if they are out of date
+npm test
+```
+
+`test/openapi-coverage.test.js` fails when an operation of the spec has no
+method, and calls every method to check it sends the HTTP method and path of its
+operation. `test/upload-fields.test.js` fails when an upload drops a form field
+the spec gives that endpoint. Generated code sits between `<openapi:...>`
+markers: do not edit it by hand.
 
 ## Links
 
