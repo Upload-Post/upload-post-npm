@@ -217,7 +217,8 @@ await client.cancelScheduled('job-id');
 // List all profiles
 const users = await client.listUsers();
 
-// Create a new profile
+// Create a new profile (409 "Username already in use" if it exists,
+// 403 PROFILE_LIMIT_REACHED at the plan's profile limit)
 await client.createUser('new-profile');
 
 // Delete a profile
@@ -561,8 +562,9 @@ Asking a platform a question it cannot answer fails with
 
 `sendDm()` and `getDmConversations()` cover Instagram, Facebook Messenger
 (`platform: 'facebook'`), WhatsApp and Bluesky. `sendDm()` also sends from your
-own Telegram bot (`platform: 'telegram'`) to people who started it; reading
-Telegram conversations is not available yet. Options are camelCase; any other
+own Telegram bot (`platform: 'telegram'`) to people who started it, and
+`getDmConversations({ platform: 'telegram' })` reads them once the bot's updates
+are turned on. Options are camelCase; any other
 key is sent to the API as given.
 
 ```javascript
@@ -746,6 +748,40 @@ downgrade), the last invited members are **suspended, not removed**: their
 requests fail with HTTP 403 and `error.code === 'TEAM_SEAT_SUSPENDED'` until the
 owner upgrades or removes someone. `listTeamMembers()` (owner) and
 `listSharedAccounts()` (member) show `suspended` and `suspended_reason`.
+
+#### Roles and post approvals (not generally available yet)
+
+Team roles (admin, editor, contributor, viewer) and the approval queue are
+**not generally available yet**: while they are switched off the approval
+methods answer HTTP 503 (`post_approvals_disabled`) and every member acts as an
+Admin. The owner invites members and sets their role and profiles in the
+dashboard; that is not done with the API key. With the API you can read them:
+`getTeamRoles()` (roles and your own), `listTeamMembers()` and
+`listSharedAccounts()` (each entry adds `role` and `profiles`, `null` = every
+profile) and `listTeamAudit()` (owner and Admins).
+
+When an Editor uploads, the post is **not** published or scheduled: the upload
+answers HTTP 202 with `pending_approval: true`, `approval_id`,
+`approval_status: 'pending_approval'` and `job_id: null` (a Contributor gets
+`approval_status: 'draft'`). A reviewer (owner or Admin) decides:
+
+```javascript
+const { items } = await client.listPostApprovals({ status: 'pending_approval' });
+const { counts, total } = await client.listPostApprovals({ countOnly: true });
+
+const { item } = await client.getPostApproval({ approvalId: items[0].approval_id });
+// version is required: the item.version you reviewed (409 approval_version_changed otherwise)
+await client.approvePostApproval({ approvalId: item.approval_id, version: item.version });
+// or: comment is required to reject
+await client.rejectPostApproval({ approvalId: item.approval_id, comment: 'Fix the caption' });
+```
+
+`editPostApproval()` and `withdrawPostApproval()` change or withdraw an open
+item. The end client of a white-label profile can decide too: generate the
+profile JWT with `generateJwt(username, { clientApproval: true })` and call
+`listClientPostApprovals({ token })`, `approveClientPostApproval({ token,
+approvalId, version })` or `rejectClientPostApproval({ token, approvalId,
+comment })` with that JWT instead of the API key.
 
 ### Post actions, best times, queue, Telegram, Bluesky and Google Business
 

@@ -1068,6 +1068,20 @@ declare module 'upload-post' {
     success: boolean;
     request_id?: string;
     message?: string;
+    /**
+     * Not generally available yet (team roles and post approvals). `true` when the
+     * caller is an Editor or Contributor team member (HTTP 202): nothing is
+     * published or scheduled; the post waits for review (`approval_status:
+     * 'pending_approval'`) or stays as a draft (`'draft'`). Follow it with
+     * `getPostApproval({ approvalId })` or `getStatus(request_id)`.
+     */
+    pending_approval?: boolean;
+    approval_id?: string;
+    approval_status?: 'pending_approval' | 'draft';
+    /** `null` while the post waits for approval. */
+    job_id?: string | null;
+    scheduled_date?: string | null;
+    queued?: boolean;
     data?: {
       status?: string;
       platforms?: Array<{
@@ -1496,6 +1510,10 @@ declare module 'upload-post' {
     /** Only when seat limits are enforced */
     suspended?: boolean;
     suspended_reason?: 'owner_plan_limit' | null;
+    /** With team roles on. */
+    role?: 'admin' | 'editor' | 'contributor' | 'viewer';
+    /** With team roles on: profiles this member can use (`null` = every profile). */
+    profiles?: string[] | null;
     [key: string]: any;
   }
 
@@ -1516,6 +1534,10 @@ declare module 'upload-post' {
       status: string;
       suspended?: boolean;
       suspended_reason?: 'owner_plan_limit' | null;
+      /** With team roles on: your role in that account. */
+      role?: string;
+      /** With team roles on: profiles you can use there (`null` = every profile). */
+      profiles?: string[] | null;
     }>;
   }
 
@@ -5237,10 +5259,12 @@ declare module 'upload-post' {
     listUsers(): Promise<UsersResponse>;
 
     /**
-     * Create a new user/profile
+     * Create a new user/profile. A username that already exists fails with 409
+     * ("Username already in use"); the profile limit of the plan with 403
+     * `PROFILE_LIMIT_REACHED`.
      * @param username - Profile name to create
      */
-    createUser(username: string): Promise<{ success: boolean; username?: string }>;
+    createUser(username: string): Promise<{ success: boolean; profile?: Record<string, any>; [key: string]: any }>;
 
     /**
      * Delete a user/profile
@@ -5270,10 +5294,17 @@ declare module 'upload-post' {
        * Returned back in the `profile` object of validateJwt.
        */
       uiLabels?: Record<string, string>;
+      /**
+       * Not generally available yet (post approvals). `true` lets the end client
+       * approve or reject the pending posts of this profile from the connect page
+       * (`listClientPostApprovals` and friends, called with this JWT). Stored on
+       * the profile; generate again with `false` to turn it off.
+       */
+      clientApproval?: boolean;
     }): Promise<JwtResponse>;
 
     /**
-     * Validate a JWT token
+     * Validate a JWT token (`GET`, the token goes in `Authorization: Bearer`).
      * @param jwt - JWT token to validate
      */
     validateJwt(jwt: string): Promise<{
@@ -5284,6 +5315,8 @@ declare module 'upload-post' {
         language?: 'en' | 'es' | 'de' | 'fr' | 'pt' | 'pl' | 'tr';
         /** The ui_labels sent to generateJwt, echoed back for the connection page. */
         ui_labels?: Record<string, string>;
+        /** While post approvals are on: whether the end client may approve posts with this JWT. */
+        client_approval?: boolean;
         [key: string]: any;
       };
       [key: string]: any;
@@ -5614,9 +5647,11 @@ declare module 'upload-post' {
 
     /**
      * Queue settings, including `slots_mode`, `auto_slots` and `effective_slots`.
+     * `configured` is `false` while the queue of the profile was never saved
+     * (`queue_settings` then shows the defaults).
      * @see https://docs.upload-post.com/api/queue-system
      */
-    getQueueSettings(options: { profileUsername: string } & ApiParams): Promise<ApiResponse>;
+    getQueueSettings(options: { profileUsername: string } & ApiParams): Promise<ApiResponse & { queue_settings?: Record<string, any>; configured?: boolean }>;
 
     /**
      * Update the queue. `slots: "auto"` (or `slots_mode: "auto"`) fills the best hours automatically (`auto_slots_count`, `auto_platforms`, `refresh`); a `slots` array switches back to fixed slots.

@@ -216,3 +216,44 @@ describe('new publish fields', () => {
     assert.equal(f.pinterest_sponsor_id, '9');
   });
 });
+
+describe('generateJwt', () => {
+  const spec = JSON.parse(fs.readFileSync(new URL('../codegen/openapi.json', import.meta.url)));
+  const resolve = (node) => {
+    while (node && node.$ref) node = node.$ref.slice(2).split('/').reduce((n, part) => n[part], spec);
+    return node || {};
+  };
+  const sample = (schema) => {
+    schema = resolve(schema);
+    if (schema.type === 'boolean') return true;
+    if (schema.type === 'array') return ['tiktok'];
+    if (schema.type === 'object') return { 'connect.title': 'x' };
+    return schema.enum ? schema.enum[0] : 'x';
+  };
+
+  test('sends every body field of the spec', async () => {
+    const op = spec.paths['/uploadposts/users/generate-jwt'].post;
+    const schema = resolve(op.requestBody.content['application/json'].schema);
+    const options = {};
+    for (const [name, prop] of Object.entries(schema.properties)) {
+      if (name !== 'username') options[camel(name)] = sample(prop);
+    }
+    await client().generateJwt('p', options);
+    const body = JSON.parse(last().data);
+    for (const name of Object.keys(schema.properties)) {
+      assert.ok(name in body, `generateJwt drops ${name}`);
+    }
+  });
+
+  test('clientApproval false is sent, not dropped', async () => {
+    await client().generateJwt('p', { clientApproval: false });
+    assert.equal(JSON.parse(last().data).client_approval, false);
+  });
+
+  test('validateJwt is a GET with the token as Bearer', async () => {
+    await client().validateJwt('tok');
+    assert.equal(last().method, 'get');
+    assert.equal(urlPath(), '/uploadposts/users/validate-jwt');
+    assert.equal(last().headers.Authorization, 'Bearer tok');
+  });
+});

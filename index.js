@@ -1682,10 +1682,12 @@ export class UploadPost {
   }
 
   /**
-   * Create a new user/profile
-   * 
+   * Create a new user/profile. A username that already exists fails with 409
+   * ("Username already in use"); the profile limit of the plan with 403
+   * `PROFILE_LIMIT_REACHED`.
+   *
    * @param {string} username - Profile name to create
-   * @returns {Promise<Object>} Created user
+   * @returns {Promise<Object>} `{ success, profile }`
    */
   async createUser(username) {
     return this._request('/uploadposts/users', 'POST', { username });
@@ -1717,6 +1719,7 @@ export class UploadPost {
    * @param {string} [options.connectDescription] - Custom description for the connection page
    * @param {('en'|'es'|'de'|'fr'|'pt'|'pl'|'tr')} [options.language] - Force the connection page language for this profile. When omitted, the page auto-detects the visitor's browser language and falls back to English.
    * @param {Object.<string, string>} [options.uiLabels] - Flat map of i18n dot-path keys to replacement strings, e.g. `{ 'connect.title': 'Link your accounts' }`. Max 100 entries; keys must match `^[a-zA-Z0-9_.]+$` and values are strings of up to 300 characters. Returned back in the `profile` object of validateJwt.
+   * @param {boolean} [options.clientApproval] - Not generally available yet (post approvals). `true` lets the end client approve or reject the pending posts of this profile from the connect page (`listClientPostApprovals`, `approveClientPostApproval`, `rejectClientPostApproval` with this JWT). Stored on the profile; generate again with `false` to turn it off.
    * @returns {Promise<Object>} JWT and connection URL
    */
   async generateJwt(username, options = {}) {
@@ -1731,12 +1734,15 @@ export class UploadPost {
     if (options.connectDescription) body.connect_description = options.connectDescription;
     if (options.language) body.language = options.language;
     if (options.uiLabels) body.ui_labels = options.uiLabels;
+    if (options.clientApproval !== undefined) body.client_approval = options.clientApproval;
     return this._request('/uploadposts/users/generate-jwt', 'POST', body);
   }
 
   /**
-   * Validate a JWT token
-   * 
+   * Validate a JWT token (`GET`, the token goes in `Authorization: Bearer`).
+   * While post approvals are on, `profile.client_approval` says whether the
+   * end client may approve posts with this JWT.
+   *
    * @param {string} jwt - JWT token to validate
    * @returns {Promise<Object>} Validation result
    */
@@ -1935,7 +1941,10 @@ export class UploadPost {
    * `actAsUser` gets 403). When seat limits are enforced each member carries
    * `suspended` / `suspended_reason` (`owner_plan_limit`) and the response adds
    * `plan` and `seat_limit`: after a downgrade the last invited members are
-   * suspended, not removed, until you upgrade or remove someone.
+   * suspended, not removed, until you upgrade or remove someone. With team
+   * roles on, each member also has `role` (admin, editor, contributor, viewer)
+   * and `profiles` (`null` = every profile). Inviting members and changing
+   * roles is done by the owner in the dashboard, not with the API key.
    *
    * @returns {Promise<Object>} `{ success, team_members, plan?, seat_limit? }`
    */
@@ -1947,8 +1956,9 @@ export class UploadPost {
    * List the accounts shared with you as a team member. Each one may carry
    * `suspended` / `suspended_reason`: a suspended seat cannot act on that
    * account (403 `TEAM_SEAT_SUSPENDED`) until its owner upgrades or frees a seat.
+   * With team roles on, each account also has your `role` and `profiles` there.
    *
-   * @returns {Promise<Object>} `{ success, accounts: [{ owner_email, owner_name, status, suspended?, suspended_reason? }] }`
+   * @returns {Promise<Object>} `{ success, accounts: [{ owner_email, owner_name, status, suspended?, suspended_reason?, role?, profiles? }] }`
    */
   async listSharedAccounts() {
     return this._request('/uploadposts/teams/shared-with-me', 'GET');
@@ -2696,6 +2706,8 @@ export class UploadPost {
 
   /**
    * Queue settings, including `slots_mode`, `auto_slots` and `effective_slots`.
+   * `configured` is `false` while the queue of the profile was never saved
+   * (`queue_settings` then shows the defaults).
    * @see https://docs.upload-post.com/api/queue-system
    * @param {Object} options - `profileUsername` and any other API field
    * @returns {Promise<Object>}

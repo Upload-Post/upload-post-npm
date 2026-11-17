@@ -41,6 +41,14 @@ additions: no existing method changes its name, arguments or result.
   `platforms: ['telegram']` (default still LinkedIn only) with the Telegram options.
 - `error.errorType` (the `error_type` of the answer, where the API sends one).
 - `firstCommentMedia` is now in the TypeScript types.
+- `generateJwt(username, { clientApproval })`: lets the end client approve posts
+  from the connect page (post approvals, not generally available yet). It was
+  dropped before.
+- Types and docs for the new answers: `UploadResponse` gains `pending_approval`,
+  `approval_id`, `approval_status` (HTTP 202 for Editors and Contributors),
+  team members and shared accounts gain `role` / `profiles`, `getQueueSettings`
+  gains `configured`, `validateJwt` gains `profile.client_approval`. README:
+  roles and post approvals, and reading Telegram DMs (`getDmConversations`).
 
 ### Fixed
 
@@ -57,5 +65,6 @@ additions: no existing method changes its name, arguments or result.
 - `test/openapi-coverage.test.js`: every operation of the spec has a method and
   each method sends the HTTP method and path of its operation.
 - `test/upload-fields.test.js`: the uploads send every form field the spec gives them.
+- `test/resource-endpoints.test.js`: `generateJwt` sends every body field of the spec.
 - `.github/workflows/test.yml` runs the tests, the generator check and the type
   check on every push and pull request.
