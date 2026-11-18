@@ -20,11 +20,25 @@ export class UploadPost {
    *   owner's current plan no longer covers your team seat, requests fail with HTTP
    *   403 and `error.code === 'TEAM_SEAT_SUSPENDED'` until the owner upgrades or
    *   frees a seat.
+   * @param {number} [options.timeout=60000] - Milliseconds a request may take
+   *   before it fails with `error.code === 'ECONNABORTED'`. `0` = no limit.
+   * @param {number} [options.uploadTimeout=600000] - The same for uploads and
+   *   other requests that send or download a file (multipart bodies, file
+   *   answers). A synchronous upload waits on the server before it answers and
+   *   a big video takes minutes to send, so this one is longer. `0` = no limit.
    */
   constructor(apiKey, options = {}) {
     this.apiKey = apiKey;
     this.baseUrl = API_BASE_URL;
     this.actAsUser = options.actAsUser || null;
+    this.timeout = UploadPost._timeoutOption(options.timeout, 60000);
+    this.uploadTimeout = UploadPost._timeoutOption(options.uploadTimeout, 600000);
+  }
+
+  /** @private */
+  static _timeoutOption(value, fallback) {
+    const ms = Number(value);
+    return value === undefined || value === null || !Number.isFinite(ms) || ms < 0 ? fallback : ms;
   }
 
   /**
@@ -60,6 +74,8 @@ export class UploadPost {
     // Query string on a request with a body, and file answers (generated methods).
     if (requestConfig.params) config.params = { ...(config.params || {}), ...requestConfig.params };
     if (requestConfig.responseType) config.responseType = requestConfig.responseType;
+    // Without a timeout axios waits for ever on a connection that stalls.
+    config.timeout = (isFormData || requestConfig.responseType) ? this.uploadTimeout : this.timeout;
 
     try {
       const response = await axios(config);
@@ -98,6 +114,18 @@ export class UploadPost {
   _idempotencyHeaders(options) {
     const key = options.idempotencyKey || options.requestId;
     return key ? { 'Idempotency-Key': String(key) } : {};
+  }
+
+  /**
+   * A required value that goes in the URL path, encoded. An empty one would
+   * send `/undefined` (or drop the segment), so it fails before the request.
+   * @private
+   */
+  _pathParam(name, value) {
+    if (value === undefined || value === null || String(value).trim() === '') {
+      throw new Error(`Upload-Post: ${name} is required`);
+    }
+    return encodeURIComponent(String(value));
   }
 
   /**
@@ -1378,20 +1406,25 @@ export class UploadPost {
    * Get analytics for a profile
    *
    * @param {string} profileUsername - Profile username
-   * @param {Object} [options] - Query options
-   * @param {string[]} [options.platforms] - Filter by platforms (instagram, linkedin, facebook, x, youtube, tiktok, threads, pinterest, reddit)
+   * @param {Object} options - Query options
+   * @param {string[]} options.platforms - Required: the platforms to read (instagram, linkedin, facebook, x, youtube, tiktok, threads, pinterest, reddit); an array or a comma-separated string
    * @param {string} [options.pageId] - Facebook Page ID (required for Facebook analytics)
    * @param {string} [options.pageUrn] - LinkedIn organization/company page URN or numeric ID. LinkedIn analytics are only available for pages you administer; personal profiles are not supported (LinkedIn exposes no member-level analytics). Defaults to the first administered organization page.
    * @returns {Promise<Object>} Analytics data per platform
    */
   async getAnalytics(profileUsername, options = {}) {
-    const params = {};
-    if (options.platforms && options.platforms.length > 0) {
-      params.platforms = options.platforms.join(',');
+    const profile = this._pathParam('profileUsername', profileUsername);
+    const platforms = Array.isArray(options.platforms)
+      ? options.platforms.filter((p) => p !== undefined && p !== null && String(p).trim() !== '').join(',')
+      : String(options.platforms ?? '').trim();
+    if (!platforms) {
+      // The API answers 400 without it.
+      throw new Error('Upload-Post: platforms is required (e.g. { platforms: [\'instagram\'] })');
     }
+    const params = { platforms };
     if (options.pageId) params.page_id = options.pageId;
     if (options.pageUrn) params.page_urn = options.pageUrn;
-    return this._request(`/analytics/${encodeURIComponent(profileUsername)}`, 'GET', params);
+    return this._request(`/analytics/${profile}`, 'GET', params);
   }
 
   /**
@@ -1421,7 +1454,7 @@ export class UploadPost {
     if (options.metrics && options.metrics.length > 0) {
       params.metrics = options.metrics.join(',');
     }
-    return this._request(`/uploadposts/total-impressions/${encodeURIComponent(profileUsername)}`, 'GET', params);
+    return this._request(`/uploadposts/total-impressions/${this._pathParam('profileUsername', profileUsername)}`, 'GET', params);
   }
 
   /**
@@ -1451,7 +1484,7 @@ export class UploadPost {
    * @returns {Promise<Object>} Post analytics with per-platform metrics
    */
   async getPostAnalytics(requestId) {
-    return this._request(`/uploadposts/post-analytics/${encodeURIComponent(requestId)}`, 'GET');
+    return this._request(`/uploadposts/post-analytics/${this._pathParam('requestId', requestId)}`, 'GET');
   }
 
   /**
@@ -1621,7 +1654,7 @@ export class UploadPost {
    * @returns {Promise<Object>} Cancellation result
    */
   async cancelScheduled(jobId) {
-    return this._request(`/uploadposts/schedule/${jobId}`, 'DELETE');
+    return this._request(`/uploadposts/schedule/${this._pathParam('jobId', jobId)}`, 'DELETE');
   }
 
   /**
@@ -1651,6 +1684,7 @@ export class UploadPost {
    * @returns {Promise<Object>} Edit result
    */
   async editScheduled(jobId, options = {}) {
+    const job = this._pathParam('jobId', jobId);
     const body = {};
     if (options.scheduledDate) body.scheduled_date = options.scheduledDate;
     if (options.timezone) body.timezone = options.timezone;
@@ -1667,7 +1701,7 @@ export class UploadPost {
       if (options.coverFilename) body.cover_filename = options.coverFilename;
       if (options.coverContentType) body.cover_content_type = options.coverContentType;
     }
-    return this._request(`/uploadposts/schedule/${jobId}`, 'PATCH', body);
+    return this._request(`/uploadposts/schedule/${job}`, 'PATCH', body);
   }
 
   // ==================== User Management ====================
@@ -1919,7 +1953,7 @@ export class UploadPost {
    * @returns {Promise<Object>} `{ success, delivery }`
    */
   async getWebhookDelivery(deliveryId) {
-    return this._request(`/uploadposts/webhooks/deliveries/${encodeURIComponent(deliveryId)}`, 'GET');
+    return this._request(`/uploadposts/webhooks/deliveries/${this._pathParam('deliveryId', deliveryId)}`, 'GET');
   }
 
   /**
@@ -1935,7 +1969,7 @@ export class UploadPost {
    * @returns {Promise<Object>} `{ success, delivery }` (the new delivery, with `redelivery_of`)
    */
   async redeliverWebhook(deliveryId) {
-    return this._request(`/uploadposts/webhooks/deliveries/${encodeURIComponent(deliveryId)}/redeliver`, 'POST', {});
+    return this._request(`/uploadposts/webhooks/deliveries/${this._pathParam('deliveryId', deliveryId)}/redeliver`, 'POST', {});
   }
 
   // ==================== Teams ====================

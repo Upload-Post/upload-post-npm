@@ -27,6 +27,24 @@ const response = await client.upload('./video.mp4', {
 console.log(response);
 ```
 
+### Timeouts
+
+Every request has a timeout: 60 s by default, and 10 minutes for uploads and
+other requests that send or download a file (a synchronous upload waits on the
+server before it answers, and a big video takes minutes to send). A request
+that runs out fails with `error.code === 'ECONNABORTED'`. Change them in
+milliseconds (`0` = no limit):
+
+```javascript
+const client = new UploadPost('YOUR_API_KEY', {
+  timeout: 30000,        // every other call
+  uploadTimeout: 1800000 // uploads and file transfers
+});
+```
+
+A timed-out upload may still have reached the API. Retry it with the same
+`idempotencyKey` so it can not be published twice.
+
 ## Features
 
 - ✅ **Video Upload** - TikTok, Instagram, YouTube, LinkedIn, Facebook, Pinterest, Threads, Bluesky, X, Discord, Telegram

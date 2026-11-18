@@ -1378,6 +1378,17 @@ declare module 'upload-post' {
      * with HTTP 403 and `error.code === 'TEAM_SEAT_SUSPENDED'`.
      */
     actAsUser?: string;
+    /**
+     * Milliseconds a request may take before it fails with
+     * `error.code === 'ECONNABORTED'`. Default 60000 (60 s); `0` = no limit.
+     */
+    timeout?: number;
+    /**
+     * The same for uploads and other requests that send or download a file.
+     * Default 600000 (10 min): a synchronous upload waits on the server before it
+     * answers and a big video takes minutes to send. `0` = no limit.
+     */
+    uploadTimeout?: number;
   }
 
   /**
@@ -5048,9 +5059,10 @@ declare module 'upload-post' {
     /**
      * Get analytics for a profile
      * @param profileUsername - Profile username
-     * @param options - Query options
+     * @param options - Query options. `platforms` is required (the API answers 400
+     *   without it): the call throws before sending when it or the profile is empty.
      */
-    getAnalytics(profileUsername: string, options?: { platforms?: string[]; pageId?: string; pageUrn?: string }): Promise<AnalyticsResponse>;
+    getAnalytics(profileUsername: string, options?: { platforms?: string[] | string; pageId?: string; pageUrn?: string }): Promise<AnalyticsResponse>;
 
     /**
      * Get total impressions for a profile from daily snapshots
