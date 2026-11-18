@@ -101,6 +101,18 @@ export class UploadPost {
   }
 
   /**
+   * A required value that goes in the URL path, encoded. An empty one would
+   * send `/undefined` (or drop the segment), so it fails before the request.
+   * @private
+   */
+  _pathParam(name, value) {
+    if (value === undefined || value === null || String(value).trim() === '') {
+      throw new Error(`Upload-Post: ${name} is required`);
+    }
+    return encodeURIComponent(String(value));
+  }
+
+  /**
    * First defined alias. Upload option keys are camelCase; a few fields also
    * accept the snake_case name the API uses.
    * @private
@@ -1378,20 +1390,25 @@ export class UploadPost {
    * Get analytics for a profile
    *
    * @param {string} profileUsername - Profile username
-   * @param {Object} [options] - Query options
-   * @param {string[]} [options.platforms] - Filter by platforms (instagram, linkedin, facebook, x, youtube, tiktok, threads, pinterest, reddit)
+   * @param {Object} options - Query options
+   * @param {string[]} options.platforms - Required: the platforms to read (instagram, linkedin, facebook, x, youtube, tiktok, threads, pinterest, reddit); an array or a comma-separated string
    * @param {string} [options.pageId] - Facebook Page ID (required for Facebook analytics)
    * @param {string} [options.pageUrn] - LinkedIn organization/company page URN or numeric ID. LinkedIn analytics are only available for pages you administer; personal profiles are not supported (LinkedIn exposes no member-level analytics). Defaults to the first administered organization page.
    * @returns {Promise<Object>} Analytics data per platform
    */
   async getAnalytics(profileUsername, options = {}) {
-    const params = {};
-    if (options.platforms && options.platforms.length > 0) {
-      params.platforms = options.platforms.join(',');
+    const profile = this._pathParam('profileUsername', profileUsername);
+    const platforms = Array.isArray(options.platforms)
+      ? options.platforms.filter((p) => p !== undefined && p !== null && String(p).trim() !== '').join(',')
+      : String(options.platforms ?? '').trim();
+    if (!platforms) {
+      // The API answers 400 without it.
+      throw new Error('Upload-Post: platforms is required (e.g. { platforms: [\'instagram\'] })');
     }
+    const params = { platforms };
     if (options.pageId) params.page_id = options.pageId;
     if (options.pageUrn) params.page_urn = options.pageUrn;
-    return this._request(`/analytics/${encodeURIComponent(profileUsername)}`, 'GET', params);
+    return this._request(`/analytics/${profile}`, 'GET', params);
   }
 
   /**
@@ -1421,7 +1438,7 @@ export class UploadPost {
     if (options.metrics && options.metrics.length > 0) {
       params.metrics = options.metrics.join(',');
     }
-    return this._request(`/uploadposts/total-impressions/${encodeURIComponent(profileUsername)}`, 'GET', params);
+    return this._request(`/uploadposts/total-impressions/${this._pathParam('profileUsername', profileUsername)}`, 'GET', params);
   }
 
   /**
@@ -1451,7 +1468,7 @@ export class UploadPost {
    * @returns {Promise<Object>} Post analytics with per-platform metrics
    */
   async getPostAnalytics(requestId) {
-    return this._request(`/uploadposts/post-analytics/${encodeURIComponent(requestId)}`, 'GET');
+    return this._request(`/uploadposts/post-analytics/${this._pathParam('requestId', requestId)}`, 'GET');
   }
 
   /**
@@ -1621,7 +1638,7 @@ export class UploadPost {
    * @returns {Promise<Object>} Cancellation result
    */
   async cancelScheduled(jobId) {
-    return this._request(`/uploadposts/schedule/${jobId}`, 'DELETE');
+    return this._request(`/uploadposts/schedule/${this._pathParam('jobId', jobId)}`, 'DELETE');
   }
 
   /**
@@ -1651,6 +1668,7 @@ export class UploadPost {
    * @returns {Promise<Object>} Edit result
    */
   async editScheduled(jobId, options = {}) {
+    const job = this._pathParam('jobId', jobId);
     const body = {};
     if (options.scheduledDate) body.scheduled_date = options.scheduledDate;
     if (options.timezone) body.timezone = options.timezone;
@@ -1667,7 +1685,7 @@ export class UploadPost {
       if (options.coverFilename) body.cover_filename = options.coverFilename;
       if (options.coverContentType) body.cover_content_type = options.coverContentType;
     }
-    return this._request(`/uploadposts/schedule/${jobId}`, 'PATCH', body);
+    return this._request(`/uploadposts/schedule/${job}`, 'PATCH', body);
   }
 
   // ==================== User Management ====================
@@ -1919,7 +1937,7 @@ export class UploadPost {
    * @returns {Promise<Object>} `{ success, delivery }`
    */
   async getWebhookDelivery(deliveryId) {
-    return this._request(`/uploadposts/webhooks/deliveries/${encodeURIComponent(deliveryId)}`, 'GET');
+    return this._request(`/uploadposts/webhooks/deliveries/${this._pathParam('deliveryId', deliveryId)}`, 'GET');
   }
 
   /**
@@ -1935,7 +1953,7 @@ export class UploadPost {
    * @returns {Promise<Object>} `{ success, delivery }` (the new delivery, with `redelivery_of`)
    */
   async redeliverWebhook(deliveryId) {
-    return this._request(`/uploadposts/webhooks/deliveries/${encodeURIComponent(deliveryId)}/redeliver`, 'POST', {});
+    return this._request(`/uploadposts/webhooks/deliveries/${this._pathParam('deliveryId', deliveryId)}/redeliver`, 'POST', {});
   }
 
   // ==================== Teams ====================

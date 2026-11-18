@@ -5048,9 +5048,10 @@ declare module 'upload-post' {
     /**
      * Get analytics for a profile
      * @param profileUsername - Profile username
-     * @param options - Query options
+     * @param options - Query options. `platforms` is required (the API answers 400
+     *   without it): the call throws before sending when it or the profile is empty.
      */
-    getAnalytics(profileUsername: string, options?: { platforms?: string[]; pageId?: string; pageUrn?: string }): Promise<AnalyticsResponse>;
+    getAnalytics(profileUsername: string, options?: { platforms?: string[] | string; pageId?: string; pageUrn?: string }): Promise<AnalyticsResponse>;
 
     /**
      * Get total impressions for a profile from daily snapshots
