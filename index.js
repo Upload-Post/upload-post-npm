@@ -20,11 +20,25 @@ export class UploadPost {
    *   owner's current plan no longer covers your team seat, requests fail with HTTP
    *   403 and `error.code === 'TEAM_SEAT_SUSPENDED'` until the owner upgrades or
    *   frees a seat.
+   * @param {number} [options.timeout=60000] - Milliseconds a request may take
+   *   before it fails with `error.code === 'ECONNABORTED'`. `0` = no limit.
+   * @param {number} [options.uploadTimeout=600000] - The same for uploads and
+   *   other requests that send or download a file (multipart bodies, file
+   *   answers). A synchronous upload waits on the server before it answers and
+   *   a big video takes minutes to send, so this one is longer. `0` = no limit.
    */
   constructor(apiKey, options = {}) {
     this.apiKey = apiKey;
     this.baseUrl = API_BASE_URL;
     this.actAsUser = options.actAsUser || null;
+    this.timeout = UploadPost._timeoutOption(options.timeout, 60000);
+    this.uploadTimeout = UploadPost._timeoutOption(options.uploadTimeout, 600000);
+  }
+
+  /** @private */
+  static _timeoutOption(value, fallback) {
+    const ms = Number(value);
+    return value === undefined || value === null || !Number.isFinite(ms) || ms < 0 ? fallback : ms;
   }
 
   /**
@@ -60,6 +74,8 @@ export class UploadPost {
     // Query string on a request with a body, and file answers (generated methods).
     if (requestConfig.params) config.params = { ...(config.params || {}), ...requestConfig.params };
     if (requestConfig.responseType) config.responseType = requestConfig.responseType;
+    // Without a timeout axios waits for ever on a connection that stalls.
+    config.timeout = (isFormData || requestConfig.responseType) ? this.uploadTimeout : this.timeout;
 
     try {
       const response = await axios(config);
