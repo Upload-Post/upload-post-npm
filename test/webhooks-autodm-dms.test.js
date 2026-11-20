@@ -7,6 +7,9 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import axios from 'axios';
+import fs from 'fs';
+import os from 'os';
+import { join } from 'path';
 import { UploadPost } from '../index.js';
 
 let sent;
@@ -207,6 +210,33 @@ describe('direct messages', () => {
     assert.deepEqual(body().cta_url, { url: 'https://e.com' });
   });
 
+  test('sendDm sends every WhatsApp field with its API name and shape', async () => {
+    const template = { name: 'order_update', language: 'en_US', components: [{ type: 'body', parameters: [{ type: 'text', text: '42' }] }] };
+    await client().sendDm({
+      platform: 'whatsapp', user: 'p1', recipientId: '+34600000000', message: 'Pick one',
+      attachments: [{ type: 'image', media_id: 'm1', caption: 'c' }, { type: 'document', url: 'https://e.com/a.pdf', filename: 'a.pdf' }],
+      template, replyTo: 'wamid.A', location: { latitude: 40.4, longitude: -3.7, name: 'Shop' },
+      contacts: [{ name: { formatted_name: 'Ana' }, phones: [{ phone: '+34600000001' }] }],
+      buttons: [{ title: 'Yes', id: 'y' }, 'No'],
+      list: { button: 'Options', sections: [{ rows: [{ id: 'r1', title: 'One' }] }] },
+      ctaUrl: { display_text: 'Open', url: 'https://e.com' }, header: 'Hi', footer: 'Bye',
+      reaction: { message_id: 'wamid.B', emoji: '👍' }, senderAction: 'mark_read', messageId: 'wamid.C', typing: true,
+      attachment: { type: 'sticker', media_id: 's1' },
+    });
+    assert.equal(path(), '/uploadposts/dms/send');
+    assert.deepEqual(body(), {
+      platform: 'whatsapp', user: 'p1', recipient_id: '+34600000000', message: 'Pick one',
+      attachments: [{ type: 'image', media_id: 'm1', caption: 'c' }, { type: 'document', url: 'https://e.com/a.pdf', filename: 'a.pdf' }],
+      template, reply_to: 'wamid.A', location: { latitude: 40.4, longitude: -3.7, name: 'Shop' },
+      contacts: [{ name: { formatted_name: 'Ana' }, phones: [{ phone: '+34600000001' }] }],
+      buttons: [{ title: 'Yes', id: 'y' }, 'No'],
+      list: { button: 'Options', sections: [{ rows: [{ id: 'r1', title: 'One' }] }] },
+      cta_url: { display_text: 'Open', url: 'https://e.com' }, header: 'Hi', footer: 'Bye',
+      reaction: { message_id: 'wamid.B', emoji: '👍' }, sender_action: 'mark_read', message_id: 'wamid.C', typing: true,
+      attachment: { type: 'sticker', media_id: 's1' },
+    });
+  });
+
   test('getDmConversations maps the Bluesky filters', async () => {
     await client().getDmConversations({
       platform: 'bluesky', user: 'p1', limit: 25, cursor: 'c1', participantId: 'alice.bsky.social',
@@ -218,6 +248,131 @@ describe('direct messages', () => {
       platform: 'bluesky', user: 'p1', limit: 25, cursor: 'c1', participant_id: 'alice.bsky.social',
       messages_limit: 1, conversation_id: 'convo1', messages_cursor: 'mc', status: 'request', read_state: 'unread',
     });
+  });
+});
+
+// Multipart body of the last request: { name: { headers, value } }.
+const readForm = (form) => new Promise((resolve, reject) => {
+  const chunks = [];
+  form.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+  form.on('end', () => {
+    const text = Buffer.concat(chunks).toString('utf8');
+    const parts = {};
+    for (const part of text.split(`--${form.getBoundary()}`)) {
+      const match = part.match(/^\r\n([\s\S]*?)\r\n\r\n([\s\S]*)\r\n$/);
+      if (!match) continue;
+      const name = match[1].match(/name="([^"]+)"/)[1];
+      parts[name] = { headers: match[1], value: match[2] };
+    }
+    resolve(parts);
+  });
+  form.on('error', reject);
+  form.resume();
+});
+
+describe('WhatsApp DM media, templates, business profile and QR codes', () => {
+  test('uploadDmMedia sends a local file as multipart with its name and type', async () => {
+    const dir = fs.mkdtempSync(join(os.tmpdir(), 'up-wa-'));
+    const file = join(dir, 'photo.jpg');
+    fs.writeFileSync(file, 'JPEGDATA');
+    await client().uploadDmMedia({ platform: 'whatsapp', user: 'p1', file, type: 'image', extraField: 'kept' });
+    assert.equal(method(), 'POST');
+    assert.equal(path(), '/uploadposts/dms/media');
+    assert.equal(last().timeout, 600000);
+    const parts = await readForm(last().data);
+    assert.equal(parts.platform.value, 'whatsapp');
+    assert.equal(parts.user.value, 'p1');
+    assert.equal(parts.type.value, 'image');
+    assert.equal(parts.extra_field.value, 'kept');
+    assert.equal(parts.file.value, 'JPEGDATA');
+    assert.match(parts.file.headers, /filename="photo\.jpg"/);
+    assert.match(parts.file.headers, /Content-Type: image\/jpeg/);
+  });
+
+  test('uploadDmMedia with a Buffer uses filename / contentType; Messenger pageId mapped', async () => {
+    await client().uploadDmMedia({
+      platform: 'facebook', user: 'p1', pageId: '123', file: Buffer.from('PNG'), filename: 'a.png', contentType: 'image/png',
+    });
+    const parts = await readForm(last().data);
+    assert.equal(parts.page_id.value, '123');
+    assert.match(parts.file.headers, /filename="a\.png"/);
+    assert.match(parts.file.headers, /Content-Type: image\/png/);
+    assert.equal(parts.filename, undefined);
+    assert.equal(parts.contentType, undefined);
+  });
+
+  test('uploadDmMedia refuses a URL or a missing file before any request', async () => {
+    await assert.rejects(client().uploadDmMedia({ user: 'p1', file: 'https://e.com/a.jpg' }), /local path/);
+    await assert.rejects(client().uploadDmMedia({ user: 'p1', file: '/nope/missing.jpg' }), /not found/);
+    await assert.rejects(client().uploadDmMedia({ user: 'p1' }), /file is required/);
+    assert.equal(sent.length, 0);
+  });
+
+  test('templates: list and delete in the query string, create in the JSON body', async () => {
+    await client().listDmTemplates({ platform: 'whatsapp', user: 'p1', status: 'APPROVED', limit: 50 });
+    assert.equal(method(), 'GET');
+    assert.equal(path(), '/uploadposts/dms/templates');
+    assert.deepEqual(last().params, { platform: 'whatsapp', user: 'p1', status: 'APPROVED', limit: 50 });
+
+    await client().createDmTemplate({
+      platform: 'whatsapp', user: 'p1', name: 'order_update', category: 'UTILITY', language: 'es',
+      body: 'Order {{1}} is ready', examples: ['42'], footer: 'Thanks',
+      buttons: [{ text: 'Track', url: 'https://e.com/t' }, { text: 'Call', phone_number: '+34600000000' }],
+    });
+    assert.equal(method(), 'POST');
+    assert.equal(path(), '/uploadposts/dms/templates');
+    assert.equal(last().params, undefined);
+    assert.deepEqual(body(), {
+      platform: 'whatsapp', user: 'p1', name: 'order_update', category: 'UTILITY', language: 'es',
+      body: 'Order {{1}} is ready', examples: ['42'], footer: 'Thanks',
+      buttons: [{ text: 'Track', url: 'https://e.com/t' }, { text: 'Call', phone_number: '+34600000000' }],
+    });
+
+    await client().deleteDmTemplate({ platform: 'whatsapp', user: 'p1', name: 'order_update' });
+    assert.equal(method(), 'DELETE');
+    assert.equal(path(), '/uploadposts/dms/templates');
+    assert.deepEqual(last().params, { platform: 'whatsapp', user: 'p1', name: 'order_update' });
+    assert.equal(last().data, undefined);
+  });
+
+  test('business profile: get, JSON update, and photo update as multipart', async () => {
+    await client().getWhatsappBusinessProfile({ user: 'p1' });
+    assert.equal(method(), 'GET');
+    assert.equal(path(), '/uploadposts/dms/whatsapp/profile');
+    assert.deepEqual(last().params, { user: 'p1' });
+
+    await client().updateWhatsappBusinessProfile({
+      user: 'p1', about: 'Open 9-5', websites: ['https://a.com', 'https://b.com'], vertical: 'RETAIL',
+    });
+    assert.equal(method(), 'POST');
+    assert.deepEqual(body(), {
+      user: 'p1', about: 'Open 9-5', websites: ['https://a.com', 'https://b.com'], vertical: 'RETAIL',
+    });
+
+    await client().updateWhatsappBusinessProfile({
+      user: 'p1', websites: ['https://a.com', 'https://b.com'], file: Buffer.from('IMG'), filename: 'logo.png',
+    });
+    const parts = await readForm(last().data);
+    assert.equal(parts.user.value, 'p1');
+    assert.equal(parts.websites.value, 'https://a.com,https://b.com');
+    assert.equal(parts.file.value, 'IMG');
+    assert.match(parts.file.headers, /Content-Type: image\/png/);
+  });
+
+  test('QR codes: list, create (JSON body) and delete (query)', async () => {
+    await client().listWhatsappQrCodes({ user: 'p1' });
+    assert.equal(method(), 'GET');
+    assert.equal(path(), '/uploadposts/dms/whatsapp/qr');
+    assert.deepEqual(last().params, { user: 'p1' });
+
+    await client().createWhatsappQrCode({ user: 'p1', prefilledMessage: 'Hi!', code: 'ABC' });
+    assert.equal(method(), 'POST');
+    assert.deepEqual(body(), { user: 'p1', prefilled_message: 'Hi!', code: 'ABC' });
+
+    await client().deleteWhatsappQrCode({ user: 'p1', code: 'ABC' });
+    assert.equal(method(), 'DELETE');
+    assert.deepEqual(last().params, { user: 'p1', code: 'ABC' });
+    assert.equal(last().data, undefined);
   });
 });
 

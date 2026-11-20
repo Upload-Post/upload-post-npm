@@ -57,7 +57,7 @@ A timed-out upload may still have reached the API. Retry it with the same
 - ✅ **Analytics** - Get engagement metrics
 - ✅ **Audience** - Who follows a profile, per platform
 - ✅ **Comments** - Read, reply, moderate; replies under a comment on TikTok, Threads, YouTube, Instagram, Facebook and LinkedIn
-- ✅ **Direct messages** - Instagram, Messenger, WhatsApp and Bluesky inboxes
+- ✅ **Direct messages** - Instagram, WhatsApp (messaging only: WhatsApp does not publish posts), Bluesky and Telegram bot DMs; Messenger is a limited rollout
 - ✅ **AutoDM** - Per-post monitors and account-wide Instagram rules (every post, story replies, story mentions, keyword DMs)
 - ✅ **Webhooks** - Delivery log, retries and redelivery
 - ✅ **Teams** - Act on the account you were invited to (`actAsUser`)
@@ -578,8 +578,9 @@ Asking a platform a question it cannot answer fails with
 
 ### Direct messages
 
-`sendDm()` and `getDmConversations()` cover Instagram, Facebook Messenger
-(`platform: 'facebook'`), WhatsApp and Bluesky. `sendDm()` also sends from your
+`sendDm()` and `getDmConversations()` cover Instagram, WhatsApp, Bluesky and
+Facebook Messenger (`platform: 'facebook'`; Messenger is a limited rollout, other
+accounts get `403 messenger_not_enabled`). `sendDm()` also sends from your
 own Telegram bot (`platform: 'telegram'`) to people who started it, and
 `getDmConversations({ platform: 'telegram' })` reads them once the bot's updates
 are turned on. Options are camelCase; any other
@@ -602,6 +603,84 @@ await client.sendDm({
   buttons: [{ title: 'Open the guide', url: 'https://example.com/guide' }],
 });
 ```
+
+#### WhatsApp DMs
+
+WhatsApp is a messaging channel, not a place to publish: the upload methods
+never send to it. Connect the profile's WhatsApp Business number (the connect
+page, or `generateJwt(..., { platforms: ['whatsapp'] })`) and write from it with
+`sendDm({ platform: 'whatsapp' })`. `recipientId` is the phone number in
+international format. Meta bills the conversations to your WhatsApp Business
+Account.
+
+Free text, media and interactive messages only go inside the **24-hour
+customer-service window** that opens each time the person writes to you.
+Outside it Meta refuses (`meta_error_code` 131047): send an approved template.
+
+```javascript
+// Inside the 24 h window: text, a reply or interactive buttons
+await client.sendDm({
+  platform: 'whatsapp', user: 'my-profile', recipientId: '+34600000000',
+  message: 'Your order is ready. Pick it up today?',
+  buttons: [{ id: 'yes', title: 'Yes' }, { id: 'later', title: 'Tomorrow' }],
+});
+
+// Outside the window: an approved template
+await client.sendDm({
+  platform: 'whatsapp', user: 'my-profile', recipientId: '+34600000000',
+  template: {
+    name: 'order_ready', language: 'en_US',
+    components: [{ type: 'body', parameters: [{ type: 'text', text: '#1042' }] }],
+  },
+});
+
+// Media: upload a local file (or put an https `url` straight in the attachment)
+const media = await client.uploadDmMedia({ platform: 'whatsapp', user: 'my-profile', file: './invoice.pdf' });
+await client.sendDm({
+  platform: 'whatsapp', user: 'my-profile', recipientId: '+34600000000',
+  attachments: { type: media.type, media_id: media.media_id, filename: 'invoice.pdf' },
+});
+
+// Mark an inbound message as read and show "typing..." (no DM allowance used)
+await client.sendDm({
+  platform: 'whatsapp', user: 'my-profile', recipientId: '+34600000000',
+  senderAction: 'mark_read', messageId: 'wamid.HBg...', typing: true,
+});
+```
+
+Other `sendDm` fields for WhatsApp: `attachments` (up to 10, `{ type: 'image' |
+'video' | 'audio' | 'document' | 'sticker', url | media_id, caption?, filename? }`),
+`replyTo` (wamid), `location` (`{ latitude, longitude, name?, address? }`),
+`contacts`, `list` (`{ button, sections }`), `ctaUrl` (`{ display_text, url }`),
+`header`, `footer` and `reaction` (`{ message_id, emoji }`). Inbound media arrive
+with a `media_id`: download them with `downloadDmMedia({ platform: 'whatsapp',
+user, mediaId })`. New messages also reach you as `dm_received` webhooks.
+
+```javascript
+// Templates (Meta reviews new ones: PENDING, then APPROVED or REJECTED)
+await client.listDmTemplates({ user: 'my-profile', status: 'APPROVED' });
+await client.createDmTemplate({
+  user: 'my-profile', name: 'order_ready', category: 'UTILITY', language: 'en_US',
+  body: 'Your order {{1}} is ready.', examples: ['#1042'],
+});
+await client.deleteDmTemplate({ user: 'my-profile', name: 'order_ready' });
+
+// Business profile of the number (file = new profile photo, JPEG/PNG)
+await client.getWhatsappBusinessProfile({ user: 'my-profile' });
+await client.updateWhatsappBusinessProfile({
+  user: 'my-profile', about: 'Open 9-18', websites: ['https://example.com'], file: './logo.png',
+});
+
+// QR codes / wa.me links that open a chat with a prefilled message
+const { qr_code } = await client.createWhatsappQrCode({ user: 'my-profile', prefilledMessage: 'Hi! I want to order' });
+await client.listWhatsappQrCodes({ user: 'my-profile' });
+await client.deleteWhatsappQrCode({ user: 'my-profile', code: qr_code.code });
+```
+
+Errors come as `err.code`: 400 `whatsapp_invalid_request`, 401
+`whatsapp_reauth_required` (reconnect the number). Meta's own code is in
+`err.response.meta_error_code`: 131047 outside the window (send a template),
+131026 undeliverable, 131030 recipient not allowed on a test number.
 
 #### Bluesky DMs
 

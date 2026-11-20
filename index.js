@@ -1746,7 +1746,7 @@ export class UploadPost {
    * @param {string} [options.redirectUrl] - URL to redirect after linking
    * @param {string} [options.logoImage] - Logo image URL for the linking page
    * @param {string} [options.redirectButtonText] - Text for redirect button
-   * @param {string[]} [options.platforms] - Platforms to show for connection
+   * @param {string[]} [options.platforms] - Platforms to show for connection (e.g. `tiktok`, `instagram`, `youtube`, `linkedin`, `facebook`, `x`, `threads`, `pinterest`, `reddit`, `bluesky`, `google_business`, `telegram`, `whatsapp`; `whatsapp` connects a WhatsApp Business number for DMs)
    * @param {boolean} [options.showCalendar] - Whether to show the calendar view
    * @param {boolean} [options.readonlyCalendar] - Show only a read-only calendar (no editing, no account connection)
    * @param {string} [options.connectTitle] - Custom title for the connection page
@@ -2407,33 +2407,64 @@ export class UploadPost {
    * (`reply_markup`) and sender actions. Reading Telegram conversations needs
    * update receiving, which is not available yet.
    *
+   * WhatsApp (`platform: 'whatsapp'`, open to every account; it sends DMs
+   * only, never posts) writes from the WhatsApp Business number connected to
+   * the profile. `recipientId` is the phone number in international format.
+   * Free text (`message`, up to 4,096 characters), media and interactive
+   * messages only go inside the 24-hour customer-service window opened by the
+   * person's last message; outside it Meta refuses with `meta_error_code`
+   * 131047 and you have to send an approved `template` (see
+   * `listDmTemplates`). WhatsApp fields:
+   * - `attachments`: one object or up to 10, `{ type: 'image'|'video'|'audio'|'document'|'sticker',
+   *   url (https) | media_id (from `uploadDmMedia`), caption?, filename? }`; a
+   *   single image/video/document takes `message` as its caption.
+   * - `template`: `{ name, language: 'en_US', components: [...] }` (Meta format).
+   * - `replyTo`: wamid of the message you answer.
+   * - `location`: `{ latitude, longitude, name?, address? }`; `contacts`: 1-10
+   *   contacts (`{ name: { formatted_name }, phones: [{ phone }] }`).
+   * - Interactive (`message` is the body, max 1,024, no attachments):
+   *   `buttons` (up to 3 reply buttons, `{ title (<= 20), id? }` or strings),
+   *   `list` (`{ button, sections: [{ title?, rows: [{ id?, title, description? }] }] }`,
+   *   10 rows max), `ctaUrl` (`{ display_text, url }`), `header`/`footer` (text, <= 60).
+   * - `reaction` (emoji, with `messageId`, or `{ message_id, emoji }`; `''` removes it)
+   *   and `senderAction: 'mark_read'|'typing_on'` (on the inbound `messageId`;
+   *   `typing: true` with `mark_read` also shows typing) are not messages and do
+   *   not count against the daily DM allowance.
+   * - Errors: 400 `whatsapp_invalid_request`, 401 `whatsapp_reauth_required`
+   *   (reconnect the number); `meta_error_code` 131047 (outside the window: use
+   *   a template), 131026 (undeliverable), 131030 (recipient not allowed on a
+   *   test number).
+   *
+   * Messenger (`platform: 'facebook'`) is a limited rollout: accounts without
+   * it get `403 messenger_not_enabled`.
+   *
    * Known options are camelCase and mapped to the API names; any other key is
    * sent as given.
    *
    * @param {Object} options
    * @param {('instagram'|'facebook'|'whatsapp'|'bluesky'|'telegram')} options.platform
    * @param {string} options.user - Profile username
-   * @param {string} [options.recipientId] - Platform id of the person (Bluesky: handle/DID)
+   * @param {string} [options.recipientId] - Platform id of the person (WhatsApp: phone number; Bluesky: handle/DID)
    * @param {string} [options.conversationId] - Bluesky: send into this conversation
    * @param {string} [options.message] - Text (optional with attachments, templates or senderAction)
-   * @param {Object|Object[]} [options.attachments] - Media/attachments (Bluesky: a shared post)
-   * @param {Array<{title: string, url: string}>} [options.buttons] - Instagram/Messenger/WhatsApp buttons
+   * @param {Object|Object[]} [options.attachments] - Media/attachments (WhatsApp: `{ type, url | media_id, caption?, filename? }`; Bluesky: a shared post)
+   * @param {Array<Object|string>} [options.buttons] - Instagram/Messenger link buttons `{ title, url }`; WhatsApp reply buttons `{ title, id? }` (max 3)
    * @param {Object[]} [options.quickReplies] - Instagram/Messenger quick replies
    * @param {Object|Object[]} [options.genericTemplate] - Instagram generic template
-   * @param {string} [options.senderAction] - e.g. `typing_on`, `mark_seen`, `react`, `mark_read`
-   * @param {string|Object} [options.reaction] - Emoji for `react` (WhatsApp: reaction object)
-   * @param {string} [options.messageId] - Message to react to / mark read / delete
-   * @param {string} [options.replyTo] - Message to reply to
-   * @param {Object} [options.template] - WhatsApp approved template / Messenger utility template
+   * @param {string} [options.senderAction] - e.g. `typing_on`, `mark_seen`, `react`; WhatsApp: `mark_read`, `typing_on`
+   * @param {string|Object} [options.reaction] - Emoji for `react`; WhatsApp: emoji (with `messageId`) or `{ message_id, emoji }`
+   * @param {string} [options.messageId] - Message to react to / mark read / delete (WhatsApp: the inbound wamid)
+   * @param {string} [options.replyTo] - Message to reply to (WhatsApp: wamid)
+   * @param {Object} [options.template] - WhatsApp approved template `{ name, language, components }` (works outside the 24 h window) / Messenger utility template
    * @param {string} [options.tag] - Messenger message tag (`HUMAN_AGENT`)
    * @param {string} [options.pageId] - Messenger: Facebook Page id
-   * @param {Object} [options.location] - WhatsApp location
-   * @param {Object[]} [options.contacts] - WhatsApp contacts
-   * @param {Object} [options.list] - WhatsApp interactive list
-   * @param {Object} [options.ctaUrl] - WhatsApp CTA URL button
-   * @param {Object|string} [options.header] - WhatsApp interactive header
-   * @param {string} [options.footer] - WhatsApp interactive footer
-   * @param {boolean} [options.typing] - WhatsApp typing indicator
+   * @param {Object} [options.location] - WhatsApp location `{ latitude, longitude, name?, address? }`
+   * @param {Object[]} [options.contacts] - WhatsApp contacts (1-10)
+   * @param {Object} [options.list] - WhatsApp interactive list `{ button, sections }`
+   * @param {Object} [options.ctaUrl] - WhatsApp CTA URL button `{ display_text, url }`
+   * @param {Object|string} [options.header] - WhatsApp interactive header (text, max 60)
+   * @param {string} [options.footer] - WhatsApp interactive footer (max 60)
+   * @param {boolean} [options.typing] - WhatsApp: with `senderAction: 'mark_read'`, also show typing
    * @returns {Promise<Object>} Send result (Bluesky: `conversation_id`, `message_id`)
    */
   async sendDm(options) {
@@ -2459,6 +2490,9 @@ export class UploadPost {
    * (`request`/`accepted`), `unread_count`, `muted`, `kind` (`direct`/`group`).
    * On Bluesky at most 25 conversations come per page; ones past the time
    * budget carry only their last message and `messages_truncated: true`.
+   * WhatsApp: the stored inbox of the connected number (`participantId` = a
+   * phone number); inbound media carry a `media_id` to fetch with
+   * `downloadDmMedia({ platform: 'whatsapp', user, mediaId })`.
    *
    * @param {Object} options
    * @param {('instagram'|'facebook'|'whatsapp'|'bluesky'|'telegram')} options.platform
@@ -2486,6 +2520,224 @@ export class UploadPost {
       facebookPageId: 'facebook_page_id',
     });
     return this._request('/uploadposts/dms/conversations', 'GET', params);
+  }
+
+  /**
+   * Add the multipart `file` part of a DM upload. A local path keeps its name
+   * (its type comes from the extension); a Buffer or stream should come with
+   * `filename` (with extension) or `contentType`, or the API gets
+   * `application/octet-stream` and WhatsApp takes it as a document.
+   * @private
+   */
+  _appendDmFile(form, file, filename, contentType) {
+    const opts = {};
+    if (filename) opts.filename = filename;
+    if (contentType) opts.contentType = contentType;
+    if (typeof file === 'string') {
+      if (/^https?:\/\//i.test(file)) {
+        throw new Error('Upload-Post: file must be a local path, a Buffer or a stream (a URL can go straight in sendDm attachments)');
+      }
+      if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
+        throw new Error(`Upload-Post: file not found: ${file}`);
+      }
+      form.append('file', createReadStream(file), opts);
+    } else if (Buffer.isBuffer(file)) {
+      form.append('file', file, { filename: 'file', ...opts });
+    } else if (file && typeof file.pipe === 'function') {
+      form.append('file', file, opts);
+    } else {
+      throw new Error('Upload-Post: file is required (a local path, a Buffer or a stream)');
+    }
+  }
+
+  /**
+   * Options -> query string for the DM endpoints that read `user`/`platform`
+   * from the URL (DELETE included). camelCase keys become snake_case; every
+   * key is sent. @private
+   */
+  _dmQuery(options) {
+    const query = {};
+    for (const [key, value] of Object.entries(options || {})) {
+      if (value === undefined || value === null) continue;
+      const name = this._apiKey(key);
+      if (Array.isArray(value)) query[name] = value.join(',');
+      else if (typeof value === 'object') query[name] = JSON.stringify(value);
+      else query[name] = typeof value === 'boolean' ? String(value) : value;
+    }
+    return query;
+  }
+
+  /**
+   * Upload a file to send it in a WhatsApp DM (`POST /dms/media`, multipart).
+   * Returns `{ success, platform, type, media_id, mime_type, filename, size }`:
+   * send it with `sendDm({ platform: 'whatsapp', ..., attachments: { type, media_id } })`.
+   * A file that is already at a public https URL does not need this: put the
+   * `url` in the attachment instead.
+   *
+   * WhatsApp limits: image 5 MB (JPEG/PNG), video 16 MB (MP4/3GPP), audio
+   * 16 MB, document 100 MB, sticker 500 KB (WebP). Without `type` it is
+   * worked out from the file type (anything else goes as a document).
+   *
+   * `platform: 'facebook'` (Messenger, with `pageId`) is a limited rollout:
+   * accounts without it get `403 messenger_not_enabled`.
+   *
+   * @param {Object} options
+   * @param {string} options.user - Profile username
+   * @param {string|Buffer|import('stream').Readable} options.file - Local path, Buffer or stream
+   * @param {('whatsapp'|'facebook')} [options.platform] - Default `whatsapp`
+   * @param {('image'|'video'|'audio'|'document'|'sticker')} [options.type] - Force the media type
+   * @param {string} [options.pageId] - Messenger: Facebook Page id
+   * @param {string} [options.filename] - Name of the part (Buffer/stream: give it an extension)
+   * @param {string} [options.contentType] - MIME type of the part (e.g. `image/jpeg`)
+   * @returns {Promise<Object>} `{ success, platform, type, media_id, mime_type, filename, size }`
+   */
+  async uploadDmMedia(options = {}) {
+    const { file, filename, contentType, ...rest } = options || {};
+    const form = new FormData();
+    for (const [key, value] of Object.entries(rest)) {
+      if (value !== undefined) this._appendField(form, this._apiKey(key), value);
+    }
+    this._appendDmFile(form, file, filename, contentType);
+    return this._request('/uploadposts/dms/media', 'POST', form, true);
+  }
+
+  /**
+   * List the WhatsApp message templates of the connected number (its WhatsApp
+   * Business Account). Only `APPROVED` templates can be sent; a template is the
+   * only way to write to someone outside the 24-hour customer-service window.
+   *
+   * @param {Object} options
+   * @param {string} options.user - Profile username
+   * @param {('whatsapp'|'facebook')} [options.platform] - Default `whatsapp` (`facebook` = Messenger, limited rollout)
+   * @param {number} [options.limit] - 1-200 (default 100)
+   * @param {string} [options.status] - `APPROVED`, `PENDING`, `REJECTED`...
+   * @param {string} [options.name] - Only the template with this name
+   * @returns {Promise<Object>} `{ success, templates: [{ id, name, status, category, language, components, quality_score, rejected_reason }] }`
+   */
+  async listDmTemplates(options = {}) {
+    return this._request('/uploadposts/dms/templates', 'GET', this._dmQuery(options));
+  }
+
+  /**
+   * Create a WhatsApp message template and send it to Meta for review (it
+   * comes back `PENDING` and turns `APPROVED` or `REJECTED`). Give Meta's
+   * `components`, or the shorthand: `body` (text with `{{1}}` variables),
+   * `examples` (sample values for them), `header` (text), `footer` and
+   * `buttons` (`[{ text, url? | phone_number? }]`, neither = quick reply).
+   * Every option is sent in the JSON body.
+   *
+   * @param {Object} options
+   * @param {string} options.user - Profile username
+   * @param {string} options.name - Lowercase letters, digits and `_`
+   * @param {('whatsapp'|'facebook')} [options.platform] - Default `whatsapp`
+   * @param {('MARKETING'|'UTILITY'|'AUTHENTICATION')} [options.category] - Default `UTILITY`
+   * @param {string} [options.language] - Default `en_US`
+   * @param {Object[]} [options.components] - Meta template components
+   * @param {string} [options.body] - Shorthand body text
+   * @param {string[]} [options.examples] - Sample values for the body variables
+   * @param {string} [options.header] - Shorthand text header
+   * @param {string} [options.footer] - Shorthand footer
+   * @param {Object[]} [options.buttons] - Shorthand buttons
+   * @returns {Promise<Object>} `{ success, template: { id, status, category } }`
+   */
+  async createDmTemplate(options = {}) {
+    return this._call('POST', '/uploadposts/dms/templates', options);
+  }
+
+  /**
+   * Delete a WhatsApp message template (every language of that name).
+   *
+   * @param {Object} options
+   * @param {string} options.user - Profile username
+   * @param {string} options.name - Template name
+   * @param {('whatsapp'|'facebook')} [options.platform] - Default `whatsapp`
+   * @returns {Promise<Object>} `{ success }`
+   */
+  async deleteDmTemplate(options = {}) {
+    return this._request('/uploadposts/dms/templates', 'DELETE', null, false, {}, { params: this._dmQuery(options) });
+  }
+
+  /**
+   * The WhatsApp Business profile of the connected number.
+   *
+   * @param {Object} options
+   * @param {string} options.user - Profile username
+   * @returns {Promise<Object>} `{ success, profile: { about, address, description, email, profile_picture_url, websites, vertical }, phone_number, verified_name }`
+   */
+  async getWhatsappBusinessProfile(options = {}) {
+    return this._request('/uploadposts/dms/whatsapp/profile', 'GET', this._dmQuery(options));
+  }
+
+  /**
+   * Update the WhatsApp Business profile of the connected number. Only the
+   * fields sent change. With `file` (profile photo, JPEG/PNG up to 5 MB) the
+   * request goes as multipart and `websites` as a comma-separated list.
+   *
+   * @param {Object} options
+   * @param {string} options.user - Profile username
+   * @param {string} [options.about] - Up to 139 characters
+   * @param {string} [options.address] - Up to 256
+   * @param {string} [options.description] - Up to 512
+   * @param {string} [options.email] - Up to 128
+   * @param {string[]} [options.websites] - Up to 2 http(s) URLs
+   * @param {string} [options.vertical] - `RETAIL`, `RESTAURANT`, `PROF_SERVICES`, `OTHER`...
+   * @param {string|Buffer|import('stream').Readable} [options.file] - Profile photo
+   * @param {string} [options.filename] - Photo part name (Buffer/stream: with extension)
+   * @param {string} [options.contentType] - Photo MIME type (`image/jpeg`, `image/png`)
+   * @returns {Promise<Object>} `{ success, profile }`
+   */
+  async updateWhatsappBusinessProfile(options = {}) {
+    const { file, filename, contentType, ...rest } = options || {};
+    if (file === undefined || file === null) {
+      return this._call('POST', '/uploadposts/dms/whatsapp/profile', rest);
+    }
+    const form = new FormData();
+    for (const [key, value] of Object.entries(rest)) {
+      if (value === undefined) continue;
+      const name = this._apiKey(key);
+      if (name === 'websites' && Array.isArray(value)) form.append(name, value.join(','));
+      else this._appendField(form, name, value);
+    }
+    this._appendDmFile(form, file, filename, contentType);
+    return this._request('/uploadposts/dms/whatsapp/profile', 'POST', form, true);
+  }
+
+  /**
+   * The QR codes / wa.me short links of the connected WhatsApp number. Each
+   * opens a chat with the number and a prefilled message.
+   *
+   * @param {Object} options
+   * @param {string} options.user - Profile username
+   * @returns {Promise<Object>} `{ success, qr_codes: [{ code, prefilled_message, deep_link_url, qr_image_url }] }`
+   */
+  async listWhatsappQrCodes(options = {}) {
+    return this._request('/uploadposts/dms/whatsapp/qr', 'GET', this._dmQuery(options));
+  }
+
+  /**
+   * Create a WhatsApp QR code / short link, or change the prefilled message
+   * of an existing one (`code`).
+   *
+   * @param {Object} options
+   * @param {string} options.user - Profile username
+   * @param {string} options.prefilledMessage - Up to 140 characters
+   * @param {string} [options.code] - Existing code to edit
+   * @returns {Promise<Object>} `{ success, qr_code: { code, prefilled_message, deep_link_url, qr_image_url } }`
+   */
+  async createWhatsappQrCode(options = {}) {
+    return this._call('POST', '/uploadposts/dms/whatsapp/qr', options);
+  }
+
+  /**
+   * Delete a WhatsApp QR code / short link.
+   *
+   * @param {Object} options
+   * @param {string} options.user - Profile username
+   * @param {string} options.code - The `code` to delete
+   * @returns {Promise<Object>} `{ success }`
+   */
+  async deleteWhatsappQrCode(options = {}) {
+    return this._request('/uploadposts/dms/whatsapp/qr', 'DELETE', null, false, {}, { params: this._dmQuery(options) });
   }
 
   // ==================== Post Management ====================

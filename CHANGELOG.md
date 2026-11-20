@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.25.0
+
+WhatsApp DMs, fully covered. WhatsApp is open to every account; it is a
+messaging channel only (it never publishes posts). Only additions.
+
+### Added
+
+- `uploadDmMedia({ user, file, platform?, type?, pageId?, filename?, contentType? })`:
+  multipart upload to `POST /dms/media`; send the answer's `{ type, media_id }` in
+  `sendDm` attachments.
+- Templates: `listDmTemplates`, `createDmTemplate`, `deleteDmTemplate`
+  (`/dms/templates`).
+- WhatsApp Business profile: `getWhatsappBusinessProfile`,
+  `updateWhatsappBusinessProfile` (optional photo `file`, sent as multipart).
+- WhatsApp QR codes / short links: `listWhatsappQrCodes`, `createWhatsappQrCode`,
+  `deleteWhatsappQrCode`.
+
+### Changed
+
+- `sendDm` JSDoc and types document every WhatsApp field (attachments with
+  `media_id`, `template`, `replyTo`, `location`, `contacts`, reply `buttons`,
+  `list`, `ctaUrl`, `header`, `footer`, `reaction`, `senderAction`
+  `mark_read`/`typing_on`, `typing`) and the 24-hour window rule. Messenger is
+  documented as a limited rollout (`403 messenger_not_enabled`).
+
 ## 2.22.0
 
 The SDK now covers every operation of the Upload-Post OpenAPI spec (467). Only

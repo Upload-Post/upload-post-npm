@@ -1655,20 +1655,53 @@ declare module 'upload-post' {
     [key: string]: any;
   }
 
+  /** WhatsApp attachment: an https `url` or a `media_id` from `uploadDmMedia`. */
+  export interface WhatsappDmAttachment {
+    type: 'image' | 'video' | 'audio' | 'document' | 'sticker' | 'file' | (string & {});
+    url?: string;
+    media_id?: string;
+    /** image, video, document */
+    caption?: string;
+    /** document */
+    filename?: string;
+    [key: string]: any;
+  }
+
+  /** WhatsApp approved template (the only message allowed outside the 24 h window). */
+  export interface WhatsappDmTemplate {
+    name: string;
+    /** e.g. `en_US`, or `{ code: 'en_US' }` */
+    language: string | { code: string; [key: string]: any };
+    /** Meta template components (header/body/button parameters) */
+    components?: Array<Record<string, any>>;
+    [key: string]: any;
+  }
+
   export interface SendDmOptions {
     platform: DmPlatform;
     /** Profile username */
     user: string;
-    /** Platform id of the person. Bluesky: handle, `@handle`, DID or profile link */
+    /**
+     * Platform id of the person. WhatsApp: phone number in international format.
+     * Bluesky: handle, `@handle`, DID or profile link
+     */
     recipientId?: string;
     /** Bluesky: send into this conversation (also groups) instead of recipientId */
     conversationId?: string;
-    /** Optional with attachments, templates or senderAction. Bluesky: max 1,000 characters, 10 mentions */
+    /**
+     * Optional with attachments, templates or senderAction. WhatsApp: max 4,096
+     * (1,024 as the body of an interactive message); free text only inside the
+     * 24 h customer-service window, else `meta_error_code` 131047: send a `template`.
+     * Bluesky: max 1,000 characters, 10 mentions
+     */
     message?: string;
-    /** Media / attachments. Bluesky: only a shared post, `{ type: 'post', url }` or `{ type: 'post', uri }` */
-    attachments?: Record<string, any> | Array<Record<string, any>>;
-    /** Instagram, Messenger, WhatsApp: link buttons */
-    buttons?: Array<{ title: string; url?: string; [key: string]: any }>;
+    /**
+     * Media / attachments. WhatsApp: one or up to 10 `{ type, url | media_id, caption?, filename? }`.
+     * Bluesky: only a shared post, `{ type: 'post', url }` or `{ type: 'post', uri }`
+     */
+    attachments?: WhatsappDmAttachment | WhatsappDmAttachment[] | Record<string, any> | Array<Record<string, any>>;
+    /** Instagram/Messenger: link buttons `{ title, url }`. WhatsApp: up to 3 reply buttons `{ title (<= 20), id? }` or strings */
+    buttons?: Array<{ title: string; url?: string; id?: string; [key: string]: any } | string>;
     /** Instagram / Messenger */
     quickReplies?: Array<Record<string, any>>;
     /** Instagram generic template */
@@ -1676,30 +1709,155 @@ declare module 'upload-post' {
     /**
      * Instagram: typing_on, typing_off, mark_seen, react, unreact.
      * Bluesky: mark_seen / mark_read, react, unreact, delete, accept, mute, unmute, leave.
-     * WhatsApp: mark_read.
+     * WhatsApp: mark_read, typing_on (on the inbound `messageId`; no DM allowance used).
      */
     senderAction?: string;
-    /** Emoji for react/unreact (Bluesky: exactly one emoji). WhatsApp: reaction object */
-    reaction?: string | Record<string, any>;
-    /** Message to react to, mark read or delete */
+    /** Emoji for react/unreact (Bluesky: exactly one emoji). WhatsApp: emoji with `messageId`, or `{ message_id, emoji }`; `''` removes it */
+    reaction?: string | { message_id?: string; emoji: string; [key: string]: any };
+    /** Message to react to, mark read or delete (WhatsApp: the inbound wamid) */
     messageId?: string;
-    /** Message to reply to */
+    /** Message to reply to (WhatsApp: wamid) */
     replyTo?: string;
     /** WhatsApp approved template / Messenger utility template */
-    template?: Record<string, any>;
+    template?: WhatsappDmTemplate | Record<string, any>;
     /** Messenger message tag (`HUMAN_AGENT`) */
     tag?: string;
     /** Messenger: Facebook Page id */
     pageId?: string;
-    /** WhatsApp rich bodies */
-    location?: Record<string, any>;
+    /** WhatsApp location (`message`, if given too, goes first as text) */
+    location?: { latitude: number | string; longitude: number | string; name?: string; address?: string; [key: string]: any };
+    /** WhatsApp: 1-10 contacts, e.g. `{ name: { formatted_name: 'Ana' }, phones: [{ phone: '+34...' }] }` */
     contacts?: Array<Record<string, any>>;
-    list?: Record<string, any>;
-    ctaUrl?: Record<string, any>;
+    /** WhatsApp interactive list: `{ button (<= 20), sections: [{ title?, rows: [{ id?, title (<= 24), description? (<= 72) }] }] }`, 10 rows max */
+    list?: { button: string; sections: Array<Record<string, any>>; [key: string]: any };
+    /** WhatsApp CTA URL button: `{ display_text (<= 20), url }` */
+    ctaUrl?: { display_text: string; url: string; [key: string]: any };
+    /** WhatsApp interactive header (text, max 60) */
     header?: Record<string, any> | string;
+    /** WhatsApp interactive footer (max 60) */
     footer?: string;
+    /** WhatsApp: with `senderAction: 'mark_read'`, also show the typing indicator */
     typing?: boolean;
     /** Any other API field, sent as given */
+    [key: string]: any;
+  }
+
+  export interface UploadDmMediaOptions {
+    /** Profile username */
+    user: string;
+    /** Local path, Buffer or readable stream */
+    file: string | Buffer | NodeJS.ReadableStream;
+    /** Default `whatsapp`. `facebook` = Messenger (limited rollout, else 403 messenger_not_enabled) */
+    platform?: 'whatsapp' | 'facebook';
+    /** Force the media type (default: from the file type; anything else is a document) */
+    type?: 'image' | 'video' | 'audio' | 'document' | 'sticker';
+    /** Messenger: Facebook Page id */
+    pageId?: string;
+    /** Name of the file part. Give a Buffer/stream one with an extension (`photo.jpg`) */
+    filename?: string;
+    /** MIME type of the file part (e.g. `image/jpeg`) */
+    contentType?: string;
+    /** Any other API field, sent as given */
+    [key: string]: any;
+  }
+
+  export interface UploadDmMediaResponse {
+    success: boolean;
+    platform: string;
+    type: 'image' | 'video' | 'audio' | 'document' | 'sticker' | (string & {});
+    /** Pass `{ type, media_id }` in `sendDm` attachments */
+    media_id: string;
+    mime_type?: string;
+    filename?: string;
+    size?: number;
+    [key: string]: any;
+  }
+
+  export interface DmTemplate {
+    id: string;
+    name: string;
+    status: 'APPROVED' | 'PENDING' | 'REJECTED' | (string & {});
+    category?: string;
+    language?: string;
+    components?: Array<Record<string, any>>;
+    quality_score?: Record<string, any>;
+    rejected_reason?: string;
+    [key: string]: any;
+  }
+
+  export interface ListDmTemplatesOptions {
+    user: string;
+    /** Default `whatsapp`. `facebook` = Messenger (limited rollout) */
+    platform?: 'whatsapp' | 'facebook';
+    /** 1-200 (default 100) */
+    limit?: number;
+    /** `APPROVED`, `PENDING`, `REJECTED`... */
+    status?: string;
+    name?: string;
+    [key: string]: any;
+  }
+
+  export interface CreateDmTemplateOptions {
+    user: string;
+    /** Lowercase letters, digits and `_` */
+    name: string;
+    platform?: 'whatsapp' | 'facebook';
+    /** Default `UTILITY` */
+    category?: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+    /** Default `en_US` */
+    language?: string;
+    /** Meta template components; or use the shorthand fields below */
+    components?: Array<Record<string, any>>;
+    /** Shorthand: body text with `{{1}}` variables */
+    body?: string;
+    /** Shorthand: sample values for the body variables */
+    examples?: string[];
+    /** Shorthand: text header */
+    header?: string;
+    /** Shorthand: footer */
+    footer?: string;
+    /** Shorthand: `[{ text, url? | phone_number? }]` (neither = quick reply) */
+    buttons?: Array<{ text: string; url?: string; phone_number?: string; [key: string]: any }>;
+    [key: string]: any;
+  }
+
+  export interface WhatsappBusinessProfile {
+    about?: string;
+    address?: string;
+    description?: string;
+    email?: string;
+    profile_picture_url?: string;
+    websites?: string[];
+    vertical?: string;
+    [key: string]: any;
+  }
+
+  export interface UpdateWhatsappBusinessProfileOptions {
+    user: string;
+    /** Up to 139 characters */
+    about?: string;
+    /** Up to 256 */
+    address?: string;
+    /** Up to 512 */
+    description?: string;
+    /** Up to 128 */
+    email?: string;
+    /** Up to 2 http(s) URLs */
+    websites?: string[];
+    /** UNDEFINED, OTHER, AUTO, BEAUTY, APPAREL, EDU, ENTERTAIN, EVENT_PLAN, FINANCE, GROCERY, GOVT, HOTEL, HEALTH, NONPROFIT, PROF_SERVICES, RETAIL, TRAVEL, RESTAURANT, NOT_A_BIZ */
+    vertical?: string;
+    /** Profile photo (JPEG/PNG, max 5 MB): sends the request as multipart */
+    file?: string | Buffer | NodeJS.ReadableStream;
+    filename?: string;
+    contentType?: string;
+    [key: string]: any;
+  }
+
+  export interface WhatsappQrCode {
+    code: string;
+    prefilled_message: string;
+    deep_link_url: string;
+    qr_image_url?: string;
     [key: string]: any;
   }
 
@@ -5293,6 +5451,7 @@ declare module 'upload-post' {
       redirectUrl?: string;
       logoImage?: string;
       redirectButtonText?: string;
+      /** Platforms to show for connection, e.g. `tiktok`, `instagram`, `youtube`, `whatsapp` (a WhatsApp Business number, for DMs) */
       platforms?: string[];
       showCalendar?: boolean;
       readonlyCalendar?: boolean;
@@ -5592,8 +5751,10 @@ declare module 'upload-post' {
     // Direct messages
 
     /**
-     * Send a DM or a DM action on Instagram, Messenger (`facebook`), WhatsApp or
-     * Bluesky. Bluesky needs an app password with DM access (else
+     * Send a DM or a DM action on Instagram, Messenger (`facebook`, limited
+     * rollout: else `403 messenger_not_enabled`), WhatsApp or Bluesky. WhatsApp:
+     * free text only inside the 24 h customer-service window; outside it send
+     * an approved `template` (`meta_error_code` 131047). Bluesky needs an app password with DM access (else
      * `403 bluesky_dm_scope_missing`); a `504 bluesky_send_unconfirmed` may have
      * been delivered, so check the conversation before resending.
      */
@@ -5601,6 +5762,37 @@ declare module 'upload-post' {
 
     /** List DM conversations with their latest messages. */
     getDmConversations(options: DmConversationsOptions): Promise<DmConversationsResponse>;
+
+    /**
+     * Upload a file for a WhatsApp DM (multipart). Send the answer's
+     * `{ type, media_id }` in `sendDm` attachments. Limits: image 5 MB, video
+     * 16 MB, audio 16 MB, document 100 MB, sticker 500 KB.
+     */
+    uploadDmMedia(options: UploadDmMediaOptions): Promise<UploadDmMediaResponse>;
+
+    /** WhatsApp message templates of the connected number (only APPROVED ones can be sent). */
+    listDmTemplates(options: ListDmTemplatesOptions): Promise<{ success: boolean; templates: DmTemplate[]; [key: string]: any }>;
+
+    /** Create a WhatsApp template; Meta reviews it (PENDING, then APPROVED or REJECTED). */
+    createDmTemplate(options: CreateDmTemplateOptions): Promise<{ success: boolean; template: { id: string; status: string; category?: string; [key: string]: any }; [key: string]: any }>;
+
+    /** Delete a WhatsApp template by name. */
+    deleteDmTemplate(options: { user: string; name: string; platform?: 'whatsapp' | 'facebook'; [key: string]: any }): Promise<ApiResponse>;
+
+    /** WhatsApp Business profile of the connected number. */
+    getWhatsappBusinessProfile(options: { user: string; [key: string]: any }): Promise<{ success: boolean; profile: WhatsappBusinessProfile; phone_number?: string; verified_name?: string; [key: string]: any }>;
+
+    /** Update the WhatsApp Business profile (only the fields sent change; `file` = new photo). */
+    updateWhatsappBusinessProfile(options: UpdateWhatsappBusinessProfileOptions): Promise<{ success: boolean; profile: WhatsappBusinessProfile; [key: string]: any }>;
+
+    /** QR codes / wa.me short links that open a chat with the number and a prefilled message. */
+    listWhatsappQrCodes(options: { user: string; [key: string]: any }): Promise<{ success: boolean; qr_codes: WhatsappQrCode[]; [key: string]: any }>;
+
+    /** Create a QR code / short link, or edit the prefilled message of `code`. */
+    createWhatsappQrCode(options: { user: string; prefilledMessage: string; code?: string; [key: string]: any }): Promise<{ success: boolean; qr_code: WhatsappQrCode; [key: string]: any }>;
+
+    /** Delete a QR code / short link. */
+    deleteWhatsappQrCode(options: { user: string; code: string; [key: string]: any }): Promise<ApiResponse>;
 
     // Post Management
     /**
